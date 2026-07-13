@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@source "../**/*.{ts,tsx,mdx}";
+@import "../styles/tokens.css";
+
+/* VARSA brand system: .varsa-logo, .varsa-mark — see tokens.css */

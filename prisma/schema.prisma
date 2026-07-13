@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  PAUSED
+}
+
+enum SearchStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+enum AiProvider {
+  OPENAI
+  GROQ
+  GEMINI
+  CLAUDE
+  HEURISTIC
+}
+
+model User {
+  id               String    @id @default(cuid())
+  clerkId          String    @unique
+  email            String    @unique
+  name             String?
+  role             UserRole  @default(USER)
+  stripeCustomerId String?   @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  subscription  Subscription?
+  leadContext   UserLeadContext?
+  usageRecords  UsageRecord[]
+  leadSearches  LeadSearch[]
+  leads         Lead[]
+  savedLists    SavedLeadList[]
+  apiKeyConfigs ApiKeyConfig[]
+  exportLogs    ExportLog[]
+
+  @@index([clerkId])
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+model UserLeadContext {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  companyName            String?
+  websiteUrl             String?
+  businessDescription    String?
+  targetMarket           String?
+  mainOffer              String?
+  targetIndustries       Json     @default("[]")
+  targetCountries        Json     @default("[]")
+  companySizeMin         Int?
+  companySizeMax         Int?
+  targetTitles           Json     @default("[]")
+  targetSeniorities      Json     @default("[]")
+  excludedIndustries     Json     @default("[]")
+  excludedTitles         Json     @default("[]")
+  preferredBuyingSignals Json     @default("[]")
+  highQualityLeadNotes   String?
+  badLeadNotes           String?
+  preferredOutreachAngle String?
+  servicesToSell         Json     @default("[]")
+  minLeadScore           Int      @default(8)
+  onboardingCompleted    Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Plan {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  stripePriceId    String?  @unique
+  leadsPerMonth    Int
+  searchesPerMonth Int
+  features         Json
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  planId               String
+  stripeCustomerId     String?
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  planName             String?
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+model StripeEvent {
+  id            String   @id @default(cuid())
+  stripeEventId String   @unique
+  type          String
+  processed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model UsageRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  periodStart  DateTime
+  periodEnd    DateTime
+  leadsUsed    Int      @default(0)
+  searchesUsed Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodStart])
+  @@index([userId, periodStart])
+}
+
+model LeadSearch {
+  id             String       @id @default(cuid())
+  userId         String
+  prompt         String
+  inputType      String       @default("prompt")
+  status         SearchStatus @default(PENDING)
+  parsedCriteria Json?
+  apolloFilters  Json?
+  relaxNote      String?
+  totalAvailable Int?
+  leadsReturned  Int          @default(0)
+  errorMessage   String?
+  aiProviderUsed AiProvider?
+  durationMs     Int?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads Lead[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model Lead {
+  id                  String        @id @default(cuid())
+  userId              String
+  searchId            String
+  apolloPersonId      String?
+  name                String
+  title               String
+  company             String
+  industry            String?
+  employees           Int?
+  location            String?
+  email               String?
+  linkedinUrl         String?
+  leadScore           Int
+  priorityLevel       PriorityLevel
+  reasoning           String?
+  recommendedApproach String?
+  hasEmail            Boolean       @default(false)
+  rawApolloData       Json?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  deletedAt           DateTime?
+
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search    LeadSearch          @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  listItems SavedLeadListItem[]
+
+  @@index([userId, leadScore(sort: Desc)])
+  @@index([searchId])
+  @@index([email])
+}
+
+model SavedLeadList {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items SavedLeadListItem[]
+
+  @@index([userId])
+}
+
+model SavedLeadListItem {
+  id     String @id @default(cuid())
+  listId String
+  leadId String
+
+  list SavedLeadList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  lead Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, leadId])
+}
+
+model ApiKeyConfig {
+  id           String   @id @default(cuid())
+  userId       String?
+  provider     String
+  encryptedKey String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model AiProviderLog {
+  id           String     @id @default(cuid())
+  userId       String?
+  searchId     String?
+  provider     AiProvider
+  operation    String
+  success      Boolean
+  latencyMs    Int?
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+
+  @@index([provider, createdAt(sort: Desc)])
+  @@index([searchId])
+}
+
+model ApolloApiLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  searchId     String?
+  endpoint     String
+  statusCode   Int?
+  resultCount  Int?
+  relaxLevel   Int?
+  latencyMs    Int?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}
+
+model ExportLog {
+  id        String   @id @default(cuid())
+  userId    String
+  searchId  String?
+  format    String
+  leadCount Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId, createdAt(sort: Desc)])
+}
