@@ -269,12 +269,22 @@ export async function enrichPeopleBatch(
   onProgress?: (current: number, total: number) => void
 ): Promise<EnrichedApolloResult[]> {
   const enriched: EnrichedApolloResult[] = [];
+  const concurrency = Math.min(
+    5,
+    Math.max(1, parseInt(process.env.APOLLO_ENRICH_CONCURRENCY || "5", 10))
+  );
 
-  for (let i = 0; i < people.length; i++) {
-    onProgress?.(i + 1, people.length);
-    const result = await enrichPerson(people[i].id);
-    enriched.push(result ?? { person: people[i], raw: null });
-    if (i < people.length - 1) await sleep(250);
+  for (let i = 0; i < people.length; i += concurrency) {
+    const chunk = people.slice(i, i + concurrency);
+    const chunkResults = await Promise.all(
+      chunk.map(async (person) => {
+        const result = await enrichPerson(person.id);
+        return result ?? { person, raw: null };
+      })
+    );
+    enriched.push(...chunkResults);
+    onProgress?.(Math.min(i + chunk.length, people.length), people.length);
+    if (i + concurrency < people.length) await sleep(100);
   }
 
   return enriched;

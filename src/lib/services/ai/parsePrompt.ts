@@ -126,6 +126,7 @@ export async function parsePromptWithAi(
       system: PARSE_SYSTEM,
       user: buildUserMessage(userPrompt, meta?.leadContext ?? null),
       jsonMode: true,
+      temperature: 0,
     });
 
     const parsed = JSON.parse(content) as Record<string, unknown>;

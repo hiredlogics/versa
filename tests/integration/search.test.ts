@@ -149,6 +149,25 @@ describe("search-criteria helpers", () => {
     expect(criteria.apollo?.personTitles?.some((t) => /broker|property/i.test(t))).toBe(true);
   });
 
+  it("stabilizes software engineer title synonyms across AI runs", async () => {
+    const { normalizeSoftwareEngineerTitles, SOFTWARE_ENGINEER_TITLES } = await import(
+      "@/lib/search-criteria"
+    );
+
+    const runA = normalizeSoftwareEngineerTitles(
+      ["Software Engineer", "Developer", "Programmer", "Technical Lead", "Engineering Manager"],
+      "Find software engineers in California who are open to work"
+    );
+    const runB = normalizeSoftwareEngineerTitles(
+      ["Software Engineer", "Developer", "Programmer", "Technical Lead", "Software Architect"],
+      "Find software engineers in California who are open to work"
+    );
+
+    expect(runA).toEqual(SOFTWARE_ENGINEER_TITLES);
+    expect(runB).toEqual(SOFTWARE_ENGINEER_TITLES);
+    expect(runA).toEqual(runB);
+  });
+
   it("keeps industry keyword when smart-relax widens filters", () => {
     const variants = buildApolloSearchVariants({
       industry: "Real Estate",

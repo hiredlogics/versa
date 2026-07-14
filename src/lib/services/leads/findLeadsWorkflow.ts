@@ -158,11 +158,18 @@ export async function findLeadsWorkflow(user: User, input: FindLeadsInput) {
       if (withEmail.length >= 3) combined = withEmail;
     }
 
-    if (maxResults > 0) {
-      combined = combined.slice(0, Math.min(maxResults, maxLeadsCap));
-    } else if (maxLeadsCap > 0) {
-      combined = combined.slice(0, maxLeadsCap);
+    // Cap early so enrich + email drafts stay fast (defaults ~25 leads)
+    const processCap =
+      maxResults > 0
+        ? Math.min(maxResults, maxLeadsCap || maxResults, maxEnrich)
+        : Math.min(maxEnrich, maxLeadsCap || maxEnrich);
+    if (processCap > 0) {
+      combined = combined.slice(0, processCap);
     }
+
+    console.log(
+      `[findLeads] scored=${formatted.length} qualified=${combined.length} (cap=${processCap}) enriching…`
+    );
 
     if (combined.length === 0) {
       await prisma.leadSearch.update({

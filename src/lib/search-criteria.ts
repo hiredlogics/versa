@@ -52,9 +52,68 @@ const REAL_ESTATE_TITLES = [
   "CEO",
 ];
 
+/** Stable Apollo title set when the user asks for software engineers / developers. */
+export const SOFTWARE_ENGINEER_TITLES = [
+  "Software Engineer",
+  "Developer",
+  "Software Developer",
+  "Full Stack Engineer",
+  "Backend Engineer",
+];
+
+const ENGINEER_TITLE_SYNONYMS = [
+  "software engineer",
+  "developer",
+  "programmer",
+  "software developer",
+  "full stack",
+  "fullstack",
+  "backend engineer",
+  "front end engineer",
+  "frontend engineer",
+  "software architect",
+  "technical lead",
+  "tech lead",
+  "engineering manager",
+  "sde",
+  "swe",
+];
+
 function isRealEstateIndustry(industry?: string, prompt?: string, keywords?: string): boolean {
   const blob = `${industry || ""} ${prompt || ""} ${keywords || ""}`.toLowerCase();
   return /real\s*estate|real\s*state|propert(y|ies)|brokerage|realtor/.test(blob);
+}
+
+function wantsSoftwareEngineers(prompt?: string, industry?: string, titles?: string[]): boolean {
+  const blob = `${prompt || ""} ${industry || ""} ${(titles || []).join(" ")}`.toLowerCase();
+  return /software\s*engineer|developers?|programmers?|full\s*stack|backend engineer|frontend engineer/.test(
+    blob
+  );
+}
+
+/**
+ * Stabilize IC titles when searching software engineers so ChatGPT synonyms
+ * (Software Architect vs Engineering Manager) don't change Apollo results run-to-run.
+ */
+export function normalizeSoftwareEngineerTitles(
+  titles: string[],
+  userPrompt?: string,
+  industry?: string
+): string[] {
+  if (!wantsSoftwareEngineers(userPrompt, industry, titles)) {
+    return titles.slice(0, 5);
+  }
+
+  const hasEngineerSignal = titles.some((title) => {
+    const lower = title.toLowerCase();
+    return ENGINEER_TITLE_SYNONYMS.some((syn) => lower.includes(syn));
+  });
+
+  if (!hasEngineerSignal && !wantsSoftwareEngineers(userPrompt, industry)) {
+    return titles.slice(0, 5);
+  }
+
+  return [...SOFTWARE_ENGINEER_TITLES];
 }
 
 /** Drop software titles when searching an industry like real estate. */
@@ -64,24 +123,24 @@ export function alignTitlesToIndustry(
   userPrompt?: string,
   keywords?: string
 ): string[] {
-  if (!isRealEstateIndustry(industry, userPrompt, keywords)) {
-    return titles.slice(0, 5);
-  }
+  if (isRealEstateIndustry(industry, userPrompt, keywords)) {
+    const cleaned = titles.filter((title) => {
+      const lower = title.toLowerCase();
+      return !TECH_TITLES_FOR_INDUSTRY_GUARD.some((bad) => lower.includes(bad));
+    });
 
-  const cleaned = titles.filter((title) => {
-    const lower = title.toLowerCase();
-    return !TECH_TITLES_FOR_INDUSTRY_GUARD.some((bad) => lower.includes(bad));
-  });
-
-  const merged = [...cleaned];
-  for (const title of REAL_ESTATE_TITLES) {
-    if (merged.length >= 5) break;
-    if (!merged.some((t) => t.toLowerCase() === title.toLowerCase())) {
-      merged.push(title);
+    const merged = [...cleaned];
+    for (const title of REAL_ESTATE_TITLES) {
+      if (merged.length >= 5) break;
+      if (!merged.some((t) => t.toLowerCase() === title.toLowerCase())) {
+        merged.push(title);
+      }
     }
+
+    return (merged.length > 0 ? merged : REAL_ESTATE_TITLES).slice(0, 5);
   }
 
-  return (merged.length > 0 ? merged : REAL_ESTATE_TITLES).slice(0, 5);
+  return normalizeSoftwareEngineerTitles(titles, userPrompt, industry).slice(0, 5);
 }
 
 export const APOLLO_EMPLOYEE_BUCKETS = [
@@ -455,18 +514,19 @@ export function normalizeSearchCriteria(
     employeeRanges.push("11,50");
   }
 
+  // Open-to-work: Apollo can't filter OTW — keep titles/location, use broader size buckets
+  const openToWorkRanges = ["11,50", "51,200", "201,500", "501,1000"];
+
   const apollo: ApolloSearchFilters = {
     personTitles:
       personTitles.length > 0
         ? personTitles
         : openToWork
-          ? ["Software Engineer", "Developer", "Product Manager"]
+          ? [...SOFTWARE_ENGINEER_TITLES]
           : ["Founder", "CEO", "Director"],
     personLocations,
     qKeywords: openToWork ? undefined : apolloKeywords,
-    employeeRanges: openToWork
-      ? ["11,50", "51,200", "201,500"]
-      : employeeRanges,
+    employeeRanges: openToWork ? openToWorkRanges : employeeRanges,
     includeSimilarTitles: apolloIn.includeSimilarTitles !== false,
   };
 

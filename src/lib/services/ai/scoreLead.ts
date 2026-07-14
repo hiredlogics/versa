@@ -21,6 +21,12 @@ export type LeadScoreOutput = {
   recommendedApproach: string;
 };
 
+/** Keep each OpenAI score call small enough to finish under AI_TIMEOUT_MS. */
+export const SCORE_BATCH_SIZE = Math.min(
+  40,
+  Math.max(5, parseInt(process.env.AI_SCORE_BATCH_SIZE || "20", 10))
+);
+
 function toPriority(score: number): LeadScoreOutput["priorityLevel"] {
   if (score >= 9) return "Very High";
   if (score >= 8) return "High";
@@ -67,7 +73,8 @@ Rules:
 - Match saved ICP when prompt is vague.
 - Cap relevance low if title is excluded unless prompt explicitly requests that role.
 - Prefer decision-makers in target titles.
-- Include ALL leads in response.
+- For open-to-work / job-seeking intent, boost titles with seeking/available/freelance signals; do not assume unemployment.
+- Include ALL leads in response (use the provided index values).
 
 Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "..." }] }
 priorityLevel: Low|Medium|High|Very High`;
@@ -96,12 +103,8 @@ function applyCaps(
   return output;
 }
 
-export async function scoreLeadsWithAi(
-  leads: ScoredLeadInput[],
-  context: LeadScoreContext,
-  meta?: { userId?: string; searchId?: string }
-): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
-  const heuristicFixed = leads.map((lead) => {
+function heuristicScores(leads: ScoredLeadInput[], context: LeadScoreContext): LeadScoreOutput[] {
+  return leads.map((lead) => {
     const h = heuristicScoreLeadsBatch([lead], context)[0];
     const base = {
       leadScore: h.score,
@@ -111,52 +114,111 @@ export async function scoreLeadsWithAi(
     };
     return applyCaps(base, lead, context);
   });
+}
 
-  if (process.env.SCORING_MODE === "heuristic" || leads.length === 0) {
-    return { scores: heuristicFixed, provider: "HEURISTIC" };
+export function chunkLeadsForScoring<T>(leads: T[], batchSize = SCORE_BATCH_SIZE): T[][] {
+  if (leads.length === 0) return [];
+  const chunks: T[][] = [];
+  for (let i = 0; i < leads.length; i += batchSize) {
+    chunks.push(leads.slice(i, i + batchSize));
   }
+  return chunks;
+}
+
+async function scoreChunkWithAi(
+  chunk: ScoredLeadInput[],
+  absoluteOffset: number,
+  context: LeadScoreContext,
+  heuristicChunk: LeadScoreOutput[],
+  meta?: { userId?: string; searchId?: string }
+): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
+  const payload = chunk.map((l, i) => ({
+    index: i,
+    name: l.name,
+    title: l.title,
+    company: l.company,
+    industry: l.industry,
+    employees: l.employees,
+    location: l.location,
+    hasEmail: l.hasEmail ?? false,
+  }));
 
   try {
-    const payload = leads.map((l, i) => ({
-      index: i,
-      name: l.name,
-      title: l.title,
-      company: l.company,
-      industry: l.industry,
-      employees: l.employees,
-      location: l.location,
-      hasEmail: l.hasEmail ?? false,
-    }));
-
     const { content, provider } = await aiChat({
       userId: meta?.userId,
       searchId: meta?.searchId,
       operation: "score",
       system: buildScoringSystem(context),
-      user: JSON.stringify(payload),
+      user: JSON.stringify({ offset: absoluteOffset, leads: payload }),
       jsonMode: true,
-      temperature: 0.3,
+      temperature: 0.2,
     });
 
     const parsed = JSON.parse(content) as {
       leads?: Array<LeadScoreOutput & { index: number }>;
     };
 
-    const scores = [...heuristicFixed];
+    const scores = [...heuristicChunk];
     for (const item of parsed.leads || []) {
-      if (item.index >= 0 && item.index < leads.length) {
+      if (item.index >= 0 && item.index < chunk.length) {
         const base = {
           leadScore: Math.min(10, Math.max(1, item.leadScore || 5)),
           priorityLevel: item.priorityLevel || toPriority(item.leadScore),
           reasoning: item.reasoning || "AI scored",
           recommendedApproach:
-            item.recommendedApproach || heuristicFixed[item.index].recommendedApproach,
+            item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
         };
-        scores[item.index] = applyCaps(base, leads[item.index], context);
+        scores[item.index] = applyCaps(base, chunk[item.index], context);
       }
     }
     return { scores, provider };
-  } catch {
+  } catch (error) {
+    console.warn(
+      `[scoreLead] AI score chunk offset=${absoluteOffset} size=${chunk.length} failed:`,
+      error instanceof Error ? error.message : error
+    );
+    return { scores: heuristicChunk, provider: "HEURISTIC" };
+  }
+}
+
+export async function scoreLeadsWithAi(
+  leads: ScoredLeadInput[],
+  context: LeadScoreContext,
+  meta?: { userId?: string; searchId?: string }
+): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
+  const heuristicFixed = heuristicScores(leads, context);
+
+  if (process.env.SCORING_MODE === "heuristic" || leads.length === 0) {
     return { scores: heuristicFixed, provider: "HEURISTIC" };
   }
+
+  const chunks = chunkLeadsForScoring(leads, SCORE_BATCH_SIZE);
+  const scores = [...heuristicFixed];
+  const providers = new Set<string>();
+
+  for (let c = 0; c < chunks.length; c++) {
+    const chunk = chunks[c];
+    const offset = c * SCORE_BATCH_SIZE;
+    const heuristicChunk = heuristicFixed.slice(offset, offset + chunk.length);
+    const { scores: chunkScores, provider } = await scoreChunkWithAi(
+      chunk,
+      offset,
+      context,
+      heuristicChunk,
+      meta
+    );
+    providers.add(provider);
+    for (let i = 0; i < chunkScores.length; i++) {
+      scores[offset + i] = chunkScores[i];
+    }
+  }
+
+  const provider =
+    providers.size === 1
+      ? [...providers][0]
+      : providers.has("HEURISTIC")
+        ? "MIXED"
+        : [...providers][0] || "HEURISTIC";
+
+  return { scores, provider };
 }
