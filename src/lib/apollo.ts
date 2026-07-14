@@ -141,8 +141,17 @@ function buildParamsFromFilters(
   const params: Record<string, string | number | string[] | undefined> = {
     page,
     per_page: perPage,
-    person_locations: filters.personLocations,
-    person_titles: filters.personTitles.slice(0, 5),
+    person_locations: Array.isArray(filters.personLocations)
+      ? filters.personLocations
+      : typeof filters.personLocations === "string"
+        ? [filters.personLocations]
+        : ["United States"],
+    person_titles: (Array.isArray(filters.personTitles)
+      ? filters.personTitles
+      : typeof filters.personTitles === "string"
+        ? [filters.personTitles]
+        : ["Director"]
+    ).slice(0, 5),
     include_similar_titles: filters.includeSimilarTitles === false ? "false" : "true",
   };
 

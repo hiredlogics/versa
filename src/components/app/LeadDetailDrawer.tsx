@@ -126,11 +126,23 @@ export function LeadDetailDrawer({
               {lead.recommendedApproach && (
                 <section className="space-y-2">
                   <h3 className="text-xs font-medium uppercase tracking-wider text-lp-muted-dark">
-                    Recommended approach
+                    Customized email draft
                   </h3>
-                  <p className="rounded-lg border border-lp-cold-blue/20 bg-lp-cold-blue/5 p-3 text-sm leading-relaxed text-lp-off-white">
+                  <pre className="whitespace-pre-wrap rounded-lg border border-lp-cold-blue/20 bg-lp-cold-blue/5 p-3 font-sans text-sm leading-relaxed text-lp-off-white">
                     {lead.recommendedApproach}
-                  </p>
+                  </pre>
+                  {lead.email && (
+                    <a
+                      href={`mailto:${lead.email}?subject=${encodeURIComponent(
+                        lead.recommendedApproach.split("\n")[0]?.replace(/^Subject:\s*/i, "") || ""
+                      )}&body=${encodeURIComponent(
+                        lead.recommendedApproach.replace(/^Subject:.*\n+/i, "")
+                      )}`}
+                      className="inline-flex text-xs font-medium text-lp-ice-blue hover:underline"
+                    >
+                      Open in email app
+                    </a>
+                  )}
                 </section>
               )}
             </div>

@@ -16,6 +16,7 @@ export function dbLeadToExport(lead: Lead): ScoredLead {
     linkedinUrl: lead.linkedinUrl,
     score: lead.leadScore,
     reasoning: lead.reasoning || "",
+    recommendedApproach: lead.recommendedApproach,
     priority: mapPriority(lead.priorityLevel),
     hasEmail: lead.hasEmail,
     createdAt: lead.createdAt.toISOString(),

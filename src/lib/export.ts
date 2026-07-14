@@ -16,6 +16,7 @@ export function leadsToCSV(leads: ScoredLead[]): string {
     "Priority",
     "Match Signals",
     "Why Reach Out",
+    "Customized Email Draft",
     "Created At",
   ];
 
@@ -39,6 +40,7 @@ export function leadsToCSV(leads: ScoredLead[]): string {
         linkedinUrl: lead.linkedinUrl,
       }).join("; "),
       lead.reasoning,
+      lead.recommendedApproach || "",
       lead.createdAt,
     ]
       .map(escapeCSV)
@@ -78,6 +80,7 @@ export async function leadsToExcelBuffer(leads: ScoredLead[]): Promise<Buffer> {
       linkedinUrl: lead.linkedinUrl,
     }).join("; "),
     "Why Reach Out": lead.reasoning,
+    "Customized Email Draft": lead.recommendedApproach || "",
     "Created At": lead.createdAt,
   }));
 

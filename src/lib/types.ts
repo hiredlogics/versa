@@ -64,6 +64,7 @@ export interface ScoredLead {
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";
+  recommendedApproach?: string | null;
   openToWork?: boolean;
   hasEmail?: boolean;
   searchPrompt?: string;

@@ -69,8 +69,8 @@ describe("toStoredApolloProfile", () => {
 });
 
 describe("buildLeadWhyReasoning", () => {
-  it("includes name, title, location, user context, and outreach rationale", () => {
-    const reasoning = buildLeadWhyReasoning(
+  it("returns why-text plus a customized email draft with subject", () => {
+    const result = buildLeadWhyReasoning(
       {
         name: "Jane Doe",
         title: "CEO",
@@ -85,18 +85,20 @@ describe("buildLeadWhyReasoning", () => {
       scoreContext
     );
 
-    expect(reasoning).toContain("Jane Doe is CEO at CloudCo");
-    expect(reasoning).toContain("San Francisco");
-    expect(reasoning).toContain('match your search for "SaaS founders in the US"');
-    expect(reasoning).toContain("AI lead scoring");
-    expect(reasoning).toContain("target buyer roles");
-    expect(reasoning).toContain("target geography");
-    expect(reasoning).toContain("verified email");
-    expect(reasoning).toContain("Career: CEO at CloudCo");
+    expect(result.reasoning).toContain("Jane Doe is CEO at CloudCo");
+    expect(result.reasoning).toContain("San Francisco");
+    expect(result.reasoning).toContain("AI lead scoring");
+    expect(result.reasoning).toContain("Career: CEO at CloudCo");
+
+    expect(result.emailDraft).toContain("Subject:");
+    expect(result.emailDraft).toContain("Hi Jane");
+    expect(result.emailDraft).toContain("CloudCo");
+    expect(result.emailDraft).toContain("Reference their recent product launch");
+    expect(result.emailDraft).toContain("Lead scoring automation");
   });
 
-  it("notes missing email when contact is unavailable", () => {
-    const reasoning = buildLeadWhyReasoning(
+  it("notes missing email and still produces an email-style draft", () => {
+    const result = buildLeadWhyReasoning(
       {
         name: "John Smith",
         title: "CTO",
@@ -110,8 +112,9 @@ describe("buildLeadWhyReasoning", () => {
       scoreContext
     );
 
-    expect(reasoning).toContain("John Smith is CTO at TechCo");
-    expect(reasoning).toContain("no verified email");
-    expect(reasoning).toContain("LinkedIn outreach");
+    expect(result.reasoning).toContain("John Smith is CTO at TechCo");
+    expect(result.reasoning).toContain("no email");
+    expect(result.emailDraft).toContain("Hi John");
+    expect(result.emailDraft).toContain("TechCo");
   });
 });

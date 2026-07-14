@@ -219,7 +219,7 @@ export async function findLeadsWorkflow(user: User, input: FindLeadsInput) {
       };
     });
 
-    const reasoningResults = await generateLeadReasoningBatch(
+    const outreachResults = await generateLeadReasoningBatch(
       combined.map((lead) => ({
         name: lead.name,
         title: lead.title,
@@ -235,10 +235,15 @@ export async function findLeadsWorkflow(user: User, input: FindLeadsInput) {
       { userId: user.id, searchId: search.id }
     );
 
-    combined = combined.map((lead, index) => ({
-      ...lead,
-      reasoning: reasoningResults[index] ?? lead.reasoning,
-    }));
+    combined = combined.map((lead, index) => {
+      const outreach = outreachResults[index];
+      if (!outreach) return lead;
+      return {
+        ...lead,
+        reasoning: outreach.reasoning,
+        recommendedApproach: outreach.emailDraft,
+      };
+    });
 
     combined = sortLeads(combined);
 

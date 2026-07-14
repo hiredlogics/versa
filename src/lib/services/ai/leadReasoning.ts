@@ -14,182 +14,203 @@ export interface LeadReasoningInput {
   profileSummary?: string | null;
 }
 
+export interface LeadOutreachOutput {
+  reasoning: string;
+  emailDraft: string;
+}
+
+const OUTREACH_BATCH_SIZE = 8;
+
 function formatLocation(location: string): string | null {
   const trimmed = location.trim();
   if (!trimmed || trimmed === "N/A") return null;
   return trimmed;
 }
 
-function matchesTargetCountry(location: string, targetCountries: string[]): boolean {
-  const loc = location.toLowerCase();
-  return targetCountries.some((country) => {
-    const c = country.toLowerCase().trim();
-    return c && loc.includes(c);
-  });
+function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] || fullName;
 }
 
+/** Fallback only when no AI provider is available. */
 export function buildLeadWhyReasoning(
   lead: LeadReasoningInput,
   context: LeadScoreContext
-): string {
+): LeadOutreachOutput {
   const ctx = context.leadContext;
   const location = formatLocation(lead.location);
-  const sentences: string[] = [];
+  const services = ctx?.servicesToSell?.filter(Boolean).slice(0, 2) ?? [];
+  const offer = ctx?.mainOffer?.trim() || services[0] || "what we offer";
+  const angle = ctx?.preferredOutreachAngle?.trim();
+  const business = ctx?.businessDescription?.trim() || ctx?.companyName?.trim() || "our team";
 
   const who = location
     ? `${lead.name} is ${lead.title} at ${lead.company} (${location}).`
     : `${lead.name} is ${lead.title} at ${lead.company}.`;
-  sentences.push(who);
 
-  const searchIntent = context.searchIntent || context.keywords || context.originalPrompt;
-  if (searchIntent?.trim()) {
-    sentences.push(`They match your search for "${searchIntent.trim()}".`);
+  const whyParts = [who];
+  const intent = context.searchIntent || context.keywords || context.originalPrompt;
+  if (intent?.trim()) {
+    whyParts.push(`They fit your search: "${intent.trim()}".`);
   }
-
-  if (ctx) {
-    if (ctx.businessDescription?.trim()) {
-      sentences.push(`For your business (${ctx.businessDescription.trim()}), this role is a relevant buyer contact.`);
-    }
-
-    const services = ctx.servicesToSell.filter(Boolean);
-    if (services.length > 0) {
-      sentences.push(
-        `They may need what you sell: ${services.slice(0, 3).join(", ")}.`
-      );
-    }
-
-    if (ctx.targetTitles.some((t) => lead.title.toLowerCase().includes(t.toLowerCase()))) {
-      sentences.push("Their title aligns with your saved target buyer roles.");
-    }
-
-    if (
-      ctx.targetIndustries.some((t) => lead.industry.toLowerCase().includes(t.toLowerCase()))
-    ) {
-      sentences.push(`They operate in your target industry (${lead.industry}).`);
-    }
-
-    if (
-      ctx.targetCountries.length > 0 &&
-      location &&
-      matchesTargetCountry(location, ctx.targetCountries)
-    ) {
-      sentences.push(`Located in your target geography (${location}).`);
-    }
-
-    if (
-      ctx.companySizeMin != null &&
-      ctx.companySizeMax != null &&
-      lead.employees >= ctx.companySizeMin &&
-      lead.employees <= ctx.companySizeMax
-    ) {
-      sentences.push(
-        `Company size (${lead.employees} employees) fits your ${ctx.companySizeMin}–${ctx.companySizeMax} employee range.`
-      );
-    }
-
-    if (ctx.preferredOutreachAngle?.trim()) {
-      sentences.push(`Suggested angle: ${ctx.preferredOutreachAngle.trim()}.`);
-    }
-
-    if (ctx.highQualityLeadNotes?.trim()) {
-      sentences.push(`Quality signal: ${ctx.highQualityLeadNotes.trim()}.`);
-    }
+  if (services.length) {
+    whyParts.push(`Likely relevant for ${services.join(" / ")}.`);
   }
-
   if (lead.profileSummary?.trim()) {
-    sentences.push(lead.profileSummary.trim());
+    whyParts.push(lead.profileSummary.trim());
   }
+  whyParts.push(
+    lead.hasEmail
+      ? `Score ${lead.leadScore}/10 with email — ready for a personalized send.`
+      : `Score ${lead.leadScore}/10 — no email yet; use LinkedIn with the draft below.`
+  );
 
-  if (lead.hasEmail) {
-    sentences.push(
-      `Score ${lead.leadScore}/10 with verified email — worth contacting now while they fit your criteria.`
-    );
-  } else {
-    sentences.push(
-      `Score ${lead.leadScore}/10 — strong fit, but no verified email yet (try LinkedIn outreach).`
-    );
-  }
+  const subject = `${firstName(lead.name)} — quick idea for ${lead.company}`;
+  const angleLine = angle
+    ? angle
+    : `I help teams like ${lead.company} with ${offer}.`;
 
-  return sentences.join(" ");
+  const emailDraft = [
+    `Subject: ${subject}`,
+    ``,
+    `Hi ${firstName(lead.name)},`,
+    ``,
+    `I noticed you're ${lead.title} at ${lead.company}${location ? ` in ${location}` : ""}.`,
+    ``,
+    `${angleLine}`,
+    ``,
+    `At ${business}, we work with ${lead.industry !== "N/A" ? lead.industry + " " : ""}leaders on ${offer}.`,
+    `If helpful, I can share a short example relevant to your role — happy to keep it brief.`,
+    ``,
+    `Worth a quick look?`,
+    ``,
+    `Best,`,
+    `[Your name]`,
+  ].join("\n");
+
+  return {
+    reasoning: whyParts.join(" "),
+    emailDraft,
+  };
 }
 
-function buildReasoningSystem(context: LeadScoreContext): string {
+function buildOutreachSystem(context: LeadScoreContext): string {
   const ctx = context.leadContext;
   const ctxBlock = ctx
     ? `
-Your user's business context:
+Seller (your user) context — use this to personalize EVERY email:
 - Company: ${ctx.companyName ?? "n/a"}
 - Business: ${ctx.businessDescription ?? "n/a"}
+- Main offer: ${ctx.mainOffer ?? "n/a"}
 - Services sold: ${ctx.servicesToSell.join(", ") || "n/a"}
 - Target industries: ${ctx.targetIndustries.join(", ") || "n/a"}
 - Target countries: ${ctx.targetCountries.join(", ") || "n/a"}
 - Target titles: ${ctx.targetTitles.join(", ") || "n/a"}
-- Company size: ${ctx.companySizeMin ?? "?"}-${ctx.companySizeMax ?? "?"}
-- Outreach angle: ${ctx.preferredOutreachAngle ?? "n/a"}
-- High quality notes: ${ctx.highQualityLeadNotes ?? "n/a"}
+- Preferred outreach angle: ${ctx.preferredOutreachAngle ?? "n/a"}
+- High-quality lead notes: ${ctx.highQualityLeadNotes ?? "n/a"}
 `
     : "";
 
-  return `Write a concise "why reach out" explanation for each B2B lead.
+  return `You are an expert B2B sales copywriter.
 
 Search intent: "${context.searchIntent || context.keywords || context.originalPrompt || ""}"
 ${ctxBlock}
 
-For each lead, write 2-4 sentences that:
-1. Identify who they are (use name, title, company, location).
-2. Explain why they match the user's search and saved business context.
-3. Explain why the user should email or contact them now (mention email availability and score).
+For EACH lead, return:
+1. "reasoning" — 2–4 sentences answering: Who is this person, why do they match the seller's ICP/search, and why should the seller email them now? Be specific (name, title, company, location, profile). Not generic.
+2. "emailDraft" — a ready-to-send cold email the seller can copy-paste, including:
+   - First line: Subject: ...
+   - Then greeting using first name
+   - 4–7 short lines: reference their role/company/location, connect to the seller's offer/services, one clear CTA
+   - Sign-off: Best, then [Your name]
+   - Personalize with profileSummary when present
+   - Never invent fake mutual connections or fake metrics
+   - Write as the seller reaching out TO this lead
 
-Use profileSummary when provided. Be specific to the user's services and ICP — not generic.
-Return JSON: { "leads": [{ "index": 0, "reasoning": "..." }] }`;
+Return JSON only:
+{ "leads": [{ "index": 0, "reasoning": "...", "emailDraft": "Subject: ...\\n\\nHi ..." }] }`;
 }
 
+async function generateOutreachChunk(
+  leads: LeadReasoningInput[],
+  context: LeadScoreContext,
+  indexOffset: number,
+  meta?: { userId?: string; searchId?: string }
+): Promise<LeadOutreachOutput[]> {
+  const heuristic = leads.map((lead) => buildLeadWhyReasoning(lead, context));
+
+  const payload = leads.map((lead, i) => ({
+    index: i,
+    name: lead.name,
+    title: lead.title,
+    company: lead.company,
+    industry: lead.industry,
+    employees: lead.employees,
+    location: lead.location,
+    hasEmail: lead.hasEmail,
+    leadScore: lead.leadScore,
+    profileSummary: lead.profileSummary ?? null,
+  }));
+
+  const { content } = await aiChat({
+    userId: meta?.userId,
+    searchId: meta?.searchId,
+    operation: "outreach",
+    system: buildOutreachSystem(context),
+    user: JSON.stringify({ batchOffset: indexOffset, leads: payload }),
+    jsonMode: true,
+    temperature: 0.55,
+  });
+
+  const parsed = JSON.parse(content) as {
+    leads?: Array<{ index: number; reasoning?: string; emailDraft?: string }>;
+  };
+
+  const results = [...heuristic];
+  for (const item of parsed.leads ?? []) {
+    if (item.index < 0 || item.index >= leads.length) continue;
+    const reasoning = item.reasoning?.trim();
+    const emailDraft = item.emailDraft?.trim();
+    if (reasoning || emailDraft) {
+      results[item.index] = {
+        reasoning: reasoning || results[item.index].reasoning,
+        emailDraft: emailDraft || results[item.index].emailDraft,
+      };
+    }
+  }
+  return results;
+}
+
+/**
+ * Prefer full AI customization (why + email draft). Falls back to template only if AI is unavailable.
+ */
 export async function generateLeadReasoningBatch(
   leads: LeadReasoningInput[],
   context: LeadScoreContext,
   meta?: { userId?: string; searchId?: string }
-): Promise<string[]> {
-  const heuristic = leads.map((lead) => buildLeadWhyReasoning(lead, context));
-
+): Promise<LeadOutreachOutput[]> {
   if (leads.length === 0) return [];
-  if (!hasAiProvidersConfigured()) return heuristic;
+
+  const heuristic = leads.map((lead) => buildLeadWhyReasoning(lead, context));
+  if (!hasAiProvidersConfigured()) {
+    console.warn(
+      "[leadReasoning] No AI providers configured — using template outreach. Add OPENAI_API_KEY or GROQ_API_KEY for fully customized emails."
+    );
+    return heuristic;
+  }
 
   try {
-    const payload = leads.map((lead, index) => ({
-      index,
-      name: lead.name,
-      title: lead.title,
-      company: lead.company,
-      industry: lead.industry,
-      employees: lead.employees,
-      location: lead.location,
-      hasEmail: lead.hasEmail,
-      leadScore: lead.leadScore,
-      profileSummary: lead.profileSummary ?? null,
-    }));
-
-    const { content } = await aiChat({
-      userId: meta?.userId,
-      searchId: meta?.searchId,
-      operation: "outreach",
-      system: buildReasoningSystem(context),
-      user: JSON.stringify(payload),
-      jsonMode: true,
-      temperature: 0.4,
-    });
-
-    const parsed = JSON.parse(content) as {
-      leads?: Array<{ index: number; reasoning?: string }>;
-    };
-
-    const results = [...heuristic];
-    for (const item of parsed.leads ?? []) {
-      if (item.index >= 0 && item.index < leads.length && item.reasoning?.trim()) {
-        results[item.index] = item.reasoning.trim();
-      }
+    const all: LeadOutreachOutput[] = [];
+    for (let offset = 0; offset < leads.length; offset += OUTREACH_BATCH_SIZE) {
+      const chunk = leads.slice(offset, offset + OUTREACH_BATCH_SIZE);
+      const chunkResults = await generateOutreachChunk(chunk, context, offset, meta);
+      all.push(...chunkResults);
     }
-    return results;
-  } catch {
+    return all;
+  } catch (error) {
+    console.warn(
+      "[leadReasoning] AI outreach failed, using template fallback:",
+      error instanceof Error ? error.message : error
+    );
     return heuristic;
   }
 }
