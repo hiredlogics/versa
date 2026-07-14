@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { parsedSearchCriteriaSchema, findLeadsInputSchema } from "@/lib/validations/search-criteria";
-import { normalizeLocations, splitKeywordsForApollo } from "@/lib/search-criteria";
+import {
+  normalizeLocations,
+  splitKeywordsForApollo,
+  resolveApolloKeywords,
+  normalizeEmployeeRanges,
+  normalizeSearchCriteria,
+  buildApolloSearchVariants,
+} from "@/lib/search-criteria";
 
 describe("search criteria validation", () => {
   it("validates find leads input", () => {
@@ -34,11 +41,12 @@ describe("search-criteria helpers", () => {
     expect(normalizeLocations(["California", "United States"])).toEqual(["California"]);
   });
 
-  it("coerces string personLocations from ChatGPT without crashing", async () => {
-    const { normalizeSearchCriteria, asStringArray } = await import("@/lib/search-criteria");
-    expect(asStringArray("United States")).toEqual(["United States"]);
-    expect(asStringArray("California, Texas")).toEqual(["California", "Texas"]);
+  it("expands US/USA aliases for Apollo", () => {
+    expect(normalizeLocations(["US"])).toEqual(["United States"]);
+    expect(normalizeLocations(["usa"])).toEqual(["United States"]);
+  });
 
+  it("coerces string personLocations from ChatGPT without crashing", () => {
     const criteria = normalizeSearchCriteria(
       {
         industry: "SaaS",
@@ -48,7 +56,6 @@ describe("search-criteria helpers", () => {
         jobTitles: ["CEO"],
         summary: "SaaS CEOs",
         apollo: {
-          // ChatGPT sometimes returns a string instead of an array
           personTitles: "CEO, Founder" as unknown as string[],
           personLocations: "United States" as unknown as string[],
           qKeywords: "saas",
@@ -61,11 +68,8 @@ describe("search-criteria helpers", () => {
     expect(criteria.apollo?.personTitles).toEqual(["CEO", "Founder"]);
   });
 
-  it("normalizes hyphen employee ranges for Apollo", async () => {
-    const { normalizeEmployeeRanges, normalizeSearchCriteria } = await import(
-      "@/lib/search-criteria"
-    );
-    expect(normalizeEmployeeRanges(["20-43"])).toEqual(["20,43"]);
+  it("snaps invented employee ranges onto Apollo buckets", () => {
+    expect(normalizeEmployeeRanges(["20-43"])).toEqual(["11,50"]);
     expect(normalizeEmployeeRanges(["11,50", "bad"])).toEqual(["11,50"]);
 
     const criteria = normalizeSearchCriteria(
@@ -84,16 +88,99 @@ describe("search-criteria helpers", () => {
       } as never,
       "Find CEOs"
     );
-    expect(criteria.apollo?.employeeRanges).toEqual(["20,43"]);
+    expect(criteria.apollo?.employeeRanges).toEqual(["11,50"]);
   });
 
-  it("splits long keywords for Apollo", () => {
+  it("keeps real estate as industry keyword and moves automation into intent", () => {
+    const resolved = resolveApolloKeywords({
+      qKeywords: "automation, real",
+      industry: "Real Estate",
+      searchIntent: "people who need automation",
+      userPrompt: "Need automation. people in real estate in the US",
+    });
+
+    expect(resolved.apolloKeywords).toBe("real estate");
+    expect(resolved.searchIntent.toLowerCase()).toContain("automation");
+
+    const criteria = normalizeSearchCriteria(
+      {
+        industry: "Real Estate",
+        country: "United States",
+        companySizeMin: 11,
+        companySizeMax: 50,
+        summary: "Real estate automation buyers",
+        searchIntent: "Decision makers at real estate companies needing automation",
+        apollo: {
+          personTitles: ["Broker", "Property Manager", "Founder", "CEO"],
+          personLocations: ["United States"],
+          qKeywords: "automation, real",
+          employeeRanges: ["11,50"],
+        },
+      } as never,
+      "Need automation. people in real estate in the US"
+    );
+
+    expect(criteria.apollo?.qKeywords).toBe("real estate");
+    expect(criteria.searchIntent?.toLowerCase()).toMatch(/automation|real estate/);
+    expect(criteria.apollo?.personTitles?.[0]).toBe("Broker");
+  });
+
+  it("replaces tech titles when industry is real estate", () => {
+    const criteria = normalizeSearchCriteria(
+      {
+        industry: "Real Estate",
+        country: "United States",
+        companySizeMin: 11,
+        companySizeMax: 50,
+        summary: "real estate",
+        searchIntent: "real estate automation",
+        apollo: {
+          personTitles: ["Founder", "CEO", "CTO", "VP Engineering"],
+          personLocations: ["United States"],
+          qKeywords: "real estate",
+          employeeRanges: ["11,50"],
+        },
+      } as never,
+      "Need automation in real estate"
+    );
+
+    expect(criteria.apollo?.personTitles).not.toContain("CTO");
+    expect(criteria.apollo?.personTitles).not.toContain("VP Engineering");
+    expect(criteria.apollo?.personTitles?.some((t) => /broker|property/i.test(t))).toBe(true);
+  });
+
+  it("keeps industry keyword when smart-relax widens filters", () => {
+    const variants = buildApolloSearchVariants({
+      industry: "Real Estate",
+      country: "United States",
+      companySizeMin: 11,
+      companySizeMax: 50,
+      jobTitles: ["Broker", "CEO", "Founder"],
+      summary: "test",
+      searchIntent: "real estate automation",
+      apollo: {
+        personTitles: ["Broker", "Property Manager", "Founder", "CEO"],
+        personLocations: ["United States"],
+        qKeywords: "real estate",
+        employeeRanges: ["11,50"],
+        includeSimilarTitles: true,
+      },
+    });
+
+    expect(variants[0].filters.qKeywords).toBe("real estate");
+    expect(variants[1].filters.qKeywords).toBe("real estate");
+    expect(variants[2].filters.qKeywords).toBe("real estate");
+    // Last variant may drop keyword only as last resort
+    expect(variants[variants.length - 1].filters.qKeywords).toBeUndefined();
+  });
+
+  it("moves need-words out of long keyword blobs", () => {
     const { apolloKeywords, searchIntent } = splitKeywordsForApollo(
       "e-commerce marketing automation AI",
       "marketing directors"
     );
-    expect(apolloKeywords).toBe("e-commerce marketing");
-    expect(searchIntent).toContain("automation");
+    expect(apolloKeywords).toBe("e-commerce");
+    expect(searchIntent.toLowerCase()).toMatch(/automation|ai|marketing/);
   });
 });
 

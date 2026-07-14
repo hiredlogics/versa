@@ -9,6 +9,7 @@ type ParsedPrompt = SearchCriteria & {
   };
   jobTitles?: string[] | string;
   country?: string;
+  industry?: string;
 };
 
 /** Coerce AI JSON quirks (string vs array) into a clean string[]. */
@@ -16,7 +17,7 @@ export function asStringArray(value: unknown): string[] {
   if (value == null) return [];
   if (Array.isArray(value)) {
     return value
-      .flatMap((item) => (typeof item === "string" ? item.split(/[,;|]/) : []))
+      .flatMap((item) => (typeof item === "string" ? [item] : []))
       .map((s) => s.trim())
       .filter(Boolean);
   }
@@ -29,6 +30,69 @@ export function asStringArray(value: unknown): string[] {
   return [];
 }
 
+const TECH_TITLES_FOR_INDUSTRY_GUARD = [
+  "cto",
+  "cio",
+  "vp engineering",
+  "vice president engineering",
+  "head of engineering",
+  "director of engineering",
+  "software engineer",
+  "head of product",
+  "vp product",
+  "engineering manager",
+];
+
+const REAL_ESTATE_TITLES = [
+  "Broker",
+  "Managing Broker",
+  "Property Manager",
+  "Real Estate Investor",
+  "Founder",
+  "CEO",
+];
+
+function isRealEstateIndustry(industry?: string, prompt?: string, keywords?: string): boolean {
+  const blob = `${industry || ""} ${prompt || ""} ${keywords || ""}`.toLowerCase();
+  return /real\s*estate|real\s*state|propert(y|ies)|brokerage|realtor/.test(blob);
+}
+
+/** Drop software titles when searching an industry like real estate. */
+export function alignTitlesToIndustry(
+  titles: string[],
+  industry?: string,
+  userPrompt?: string,
+  keywords?: string
+): string[] {
+  if (!isRealEstateIndustry(industry, userPrompt, keywords)) {
+    return titles.slice(0, 5);
+  }
+
+  const cleaned = titles.filter((title) => {
+    const lower = title.toLowerCase();
+    return !TECH_TITLES_FOR_INDUSTRY_GUARD.some((bad) => lower.includes(bad));
+  });
+
+  const merged = [...cleaned];
+  for (const title of REAL_ESTATE_TITLES) {
+    if (merged.length >= 5) break;
+    if (!merged.some((t) => t.toLowerCase() === title.toLowerCase())) {
+      merged.push(title);
+    }
+  }
+
+  return (merged.length > 0 ? merged : REAL_ESTATE_TITLES).slice(0, 5);
+}
+
+export const APOLLO_EMPLOYEE_BUCKETS = [
+  "1,10",
+  "11,50",
+  "51,200",
+  "201,500",
+  "501,1000",
+  "1001,5000",
+] as const;
+
 export function mapEmployeeRange(min: number, max: number): string[] {
   const ranges: string[] = [];
   if (min <= 10 && max >= 1) ranges.push("1,10");
@@ -40,8 +104,6 @@ export function mapEmployeeRange(min: number, max: number): string[] {
   return ranges.length > 0 ? ranges : ["11,50", "51,200", "201,500"];
 }
 
-const APOLLO_RANGE_RE = /^\d+,\d+$/;
-
 function coerceEmployeeRangeList(value: unknown): string[] {
   if (value == null) return [];
   if (Array.isArray(value)) {
@@ -51,7 +113,6 @@ function coerceEmployeeRangeList(value: unknown): string[] {
       .filter(Boolean);
   }
   if (typeof value === "string") {
-    // Prefer splitting multiple ranges on ; | or whitespace — NOT commas (Apollo uses commas inside a range)
     return value
       .split(/[;|]+|\s{2,}/)
       .map((s) => s.trim())
@@ -60,22 +121,45 @@ function coerceEmployeeRangeList(value: unknown): string[] {
   return [];
 }
 
-/** Apollo expects "min,max" (comma). ChatGPT often returns "20-43" or invalid buckets. */
+function parseRangeBounds(range: string): { min: number; max: number } | null {
+  const normalized = range.replace(/\s+/g, "").replace(/^(\d+)-(\d+)$/, "$1,$2");
+  const match = normalized.match(/^(\d+),(\d+)$/);
+  if (!match) return null;
+  return { min: Number(match[1]), max: Number(match[2]) };
+}
+
+/** Snap any AI range to official Apollo buckets that cover the requested sizes. */
 export function normalizeEmployeeRanges(
   value: unknown,
   fallbackMin = 10,
   fallbackMax = 500
 ): string[] {
-  const raw = coerceEmployeeRangeList(value).map((r) =>
-    r.replace(/\s+/g, "").replace(/^(\d+)-(\d+)$/, "$1,$2")
-  );
-  const valid = raw.filter((r) => APOLLO_RANGE_RE.test(r));
-  if (valid.length > 0) return valid;
+  const raw = coerceEmployeeRangeList(value);
+  if (raw.length === 0) return mapEmployeeRange(fallbackMin, fallbackMax);
+
+  const covered = new Set<string>();
+  for (const entry of raw) {
+    const bounds = parseRangeBounds(entry);
+    if (!bounds) continue;
+    for (const bucket of APOLLO_EMPLOYEE_BUCKETS) {
+      const b = parseRangeBounds(bucket)!;
+      if (bounds.min <= b.max && bounds.max >= b.min) covered.add(bucket);
+    }
+  }
+
+  if (covered.size > 0) return [...covered];
   return mapEmployeeRange(fallbackMin, fallbackMax);
 }
 
 export function normalizeLocations(locations: unknown): string[] {
-  const cleaned = asStringArray(locations);
+  const cleaned = asStringArray(locations).map((loc) => {
+    const lower = loc.toLowerCase().trim();
+    if (lower === "us" || lower === "usa" || lower === "u.s." || lower === "u.s.a.") {
+      return "United States";
+    }
+    if (lower === "uk" || lower === "u.k.") return "United Kingdom";
+    return loc.trim();
+  });
   if (cleaned.length <= 1) return cleaned.length ? cleaned : ["United States"];
 
   const generic = new Set([
@@ -94,25 +178,113 @@ export function normalizeLocations(locations: unknown): string[] {
   return [cleaned[0]];
 }
 
-/** Apollo q_keywords works best with 1-2 industry terms — interests go to searchIntent for ranking */
+const KNOWN_INDUSTRY_PHRASES = [
+  "real estate",
+  "property management",
+  "property development",
+  "e-commerce",
+  "ecommerce",
+  "human resources",
+  "private equity",
+  "venture capital",
+  "investment banking",
+  "oil and gas",
+  "food and beverage",
+  "machine learning",
+];
+
+const NEED_WORDS = new Set([
+  "automation",
+  "ai",
+  "chatbot",
+  "chatbots",
+  "need",
+  "needs",
+  "interested",
+  "looking",
+  "hiring",
+  "software",
+  "platform",
+  "tools",
+]);
+
+/**
+ * Build Apollo q_keywords from industry (preferred) + AI keywords.
+ * Keeps multi-word industry phrases; moves "needs" like automation into searchIntent.
+ */
+export function resolveApolloKeywords(input: {
+  qKeywords?: string;
+  industry?: string;
+  searchIntent?: string;
+  userPrompt?: string;
+}): { apolloKeywords?: string; searchIntent: string } {
+  let searchIntent = (input.searchIntent || input.userPrompt || "").trim();
+
+  const industry =
+    input.industry && input.industry.trim() && input.industry.trim().toLowerCase() !== "any"
+      ? input.industry.trim()
+      : "";
+
+  const raw = (input.qKeywords || "").trim();
+
+  // Prefer explicit industry when it looks like a domain, not a need-word blob
+  if (industry && !NEED_WORDS.has(industry.toLowerCase())) {
+    const phrase = industry.toLowerCase();
+    // Keep known phrases intact; otherwise use up to 3 words from industry
+    const known = KNOWN_INDUSTRY_PHRASES.find((p) => phrase.includes(p));
+    const apolloKeywords = known || industry.split(/[\/,]/)[0].trim().slice(0, 40);
+    if (raw && !searchIntent.toLowerCase().includes(raw.toLowerCase())) {
+      searchIntent = `${searchIntent} ${raw}`.trim();
+    }
+    return { apolloKeywords, searchIntent };
+  }
+
+  if (!raw) return { searchIntent };
+
+  const lower = raw.toLowerCase().replace(/,/g, " ");
+  const known = KNOWN_INDUSTRY_PHRASES.find((p) => lower.includes(p));
+  if (known) {
+    const leftover = lower
+      .replace(known, " ")
+      .split(/\s+/)
+      .filter((w) => w && !NEED_WORDS.has(w) && w !== "and");
+    if (leftover.length) {
+      searchIntent = `${searchIntent} ${leftover.join(" ")}`.trim();
+    }
+    // Move need-words into intent
+    for (const w of lower.split(/\s+/)) {
+      if (NEED_WORDS.has(w) && !searchIntent.toLowerCase().includes(w)) {
+        searchIntent = `${searchIntent} ${w}`.trim();
+      }
+    }
+    return { apolloKeywords: known, searchIntent };
+  }
+
+  // Fallback: strip need words, keep 1–2 domain tokens
+  const tokens = lower
+    .split(/[^a-z0-9+-]+/)
+    .filter((w) => w.length > 1 && !NEED_WORDS.has(w));
+
+  if (tokens.length === 0) {
+    // Everything was a "need" — keep as intent, no q_keywords
+    if (!searchIntent.toLowerCase().includes(lower)) {
+      searchIntent = `${searchIntent} ${raw}`.trim();
+    }
+    return { searchIntent };
+  }
+
+  const apolloKeywords = tokens.slice(0, 2).join(" ");
+  const extra = tokens.slice(2).join(" ");
+  if (extra) searchIntent = `${searchIntent} ${extra}`.trim();
+  return { apolloKeywords, searchIntent };
+}
+
+/** @deprecated use resolveApolloKeywords — kept for existing tests */
 export function splitKeywordsForApollo(
   qKeywords: string,
   searchIntent: string
 ): { apolloKeywords?: string; searchIntent: string } {
-  const kw = qKeywords.trim();
-  if (!kw) return { searchIntent };
-
-  const parts = kw.split(/\s+/).filter(Boolean);
-  if (parts.length <= 2) {
-    return { apolloKeywords: kw, searchIntent };
-  }
-
-  const apolloKeywords = parts.slice(0, 2).join(" ");
-  const interestPart = parts.slice(2).join(" ");
-  return {
-    apolloKeywords,
-    searchIntent: `${searchIntent} ${interestPart}`.trim(),
-  };
+  return resolveApolloKeywords({ qKeywords, searchIntent });
 }
 
 export interface ApolloQueryVariant {
@@ -126,8 +298,14 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   if (!base) return [];
 
   const primaryLocation = normalizeLocations(base.personLocations);
-  const personTitles = asStringArray(base.personTitles);
-  const employeeRanges = normalizeEmployeeRanges(base.employeeRanges);
+  const personTitles = asStringArray(base.personTitles).slice(0, 5);
+  const employeeRanges = normalizeEmployeeRanges(
+    base.employeeRanges,
+    criteria.companySizeMin,
+    criteria.companySizeMax
+  );
+  const industryKeyword = base.qKeywords?.trim() || undefined;
+
   const variants: ApolloQueryVariant[] = [];
   const seen = new Set<string>();
 
@@ -143,48 +321,57 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     variants.push({ level, label, filters });
   }
 
-  const normalizedBase: ApolloSearchFilters = {
-    ...base,
-    personTitles: personTitles.length ? personTitles : ["Director"],
+  const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
+
+  const exact: ApolloSearchFilters = {
+    personTitles: titles,
     personLocations: primaryLocation,
-    employeeRanges: employeeRanges.length ? employeeRanges : undefined,
+    qKeywords: industryKeyword,
+    employeeRanges,
+    includeSimilarTitles: base.includeSimilarTitles !== false,
   };
 
-  add(0, "exact AI filters", normalizedBase);
+  // 0 — exact AI filters (industry keyword kept)
+  add(0, "exact AI filters", exact);
 
-  if (normalizedBase.qKeywords) {
-    add(1, "titles + location (interests ranked after fetch, no q_keywords)", {
-      ...normalizedBase,
-      personLocations: primaryLocation,
-      qKeywords: undefined,
-    });
-  }
+  // 1 — broaden company-size buckets, KEEP industry keyword
+  add(1, "industry + titles + wider company size", {
+    ...exact,
+    employeeRanges: ["11,50", "51,200", "201,500"],
+  });
 
-  if (normalizedBase.qKeywords && normalizedBase.qKeywords.includes(" ")) {
-    const shortKw = normalizedBase.qKeywords.split(/\s+/).slice(0, 1).join(" ");
-    add(2, `single industry keyword: "${shortKw}"`, {
-      ...normalizedBase,
-      personLocations: primaryLocation,
-      qKeywords: shortKw,
-    });
-  }
-
-  add(3, "titles + location only (no company size filter)", {
-    ...normalizedBase,
-    personLocations: primaryLocation,
-    qKeywords: undefined,
+  // 2 — drop company size only, KEEP industry keyword
+  add(2, "industry + titles + location (no size filter)", {
+    ...exact,
     employeeRanges: undefined,
   });
 
-  if (personTitles.length > 2) {
-    add(4, "top 2 titles + location", {
-      ...normalizedBase,
-      personLocations: primaryLocation,
-      personTitles: personTitles.slice(0, 2),
-      qKeywords: undefined,
+  // 3 — fewer titles, KEEP industry keyword
+  if (titles.length > 2) {
+    add(3, "industry + top titles + location", {
+      ...exact,
+      personTitles: titles.slice(0, 3),
       employeeRanges: undefined,
     });
   }
+
+  // 4 — shorten keyword to primary industry token only if multi-word
+  if (industryKeyword && industryKeyword.includes(" ")) {
+    add(4, `primary industry keyword: "${industryKeyword.split(/\s+/)[0]}"`, {
+      ...exact,
+      qKeywords: industryKeyword.split(/\s+/).slice(0, 2).join(" "),
+      employeeRanges: undefined,
+    });
+  }
+
+  // 5 — LAST resort: drop keyword (score by searchIntent after fetch)
+  add(5, "titles + location only (industry ranked after fetch)", {
+    personTitles: titles.slice(0, 3),
+    personLocations: primaryLocation,
+    qKeywords: undefined,
+    employeeRanges: undefined,
+    includeSimilarTitles: true,
+  });
 
   return variants;
 }
@@ -201,11 +388,6 @@ export function normalizeSearchCriteria(
     employeeRanges?: unknown;
     includeSimilarTitles?: boolean;
   };
-
-  const personTitles =
-    asStringArray(apolloIn.personTitles).length > 0
-      ? asStringArray(apolloIn.personTitles)
-      : asStringArray(parsed.jobTitles);
 
   const personLocations = normalizeLocations(
     asStringArray(apolloIn.personLocations).length > 0
@@ -229,8 +411,31 @@ export function normalizeSearchCriteria(
     .replace(/seeking opportunities/gi, "")
     .trim();
 
-  const searchIntentBase = parsed.searchIntent || parsed.summary || userPrompt;
-  const { apolloKeywords, searchIntent } = splitKeywordsForApollo(rawKeywords, searchIntentBase);
+  const personTitles = alignTitlesToIndustry(
+    (asStringArray(apolloIn.personTitles).length > 0
+      ? asStringArray(apolloIn.personTitles)
+      : asStringArray(parsed.jobTitles)
+    ).slice(0, 5),
+    parsed.industry,
+    userPrompt,
+    rawKeywords
+  );
+
+  const searchIntentBase =
+    parsed.searchIntent || parsed.summary || userPrompt;
+
+  const { apolloKeywords, searchIntent } = resolveApolloKeywords({
+    qKeywords: rawKeywords,
+    industry: parsed.industry,
+    searchIntent: searchIntentBase,
+    userPrompt,
+  });
+
+  // Ensure full prompt intent is preserved for scoring / outreach
+  const fullIntent =
+    userPrompt && !searchIntent.toLowerCase().includes(userPrompt.toLowerCase().slice(0, 40))
+      ? `${searchIntent}. Original request: ${userPrompt}`.trim()
+      : searchIntent;
 
   const companySizeMin = parsed.companySizeMin ?? (openToWork ? 1 : 10);
   const companySizeMax = parsed.companySizeMax ?? 500;
@@ -241,13 +446,22 @@ export function normalizeSearchCriteria(
     companySizeMax
   );
 
+  // Prefer slightly broader buckets when AI only returns very-small "1,10" for "small companies"
+  if (
+    employeeRanges.length === 1 &&
+    employeeRanges[0] === "1,10" &&
+    /small|startup|smb|sme/i.test(`${userPrompt} ${searchIntentBase}`)
+  ) {
+    employeeRanges.push("11,50");
+  }
+
   const apollo: ApolloSearchFilters = {
     personTitles:
       personTitles.length > 0
         ? personTitles
         : openToWork
           ? ["Software Engineer", "Developer", "Product Manager"]
-          : ["Director"],
+          : ["Founder", "CEO", "Director"],
     personLocations,
     qKeywords: openToWork ? undefined : apolloKeywords,
     employeeRanges: openToWork
@@ -262,9 +476,9 @@ export function normalizeSearchCriteria(
     companySizeMin,
     companySizeMax,
     jobTitles: apollo.personTitles,
-    keywords: rawKeywords || apolloKeywords || undefined,
+    keywords: apolloKeywords || rawKeywords || undefined,
     summary: parsed.summary || userPrompt.slice(0, 120),
-    searchIntent,
+    searchIntent: fullIntent,
     openToWork,
     requireEmail: parsed.requireEmail ?? false,
     apollo,
@@ -282,6 +496,8 @@ export function formatApolloFiltersLog(criteria: SearchCriteria): string {
       q_keywords: a.qKeywords || null,
       organization_num_employees_ranges: a.employeeRanges,
       include_similar_titles: a.includeSimilarTitles,
+      search_intent: criteria.searchIntent || null,
+      industry: criteria.industry || null,
     },
     null,
     2

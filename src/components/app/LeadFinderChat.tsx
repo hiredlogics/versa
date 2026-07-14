@@ -105,11 +105,19 @@ function buildConversationPrompt(
   composer: ComposerValues
 ): string {
   const trimmed = nextText.trim();
-  let base = trimmed;
+  const prior = priorUserTexts.map((line) => line.trim()).filter(Boolean);
 
-  if (priorUserTexts.length > 0 && trimmed) {
-    const history = priorUserTexts.map((line, index) => `${index + 1}. ${line}`).join("\n");
-    base = `Conversation context:\n${history}\n\nContinue with: ${trimmed}`;
+  // Merge follow-ups into one clear search brief — never dump "Conversation context" raw into Apollo parse
+  let base = trimmed;
+  if (prior.length > 0 && trimmed) {
+    base = [
+      "Lead search request (combine all lines into ONE search):",
+      ...prior.map((line, i) => `- Earlier: ${line}`),
+      `- Latest refinement: ${trimmed}`,
+      "Use the latest refinement to update industry, titles, location, and needs. Keep the full meaning.",
+    ].join("\n");
+  } else if (prior.length > 0 && !trimmed) {
+    base = prior.join(". ");
   }
 
   return buildPromptWithFilters(base, filters, {

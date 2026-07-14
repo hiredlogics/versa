@@ -28,6 +28,8 @@ const LOCATION_HINTS: { pattern: RegExp; location: string }[] = [
 ];
 
 const INDUSTRY_HINTS: { pattern: RegExp; term: string }[] = [
+  { pattern: /\breal\s*estate\b/i, term: "real estate" },
+  { pattern: /\bproperty\s*management\b/i, term: "property management" },
   { pattern: /\bsaas\b/i, term: "SaaS" },
   { pattern: /\bai\b/i, term: "AI" },
   { pattern: /\bhealthcare\b/i, term: "healthcare" },

@@ -5,28 +5,42 @@ import { normalizeSearchCriteria } from "@/lib/search-criteria";
 import type { SearchCriteria } from "@/lib/types";
 import type { UserLeadContextDTO } from "@/lib/validations/onboarding-context";
 
-const PARSE_SYSTEM = `You are an expert B2B lead search strategist.
+const PARSE_SYSTEM = `You are an expert B2B lead search strategist for Apollo.io.
 
-Convert a rough user request into structured Apollo.io search filters.
+Your job has TWO phases — do them in order:
 
-You are given:
-1. The user's saved business context and ideal customer profile (may be null).
-2. The user's current lead search prompt.
+PHASE 1 — Understand the FULL user prompt (and saved ICP context)
+- Read the entire prompt. Do not drop topics.
+- Identify: WHO (roles), WHERE (location), INDUSTRY / DOMAIN, WHAT THEY CARE ABOUT (needs like automation, AI, hiring…), and company size if stated.
+- The current prompt wins over saved context when it is explicit.
+- Put the COMPLETE meaning into "searchIntent" and "summary" as plain English.
+  Example prompt: "Need automation. people in real estate in the US"
+  → searchIntent: "Decision makers at real estate companies in the US who may need automation"
 
-Rules:
-- Use saved context to fill missing details when the prompt is vague.
-- The current prompt overrides saved context when it is explicit.
+PHASE 2 — Convert that understanding into accurate Apollo filters
+- personTitles: 2–5 titles that match THAT industry (not generic tech titles unless the industry is tech).
+  Real estate examples: ["Broker","Managing Broker","Property Manager","Real Estate Investor","Founder","CEO"]
+  SaaS examples: ["CEO","Founder","CTO","VP Sales"]
+  CRITICAL: If industry is Real Estate / property / brokerage, NEVER use CTO, VP Engineering, Head of Product, or other software titles unless the user explicitly asked for tech roles.
+- personLocations: ONE location only (state OR country, never both)
+- qKeywords: the INDUSTRY / domain phrase only (keep multi-word intact).
+  Good: "real estate" | "property management" | "healthcare"
+  Bad: "automation, real" | "automation real estate AI" | cutting words mid-phrase
+  Put needs like "automation", "AI", "chatbots" ONLY in searchIntent (used later for ranking) — never in qKeywords.
+- employeeRanges: ONLY Apollo standard buckets with a COMMA:
+  "1,10" | "11,50" | "51,200" | "201,500" | "501,1000" | "1001,5000"
+  Never invent "20,43" or use hyphens.
+  If the prompt says ~20–50 people → ["11,50"]. If 50–200 → ["51,200"]. If vague → ["11,50","51,200","201,500"].
+- industry: primary industry name (e.g. "Real Estate")
 - Do not invent unrelated industries, countries, or titles.
-- Respect excluded titles and industries from saved context unless the prompt explicitly requests them.
-- Prioritize decision-makers unless user explicitly asks for other roles.
-- Return only valid JSON.
+- Respect excluded titles/industries unless the prompt explicitly requests them.
 
-Return JSON:
+Return ONLY valid JSON:
 {
   "summary": "string",
-  "searchIntent": "string",
-  "industry": "string or comma-separated industries (primary first)",
-  "country": "string or comma-separated countries (primary first)",
+  "searchIntent": "full intent including industry AND needs",
+  "industry": "primary industry",
+  "country": "primary country",
   "companySizeMin": number,
   "companySizeMax": number,
   "openToWork": boolean,
@@ -42,21 +56,18 @@ Return JSON:
   "apollo": {
     "personTitles": ["string"],
     "personLocations": ["string"],
-    "qKeywords": "string",
-    "employeeRanges": ["string"],
+    "qKeywords": "industry phrase only",
+    "employeeRanges": ["11,50"],
     "includeSimilarTitles": true
   }
-}
-
-Apollo rules:
-- ONE primary location in personLocations (state OR country, not both)
-- qKeywords: 1-2 industry terms only; interests go in searchIntent
-- Never put "open to work" in qKeywords`;
+}`;
 
 function buildUserMessage(prompt: string, leadContext: UserLeadContextDTO | null): string {
   const ctx = contextForAiParser(leadContext);
   return JSON.stringify(
     {
+      instruction:
+        "First understand the full currentPrompt. Then emit Apollo filters that match the FULL intent — especially industry. Do not put needs (automation/AI) into qKeywords.",
       savedContext: ctx,
       currentPrompt: prompt,
     },
