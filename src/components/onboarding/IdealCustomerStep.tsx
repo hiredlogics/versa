@@ -20,7 +20,7 @@ export function IdealCustomerStep({
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-lp-white">Ideal customer profile</h2>
-        <p className="mt-1 text-sm text-lp-muted">Define who you want to reach on Apollo.</p>
+        <p className="mt-1 text-sm text-lp-muted">Define who you want to reach.</p>
       </div>
       <ContextTagInput
         label="Target industries *"

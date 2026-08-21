@@ -14,6 +14,7 @@ export type SearchErrorKind =
   | "apollo"
   | "scoring"
   | "empty"
+  | "still_running"
   | "generic";
 
 export function SearchErrorCard({
@@ -81,6 +82,10 @@ export function SearchErrorCard({
     empty: {
       icon: <AlertTriangle className="h-5 w-5 text-lp-muted" />,
       title: "No leads found",
+    },
+    still_running: {
+      icon: <AlertTriangle className="h-5 w-5 text-lp-ice-blue" />,
+      title: "Still processing",
     },
     generic: {
       icon: <AlertTriangle className="h-5 w-5 text-red-400" />,

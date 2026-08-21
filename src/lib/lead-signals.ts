@@ -17,10 +17,12 @@ export function deriveMatchSignals(lead: {
     signals.push("LinkedIn profile");
   }
 
-  if (lead.reasoning?.trim()) {
+  // Only short score-style fragments become chips — skip prose "Why Reach Out" paragraphs
+  if (lead.reasoning?.trim() && lead.reasoning.length < 160) {
     for (const part of lead.reasoning.split(/\.\s+/).map((s) => s.trim()).filter(Boolean)) {
       const normalized = part.replace(/\.$/, "");
       const lower = normalized.toLowerCase();
+      if (normalized.length > 48) continue;
       if (lower.includes("email available") || lower.includes("email verified")) continue;
       if (!signals.includes(normalized)) signals.push(normalized);
     }

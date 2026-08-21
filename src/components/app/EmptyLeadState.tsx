@@ -14,7 +14,7 @@ export function EmptyLeadState() {
       </h2>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-lp-muted">
         Describe your ideal customer, paste a LinkedIn profile, or enter a company URL. {BRAND.name}{" "}
-        will parse your intent, search Apollo, score leads, and save the best matches.
+        will parse your intent, find matching people, score leads, and save the best matches.
       </p>
     </div>
   );

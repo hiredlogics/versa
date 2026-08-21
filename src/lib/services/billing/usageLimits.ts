@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Plan, Subscription, User } from "@prisma/client";
+import { APOLLO_HARD_MAX_RECORDS } from "@/lib/apollo-config";
 import { isBillingEnforced } from "@/lib/billing/constants";
 import type { LeadSearchAccessCode } from "@/lib/billing/billingTypes";
 import { ensureDefaultPlanSubscription, getSubscriptionForUser, isActiveSubscription } from "@/lib/billing/subscription";
@@ -153,12 +154,15 @@ export async function requireLeadSearchAccess(user: User, requestedMaxLeads?: nu
   const usage = await getOrCreateUsageRecord(user.id, period.start, period.end);
 
   if (!isBillingEnforced()) {
+    // Dev / billing-off: don't clamp Apollo bulk pulls to Starter's 500/mo plan quota
     const effectiveMaxLeads =
-      requestedMaxLeads != null && requestedMaxLeads > 0 ? requestedMaxLeads : plan.leadsPerMonth;
+      requestedMaxLeads != null && requestedMaxLeads > 0
+        ? requestedMaxLeads
+        : APOLLO_HARD_MAX_RECORDS;
     return {
       allowed: true as const,
       effectiveMaxLeads,
-      leadsRemaining: plan.leadsPerMonth,
+      leadsRemaining: effectiveMaxLeads,
       searchesRemaining: plan.searchesPerMonth,
       period,
       plan,

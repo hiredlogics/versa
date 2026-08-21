@@ -113,9 +113,9 @@ export function AdvancedFiltersDrawer({
               min={1}
               max={10}
               className="app-input"
-              value={filters.minScore ?? 8}
+              value={filters.minScore ?? 5}
               onChange={(e) =>
-                onChange({ ...filters, minScore: Number(e.target.value) || 8 })
+                onChange({ ...filters, minScore: Number(e.target.value) || 5 })
               }
             />
           </Field>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { BRAND } from "@/config/brand";
 import { useAppShellData } from "@/components/app/AppShellDataProvider";
-import { contextSummaryLine } from "@/lib/validations/onboarding-context";
 
 export function LeadContextBanner() {
   const context = useAppShellData()?.leadContext ?? null;
@@ -13,14 +12,17 @@ export function LeadContextBanner() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-lp-border bg-lp-panel/60 px-3 py-2">
       <p className="text-xs text-lp-muted">
-        <span className="text-lp-muted-dark">Using your saved {BRAND.name} context:</span>{" "}
-        <span className="text-lp-off-white">{contextSummaryLine(context)}</span>
+        <span className="text-lp-off-white">Each prompt is searched on its own</span>
+        <span className="text-lp-muted-dark">
+          {" "}
+          — {BRAND.name} pulls every match for that prompt (saved ICP is not mixed in).
+        </span>
       </p>
       <Link
         href="/app/settings"
         className="text-xs font-medium text-lp-cold-blue hover:text-lp-ice-blue"
       >
-        Edit context
+        Account settings
       </Link>
     </div>
   );

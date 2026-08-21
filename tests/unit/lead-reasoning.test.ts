@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
-import { buildLeadWhyReasoning } from "@/lib/services/ai/leadReasoning";
+import {
+  buildLeadWhyReasoning,
+  extractTitleSignals,
+} from "@/lib/services/ai/leadReasoning";
 import type { LeadScoreContext } from "@/lib/types";
 import type { UserLeadContextDTO } from "@/lib/validations/onboarding-context";
 
@@ -68,8 +71,19 @@ describe("toStoredApolloProfile", () => {
   });
 });
 
+describe("extractTitleSignals", () => {
+  it("detects visa and stack signals from title lines", () => {
+    const signals = extractTitleSignals(
+      "Java | Full-stack | H1B Transfer Eligible | Open to Relocate"
+    );
+    expect(signals.some((s) => /visa/i.test(s))).toBe(true);
+    expect(signals.some((s) => /stack/i.test(s))).toBe(true);
+    expect(signals.some((s) => /relocat/i.test(s))).toBe(true);
+  });
+});
+
 describe("buildLeadWhyReasoning", () => {
-  it("returns why-text plus a customized email draft with subject", () => {
+  it("writes a specific Why Reach Out paragraph, not score bullets", () => {
     const result = buildLeadWhyReasoning(
       {
         name: "Jane Doe",
@@ -85,36 +99,37 @@ describe("buildLeadWhyReasoning", () => {
       scoreContext
     );
 
-    expect(result.reasoning).toContain("Jane Doe is CEO at CloudCo");
+    expect(result.reasoning).toContain("CEO at CloudCo");
     expect(result.reasoning).toContain("San Francisco");
-    expect(result.reasoning).toContain("AI lead scoring");
-    expect(result.reasoning).toContain("Career: CEO at CloudCo");
-
-    expect(result.emailDraft).toContain("Subject:");
-    expect(result.emailDraft).toContain("Hi Jane");
-    expect(result.emailDraft).toContain("CloudCo");
-    expect(result.emailDraft).toContain("Reference their recent product launch");
-    expect(result.emailDraft).toContain("Lead scoring automation");
+    expect(result.reasoning).toMatch(/SaaS founders|ICP match|AI lead scoring/i);
+    expect(result.reasoning.toLowerCase()).not.toContain("matching role");
+    expect(result.reasoning.toLowerCase()).not.toContain("matches your search intent");
+    expect(result.emailDraft).toBe("");
   });
 
-  it("notes missing email and still produces an email-style draft", () => {
+  it("surfaces title signals for job-search mode", () => {
     const result = buildLeadWhyReasoning(
       {
-        name: "John Smith",
-        title: "CTO",
-        company: "TechCo",
-        industry: "Software",
-        employees: 80,
-        location: "Toronto, Canada",
+        name: "Alex Abdelkawy",
+        title: "Java | Full-stack | H1B Transfer Eligible",
+        company: "Morgan Stanley",
+        industry: "Finance",
+        employees: 5000,
+        location: "New York, New York",
         hasEmail: false,
-        leadScore: 7,
+        leadScore: 8,
       },
-      scoreContext
+      {
+        ...scoreContext,
+        openToWork: true,
+        searchIntent: "Software engineers in New York open to work",
+        originalPrompt: "Find software engineers who are open to work",
+      }
     );
 
-    expect(result.reasoning).toContain("John Smith is CTO at TechCo");
-    expect(result.reasoning).toContain("no email");
-    expect(result.emailDraft).toContain("Hi John");
-    expect(result.emailDraft).toContain("TechCo");
+    expect(result.reasoning).toContain("Morgan Stanley");
+    expect(result.reasoning.toLowerCase()).toMatch(/visa|job-search|hire/);
+    expect(result.reasoning.toLowerCase()).not.toContain("matching role");
+    expect(result.emailDraft).toBe("");
   });
 });

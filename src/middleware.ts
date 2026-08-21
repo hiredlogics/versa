@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
@@ -26,11 +27,22 @@ export default clerkMiddleware(
       return;
     }
 
+    // API routes: return 401 JSON instead of Clerk's protect-rewrite → fake 404 HTML.
+    // (auth.protect() intentionally 404s unauthenticated session-token API requests.)
+    if (req.nextUrl.pathname.startsWith("/api/")) {
+      const session = await auth();
+      if (!session.userId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      return;
+    }
+
     await auth.protect();
   },
   {
-    // Dev machines often drift a few seconds behind Clerk; default 5s is too tight.
-    clockSkewInMs: 12000,
+    // Dev machines often drift behind Clerk's token iat (seen ~15–30s locally).
+    // Default 5s / prior 12s is too tight and causes session_expired + refresh loops.
+    clockSkewInMs: 60_000,
   }
 );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Pencil, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
 
@@ -16,8 +16,10 @@ interface PromptComposerProps {
   onChange: (values: ComposerValues) => void;
   onSubmit: () => void;
   onOpenFilters: () => void;
+  onStop?: () => void;
   loading?: boolean;
   disabled?: boolean;
+  editing?: boolean;
   placeholder?: string;
   submitLabel?: string;
 }
@@ -31,8 +33,10 @@ export function PromptComposer({
   onChange,
   onSubmit,
   onOpenFilters,
+  onStop,
   loading,
   disabled,
+  editing,
   placeholder = "Find SaaS founders in the US with 20-300 employees who may need AI automation...",
   submitLabel = "Find leads",
 }: PromptComposerProps) {
@@ -48,10 +52,12 @@ export function PromptComposer({
 
   function handleFormSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (loading) return;
     submitSearch();
   }
 
   function handlePromptKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (loading) return;
     if (!isEnterKey(e.key, e.code) || e.shiftKey || e.nativeEvent.isComposing) return;
     e.preventDefault();
     submitSearch();
@@ -59,6 +65,13 @@ export function PromptComposer({
 
   return (
     <form className="app-composer overflow-hidden" onSubmit={handleFormSubmit}>
+      {editing && (
+        <div className="flex items-center gap-2 border-b border-lp-border bg-lp-panel/50 px-4 py-2">
+          <Pencil className="h-3.5 w-3.5 text-lp-ice-blue" />
+          <p className="text-xs text-lp-ice-blue">Editing prompt — submit to run again</p>
+        </div>
+      )}
+
       <div className="p-4">
         <textarea
           rows={3}
@@ -116,28 +129,41 @@ export function PromptComposer({
           <span className="hidden text-[11px] text-lp-muted-dark sm:inline">
             Enter to search · Shift+Enter for new line
           </span>
-          <Button
-            type="submit"
-            disabled={!canSubmit}
-            size="sm"
-            className={cn("gap-2", loading && "opacity-80")}
-          >
-            {loading ? (
-              <>
-                <span className="flex gap-1">
-                  <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
-                  <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
-                  <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
-                </span>
-                Searching…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                {submitLabel}
-              </>
-            )}
-          </Button>
+          {loading && onStop ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="gap-2 border-rose-500/30 text-rose-200 hover:bg-rose-500/10"
+              onClick={onStop}
+            >
+              <Square className="h-3 w-3 fill-current" />
+              Stop
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              size="sm"
+              className={cn("gap-2", loading && "opacity-80")}
+            >
+              {loading ? (
+                <>
+                  <span className="flex gap-1">
+                    <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
+                    <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
+                    <span className="app-signal-dot h-1.5 w-1.5 rounded-full bg-lp-black" />
+                  </span>
+                  Searching…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {editing ? "Run edited prompt" : submitLabel}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </form>

@@ -24,10 +24,10 @@ export const BRAND = {
   billingSubheadline: "Manage your VARSA subscription and lead credits.",
   searchSteps: {
     understand: "VARSA is structuring your buyer intent.",
-    extract: "Extracting Apollo filters from your prompt.",
-    search: "Searching Apollo for matching companies and decision-makers.",
+    extract: "Extracting search filters from your prompt.",
+    search: "Searching for matching companies and decision-makers.",
     decision: "Finding decision-makers at target companies.",
-    enrich: "Enriching contacts with Apollo data.",
+    enrich: "Unlocking verified contact details.",
     score: "Scoring leads against your saved context.",
     save: "Saving qualified opportunities.",
   },

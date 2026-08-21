@@ -52,6 +52,46 @@ const REAL_ESTATE_TITLES = [
   "CEO",
 ];
 
+/** HR / People Ops titles — "HR" alone is too vague for Apollo and balloons the pool. */
+export const HR_TITLES = [
+  "HR Manager",
+  "Human Resources Manager",
+  "Head of People",
+  "People Operations Manager",
+  "CHRO",
+  "Talent Acquisition Manager",
+];
+
+function isHrRoleSearch(
+  industry?: string,
+  userPrompt?: string,
+  keywords?: string,
+  titles?: string[]
+): boolean {
+  const blob = `${industry || ""} ${userPrompt || ""} ${keywords || ""} ${(titles || []).join(" ")}`.toLowerCase();
+  return /\b(hr|human resources|people ops|people operations|talent acquisition|recruiter|chro)\b/.test(
+    blob
+  );
+}
+
+function alignHrTitles(titles: string[]): string[] {
+  const cleaned = titles.filter((title) => {
+    const lower = title.toLowerCase().trim();
+    // Bare "HR" / "Human Resources" is not a useful Apollo person_titles value alone
+    return lower !== "hr" && lower !== "human resources" && lower !== "hr professional";
+  });
+
+  const merged = [...cleaned];
+  for (const title of HR_TITLES) {
+    if (merged.length >= 5) break;
+    if (!merged.some((t) => t.toLowerCase() === title.toLowerCase())) {
+      merged.push(title);
+    }
+  }
+
+  return (merged.length > 0 ? merged : HR_TITLES).slice(0, 5);
+}
+
 /** Stable Apollo title set when the user asks for software engineers / developers. */
 export const SOFTWARE_ENGINEER_TITLES = [
   "Software Engineer",
@@ -140,6 +180,10 @@ export function alignTitlesToIndustry(
     return (merged.length > 0 ? merged : REAL_ESTATE_TITLES).slice(0, 5);
   }
 
+  if (isHrRoleSearch(industry, userPrompt, keywords, titles)) {
+    return alignHrTitles(titles);
+  }
+
   return normalizeSoftwareEngineerTitles(titles, userPrompt, industry).slice(0, 5);
 }
 
@@ -210,6 +254,9 @@ export function normalizeEmployeeRanges(
   return mapEmployeeRange(fallbackMin, fallbackMax);
 }
 
+/** Keep the OR list small so the pool stays intentional. */
+const MAX_PERSON_LOCATIONS = 3;
+
 export function normalizeLocations(locations: unknown): string[] {
   const cleaned = asStringArray(locations).map((loc) => {
     const lower = loc.toLowerCase().trim();
@@ -217,6 +264,17 @@ export function normalizeLocations(locations: unknown): string[] {
       return "United States";
     }
     if (lower === "uk" || lower === "u.k.") return "United Kingdom";
+    if (
+      lower === "ny" ||
+      lower === "n.y." ||
+      lower === "n.y" ||
+      lower === "nyc" ||
+      lower === "new york city" ||
+      lower === "new york, ny" ||
+      lower === "new york"
+    ) {
+      return "New York";
+    }
     return loc.trim();
   });
   if (cleaned.length <= 1) return cleaned.length ? cleaned : ["United States"];
@@ -231,10 +289,20 @@ export function normalizeLocations(locations: unknown): string[] {
     "europe",
   ]);
 
-  const specific = cleaned.filter((l) => !generic.has(l.toLowerCase().trim()));
-  if (specific.length > 0) return [specific[0]];
+  const seen = new Set<string>();
+  const deduped = cleaned.filter((l) => {
+    const key = l.toLowerCase().trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
-  return [cleaned[0]];
+  // Several sibling regions are a legitimate OR for people search; a country
+  // alongside one of its own states/cities is redundant, so drop the country.
+  const specific = deduped.filter((l) => !generic.has(l.toLowerCase().trim()));
+  if (specific.length > 0) return specific.slice(0, MAX_PERSON_LOCATIONS);
+
+  return [deduped[0]];
 }
 
 const KNOWN_INDUSTRY_PHRASES = [
@@ -496,7 +564,7 @@ export function normalizeSearchCriteria(
       ? `${searchIntent}. Original request: ${userPrompt}`.trim()
       : searchIntent;
 
-  const companySizeMin = parsed.companySizeMin ?? (openToWork ? 1 : 10);
+  const companySizeMin = parsed.companySizeMin ?? 10;
   const companySizeMax = parsed.companySizeMax ?? 500;
 
   const employeeRanges = normalizeEmployeeRanges(
@@ -514,31 +582,54 @@ export function normalizeSearchCriteria(
     employeeRanges.push("11,50");
   }
 
-  // Open-to-work: Apollo can't filter OTW — keep titles/location, use broader size buckets
-  const openToWorkRanges = ["11,50", "51,200", "201,500", "501,1000"];
+  /**
+   * Open-to-work is NOT an Apollo API filter (no person_open_to_work / similar param).
+   * Previously we dropped qKeywords and forced huge employee ranges, which ballooned
+   * pools (e.g. ~3.5M for "NY HR open to work"). Keep titles + location + keywords tight.
+   */
+  let finalTitles =
+    personTitles.length > 0
+      ? personTitles
+      : openToWork
+        ? alignTitlesToIndustry([], parsed.industry, userPrompt, rawKeywords)
+        : ["Founder", "CEO", "Director"];
+  if (finalTitles.length === 0) {
+    finalTitles = ["Director", "Manager", "Specialist"];
+  }
+
+  // Tighter matching for OTW / short role abbreviations — similar titles explode the pool
+  const includeSimilar =
+    openToWork || finalTitles.some((t) => /^(hr|manager|director|specialist)$/i.test(t.trim()))
+      ? false
+      : apolloIn.includeSimilarTitles !== false;
 
   const apollo: ApolloSearchFilters = {
-    personTitles:
-      personTitles.length > 0
-        ? personTitles
-        : openToWork
-          ? [...SOFTWARE_ENGINEER_TITLES]
-          : ["Founder", "CEO", "Director"],
+    personTitles: finalTitles.slice(0, 5),
     personLocations,
-    qKeywords: openToWork ? undefined : apolloKeywords,
-    employeeRanges: openToWork ? openToWorkRanges : employeeRanges,
-    includeSimilarTitles: apolloIn.includeSimilarTitles !== false,
+    // Keep keywords for OTW — dropping them was a major cause of multi-million pools
+    qKeywords: apolloKeywords || undefined,
+    employeeRanges,
+    includeSimilarTitles: includeSimilar,
   };
 
+  const otwIntentSuffix = openToWork
+    ? " Note: open-to-work status cannot be filtered directly; matching professionals by title/location/keywords instead."
+    : "";
+
   return {
-    industry: parsed.industry || "Any",
+    industry:
+      parsed.industry && parsed.industry !== "Any"
+        ? parsed.industry
+        : isHrRoleSearch(parsed.industry, userPrompt, rawKeywords, finalTitles)
+          ? "Human Resources"
+          : parsed.industry || "Any",
     country: personLocations[0] || parsed.country || "United States",
-    companySizeMin,
-    companySizeMax,
+    companySizeMin: companySizeMin,
+    companySizeMax: companySizeMax,
     jobTitles: apollo.personTitles,
     keywords: apolloKeywords || rawKeywords || undefined,
     summary: parsed.summary || userPrompt.slice(0, 120),
-    searchIntent: fullIntent,
+    searchIntent: `${fullIntent}${otwIntentSuffix}`.trim(),
     openToWork,
     requireEmail: parsed.requireEmail ?? false,
     apollo,

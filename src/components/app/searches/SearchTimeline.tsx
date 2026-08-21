@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn";
 const STEPS = [
   { id: "parse", label: "Prompt interpreted" },
   { id: "filters", label: "Filters extracted" },
-  { id: "search", label: "Apollo search completed" },
+  { id: "search", label: "Lead search completed" },
   { id: "score", label: "Leads scored with AI" },
   { id: "save", label: "Results saved" },
 ];

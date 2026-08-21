@@ -105,20 +105,25 @@ export function heuristicScoreLead(
       reasons.push("Job-seeking signal in title");
     }
     if (ROLE_SIGNALS.some((s) => title.includes(s))) {
-      score += 1;
+      score += 2;
       reasons.push("Matching role");
     }
-    if (textMatchesSignals(combined, signals)) {
+    if (textMatchesSignals(title, signals) || textMatchesSignals(combined, signals)) {
       score += 2;
       reasons.push("Matches your search intent");
     }
+    // Employed professionals in the target role are still valid outreach/hire targets
+    if (score < 7 && ROLE_SIGNALS.some((s) => title.includes(s))) {
+      score = 7;
+      reasons.push("Target role match for this job search");
+    }
     if (lead.hasEmail) {
-      score += 2;
+      score += 1;
       reasons.push("Email available");
     }
-    if (lead.employees >= 11 && lead.employees <= 500) {
+    if (lead.employees >= 11 && lead.employees <= 5000) {
       score += 1;
-      reasons.push("Good company size");
+      reasons.push("Known company size");
     }
   } else {
     if (AUTHORITY_SIGNALS.some((s) => title.includes(s))) {

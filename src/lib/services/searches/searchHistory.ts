@@ -133,30 +133,57 @@ export function mapSearchToHistoryItem(
   };
 }
 
+type SummaryCriteria = ParsedSearchCriteria & {
+  openToWork?: boolean;
+  searchIntent?: string;
+  summary?: string;
+};
+
 export function buildAssistantSummary(
-  criteria: ParsedSearchCriteria | null,
+  criteria: SummaryCriteria | null,
   totalQualified: number,
   totalFound: number
 ): string {
-  if (criteria?.intentSummary) return criteria.intentSummary;
+  const openToWork = Boolean(criteria?.openToWork);
+  const titles = criteria?.jobTitles?.slice(0, 3).filter(Boolean) ?? [];
+  const location = criteria?.country?.trim();
+  const industry =
+    criteria?.industry && criteria.industry !== "Any" ? criteria.industry : null;
 
-  const parts: string[] = [];
-  if (criteria?.country) parts.push(`companies in ${criteria.country}`);
-  if (criteria?.companySizeMin != null || criteria?.companySizeMax != null) {
-    parts.push(
-      `with ${criteria.companySizeMin ?? "any"}–${criteria.companySizeMax ?? "any"} employees`
-    );
+  let base: string;
+  if (criteria?.intentSummary?.trim()) {
+    base = criteria.intentSummary.trim().replace(/\.$/, "");
+  } else if (openToWork) {
+    const role = titles[0] || "professionals";
+    const where = location ? ` in ${location}` : "";
+    base = `I interpreted this as ${role}${where} who may be open to work / looking for a job. "Open to work" can't be verified directly, so results are matching professionals ranked for outreach`;
+  } else {
+    const parts: string[] = [];
+    if (titles.length) parts.push(titles.join(", "));
+    if (location) parts.push(`in ${location}`);
+    if (criteria?.companySizeMin != null || criteria?.companySizeMax != null) {
+      parts.push(
+        `at companies with ${criteria.companySizeMin ?? "any"}–${criteria.companySizeMax ?? "any"} employees`
+      );
+    }
+    if (industry) parts.push(`in ${industry}`);
+    base =
+      parts.length > 0
+        ? `I interpreted this as ${parts.join(" ")}`
+        : "I interpreted your prompt and ran a targeted lead search";
   }
-  if (criteria?.industry) parts.push(`in ${criteria.industry}`);
-
-  const base =
-    parts.length > 0
-      ? `I interpreted this as ${parts.join(" ")}.`
-      : "I interpreted your prompt and ran a targeted lead search.";
 
   if (totalQualified > 0) {
-    return `${base} Saved ${totalQualified} qualified lead${totalQualified !== 1 ? "s" : ""}${totalFound > totalQualified ? ` from ${totalFound} matches` : ""}.`;
+    const pool =
+      totalFound > totalQualified
+        ? ` from ~${totalFound.toLocaleString()} matches for this prompt`
+        : "";
+    return `${base}. Saved ${totalQualified.toLocaleString()} lead${totalQualified !== 1 ? "s" : ""}${pool}.`;
   }
 
-  return `${base} No qualified leads matched this search.`;
+  if (totalFound > 0) {
+    return `${base}. ~${totalFound.toLocaleString()} matches available — still pulling / saving for this prompt.`;
+  }
+
+  return `${base}. No qualified leads matched this search.`;
 }

@@ -17,6 +17,11 @@ import {
   type PlatformStatus,
 } from "@/components/app/PlatformStatusBanner";
 import { SearchErrorCard, type SearchErrorKind } from "@/components/app/SearchErrorCard";
+import {
+  ClarificationCard,
+  type ClarificationAnswer,
+} from "@/components/app/ClarificationCard";
+import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
 import {
   buildPromptWithFilters,
@@ -77,6 +82,11 @@ type AssistantTurn = {
   result?: FindLeadsResponse;
   error?: { kind: SearchErrorKind; message: string };
   loading?: boolean;
+  clarification?: {
+    questions: ClarificationQuestion[];
+    leadsRemaining?: number;
+    batchSize?: number;
+  };
 };
 
 type ChatTurn = UserTurn | AssistantTurn;
@@ -107,7 +117,7 @@ function buildConversationPrompt(
   const trimmed = nextText.trim();
   const prior = priorUserTexts.map((line) => line.trim()).filter(Boolean);
 
-  // Merge follow-ups into one clear search brief — never dump "Conversation context" raw into Apollo parse
+  // Merge follow-ups into one clear search brief — never dump "Conversation context" raw into the parser
   let base = trimmed;
   if (prior.length > 0 && trimmed) {
     base = [
@@ -141,7 +151,8 @@ export function LeadFinderChat() {
     companyUrl: "",
     companyName: "",
   });
-  const [filters, setFilters] = useState<AdvancedFilters>({ minScore: 8 });
+  // Default 5 — open-to-work / role searches rarely clear an 8+ buyer score
+  const [filters, setFilters] = useState<AdvancedFilters>({ minScore: 5 });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<SearchStep[]>(INITIAL_STEPS);
@@ -155,6 +166,12 @@ export function LeadFinderChat() {
     null
   );
   const [platformStatus, setPlatformStatus] = useState<PlatformStatus | null>(null);
+  const [editingUserTurnId, setEditingUserTurnId] = useState<string | null>(null);
+  const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
+  const [resumingSearchId, setResumingSearchId] = useState<string | null>(null);
+  const [loadingMoreSearchId, setLoadingMoreSearchId] = useState<string | null>(null);
+  // Set once the user has answered clarifying questions — the next run skips the gate.
+  const [clarified, setClarified] = useState(false);
   const shellData = useAppShellData();
 
   useEffect(() => {
@@ -170,6 +187,8 @@ export function LeadFinderChat() {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadedRestoreIdRef = useRef<string | null>(null);
+  const activeSearchIdRef = useRef<string | null>(null);
+  const stopRequestedRef = useRef(false);
 
   const inConversation = turns.length > 0;
 
@@ -180,6 +199,10 @@ export function LeadFinderChat() {
 
   const clearChatState = useCallback(() => {
     clearTimers();
+    stopRequestedRef.current = true;
+    activeSearchIdRef.current = null;
+    setActiveSearchId(null);
+    setEditingUserTurnId(null);
     setLoading(false);
     setTurns([]);
     setSteps(INITIAL_STEPS.map((s) => ({ ...s, status: "pending" as const })));
@@ -189,9 +212,248 @@ export function LeadFinderChat() {
     setSelectedLead(null);
     setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
     setPendingRestoreId(null);
+    setClarified(false);
     loadedRestoreIdRef.current = null;
     clearRestoreSearchId();
   }, [clearTimers]);
+
+  const stopActiveSearch = useCallback(async () => {
+    stopRequestedRef.current = true;
+    const id = activeSearchIdRef.current;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    try {
+      await fetch(`/api/searches/${id}/stop`, { method: "POST" });
+    } catch {
+      // Poll loop will still exit via stopRequestedRef
+    }
+  }, []);
+
+  const beginEditPrompt = useCallback(
+    async (userTurnId: string, text: string) => {
+      if (loading && activeSearchIdRef.current) {
+        await stopActiveSearch();
+      }
+      setEditingUserTurnId(userTurnId);
+      setComposer((prev) => ({ ...prev, prompt: text }));
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+      });
+    },
+    [loading, stopActiveSearch]
+  );
+
+  async function pollSearchUntilDone(
+    searchId: string,
+    assistantTurnId: string,
+    fallbackCriteria?: ParsedSearchCriteria
+  ) {
+    activeSearchIdRef.current = searchId;
+    setActiveSearchId(searchId);
+    const pollLimitMs = Math.max(
+      60_000,
+      parseInt(process.env.NEXT_PUBLIC_SEARCH_POLL_MS || String(45 * 60_000), 10)
+    );
+    const pollStarted = Date.now();
+    let lastNote = "";
+
+    while (Date.now() - pollStarted < pollLimitMs) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const pollRes = await fetch(`/api/searches/${searchId}?limit=200`);
+      if (!pollRes.ok) continue;
+      const pollData = (await pollRes.json()) as SearchDetailResponse;
+      const { search, leads } = pollData;
+
+      if (search.relaxNote && search.relaxNote !== lastNote) {
+        lastNote = search.relaxNote;
+        patchAssistantTurn(assistantTurnId, {
+          summary: search.relaxNote,
+          criteria: search.parsedCriteria ?? fallbackCriteria,
+        });
+      }
+
+      // Progressive: show leads as each 1,000-batch saves (don't wait for COMPLETE)
+      if (search.status === "RUNNING" && leads.length > 0) {
+        const partial: FindLeadsResponse = {
+          searchId: search.id,
+          leads,
+          criteria: search.parsedCriteria ?? fallbackCriteria ?? EMPTY_CRITERIA,
+          totalAvailable: search.totalFound,
+          totalSaved: search.totalQualified,
+          leadsOffset: search.leadsOffset ?? 0,
+          apolloRelaxNote: search.relaxNote ?? undefined,
+          message: search.relaxNote || "Processing batches…",
+          status: "RUNNING",
+          canResume: false,
+        };
+        patchAssistantTurn(assistantTurnId, {
+          loading: true,
+          criteria: partial.criteria,
+          summary: search.relaxNote || lastNote,
+          result: partial,
+        });
+      }
+
+      if (search.status === "FAILED") {
+        const stopped = /stopped by user/i.test(search.errorMessage || "");
+        finishSearchTurn(assistantTurnId, false, {
+          loading: false,
+          criteria: search.parsedCriteria ?? fallbackCriteria,
+          error: {
+            kind: stopped ? "empty" : "generic",
+            message: stopped
+              ? "Search stopped. Edit your prompt below and run again."
+              : search.errorMessage || "Search failed while pulling leads.",
+          },
+        });
+        return;
+      }
+
+      if (search.status === "COMPLETE") {
+        const result: FindLeadsResponse = {
+          searchId: search.id,
+          leads,
+          criteria: search.parsedCriteria ?? fallbackCriteria ?? EMPTY_CRITERIA,
+          totalAvailable: search.totalFound,
+          totalSaved: search.totalQualified,
+          leadsOffset: search.leadsOffset ?? 0,
+          apolloRelaxNote: search.relaxNote ?? undefined,
+          message:
+            search.relaxNote ||
+            `Saved ${search.totalQualified.toLocaleString()} leads for this prompt.`,
+          status: "COMPLETE",
+          canResume: Boolean(search.canResume),
+        };
+
+        const summary = buildAssistantSummary(
+          search.parsedCriteria ?? fallbackCriteria ?? null,
+          search.totalQualified,
+          search.totalFound
+        );
+
+        if (search.totalQualified === 0) {
+          finishSearchTurn(assistantTurnId, true, {
+            loading: false,
+            criteria: result.criteria,
+            summary,
+            error: {
+              kind: "empty",
+              message: result.message || "No leads matched your criteria.",
+            },
+          });
+          return;
+        }
+
+        finishSearchTurn(assistantTurnId, true, {
+          loading: false,
+          criteria: result.criteria,
+          summary,
+          result,
+        });
+        loadedRestoreIdRef.current = searchId;
+
+        // Prepare first batch of 200 (emails + Why) without blocking the COMPLETE UI
+        void handleLeadsPage(assistantTurnId, searchId, 0);
+        return;
+      }
+    }
+
+    finishSearchTurn(assistantTurnId, false, {
+      loading: false,
+      criteria: fallbackCriteria,
+      error: {
+        kind: "still_running",
+        message:
+          "Still processing lead batches in the background. Open Searches in a few minutes — saved leads appear after each batch of 1,000.",
+      },
+    });
+  }
+
+  async function handleResumeSearch(assistantTurnId: string, searchId: string) {
+    setResumingSearchId(searchId);
+    stopRequestedRef.current = false;
+    setLoading(true);
+    patchAssistantTurn(assistantTurnId, {
+      loading: true,
+      summary: "Getting the next 100 leads…",
+      error: undefined,
+    });
+    startStepAnimation();
+
+    try {
+      const res = await fetch(`/api/searches/${searchId}/resume`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        finishSearchTurn(assistantTurnId, false, {
+          loading: false,
+          error: {
+            kind: "generic",
+            message: data.error || "Could not resume this search.",
+          },
+        });
+        return;
+      }
+      await pollSearchUntilDone(searchId, assistantTurnId);
+    } catch {
+      finishSearchTurn(assistantTurnId, false, {
+        loading: false,
+        error: {
+          kind: "network",
+          message: "Could not reach the server to resume.",
+        },
+      });
+    } finally {
+      setResumingSearchId(null);
+      activeSearchIdRef.current = null;
+      setActiveSearchId(null);
+      setLoading(false);
+    }
+  }
+
+  async function handleLeadsPage(
+    assistantTurnId: string,
+    searchId: string,
+    nextOffset: number
+  ) {
+    setLoadingMoreSearchId(searchId);
+    try {
+      // Unlock emails + Why for this visible batch of 200
+      const enrichRes = await fetch(`/api/searches/${searchId}/enrich-page`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ offset: Math.max(0, nextOffset), limit: 200 }),
+      });
+      const enrichedBody = enrichRes.ok
+        ? ((await enrichRes.json()) as { leads?: FindLeadsResponse["leads"] })
+        : null;
+
+      const res = await fetch(
+        `/api/searches/${searchId}?limit=200&offset=${Math.max(0, nextOffset)}`
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as SearchDetailResponse;
+      patchAssistantTurn(assistantTurnId, {
+        result: {
+          searchId,
+          leads: enrichedBody?.leads?.length ? enrichedBody.leads : data.leads,
+          criteria: data.search.parsedCriteria ?? EMPTY_CRITERIA,
+          totalAvailable: data.search.totalFound,
+          totalSaved: data.search.totalQualified,
+          leadsOffset: data.search.leadsOffset ?? nextOffset,
+          apolloRelaxNote: data.search.relaxNote ?? undefined,
+          message:
+            data.search.relaxNote ||
+            `Saved ${data.search.totalQualified.toLocaleString()} leads for this prompt.`,
+          canResume: Boolean(data.search.canResume),
+          status: data.search.status,
+        },
+      });
+    } finally {
+      setLoadingMoreSearchId(null);
+    }
+  }
 
   const resetSearch = useCallback(() => {
     clearChatState();
@@ -240,7 +502,7 @@ export function LeadFinderChat() {
     setRestoring(true);
     setRestoreError(null);
 
-    fetch(`/api/searches/${encodeURIComponent(searchIdToRestore)}`, {
+    fetch(`/api/searches/${encodeURIComponent(searchIdToRestore)}?limit=200&offset=0`, {
       cache: "no-store",
       signal: controller.signal,
     })
@@ -259,8 +521,10 @@ export function LeadFinderChat() {
           leads,
           criteria,
           totalAvailable: search.totalFound,
-          apolloRelaxNote: search.relaxNote ?? undefined,
-          message: `${search.totalQualified} qualified leads restored from search history.`,
+          totalSaved: search.totalQualified,
+          leadsOffset: search.leadsOffset ?? 0,
+          message: `${search.totalQualified.toLocaleString()} leads restored from search history.`,
+          canResume: Boolean(search.canResume),
         };
 
         loadedRestoreIdRef.current = searchIdToRestore;
@@ -340,7 +604,19 @@ export function LeadFinderChat() {
     });
   }
 
-  async function runSearch(retryAssistantTurnId?: string) {
+  /** Answers from the question card become the next chat turn and start the search. */
+  function answerClarification(assistantTurnId: string, answer: ClarificationAnswer) {
+    patchAssistantTurn(assistantTurnId, { clarification: undefined });
+    void runSearch(undefined, {
+      prompt: answer.text,
+      requestedLeadCount: answer.requestedLeadCount,
+    });
+  }
+
+  async function runSearch(
+    retryAssistantTurnId?: string,
+    override?: { prompt: string; requestedLeadCount?: number }
+  ) {
     const isRetry = typeof retryAssistantTurnId === "string" && retryAssistantTurnId.length > 0;
 
     if (platformStatus && !platformStatus.leadSearchReady) {
@@ -370,8 +646,65 @@ export function LeadFinderChat() {
         .filter((turn): turn is UserTurn => turn.role === "user")
         .map((turn) => turn.text);
       assistantTurnId = retryAssistantTurnId;
-    } else {
+    } else if (editingUserTurnId) {
       snapshot = { ...composer };
+      const hasInput =
+        snapshot.prompt.trim() ||
+        snapshot.linkedinUrl ||
+        snapshot.companyUrl ||
+        snapshot.companyName;
+
+      if (!hasInput) {
+        setComposerError({
+          kind: "missing_prompt",
+          message: "Describe who you want to find or add a URL.",
+        });
+        return;
+      }
+
+      displayText =
+        snapshot.prompt.trim() ||
+        snapshot.linkedinUrl ||
+        snapshot.companyUrl ||
+        snapshot.companyName;
+
+      const editId = editingUserTurnId;
+      const editIndex = turns.findIndex((turn) => turn.id === editId);
+      if (editIndex < 0) {
+        setEditingUserTurnId(null);
+        return;
+      }
+
+      priorUserTexts = turns
+        .slice(0, editIndex)
+        .filter((turn): turn is UserTurn => turn.role === "user")
+        .map((turn) => turn.text);
+
+      assistantTurnId = newId();
+
+      setTurns((prev) => {
+        const idx = prev.findIndex((turn) => turn.id === editId);
+        if (idx < 0) return prev;
+        const kept = prev.slice(0, idx);
+        return [
+          ...kept,
+          { id: editId, role: "user" as const, text: displayText },
+          {
+            id: assistantTurnId,
+            role: "assistant" as const,
+            loading: true,
+            steps: INITIAL_STEPS.map((s, i) => ({
+              ...s,
+              status: i === 0 ? ("running" as const) : ("pending" as const),
+            })),
+          },
+        ];
+      });
+
+      setEditingUserTurnId(null);
+      setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+    } else {
+      snapshot = override ? { ...composer, prompt: override.prompt } : { ...composer };
       const hasInput =
         snapshot.prompt.trim() ||
         snapshot.linkedinUrl ||
@@ -417,6 +750,7 @@ export function LeadFinderChat() {
 
     setComposerError(null);
     setRestoreError(null);
+    stopRequestedRef.current = false;
     setLoading(true);
     setParsedCriteria(undefined);
     clearRestoreSearchId();
@@ -461,7 +795,9 @@ export function LeadFinderChat() {
           companyUrl: snapshot.companyUrl || undefined,
           companyName: snapshot.companyName || undefined,
           inputType,
-          minScore: filters.minScore ?? 8,
+          minScore: filters.minScore ?? 5,
+          skipClarification: clarified || undefined,
+          requestedLeadCount: override?.requestedLeadCount,
         }),
       });
 
@@ -487,6 +823,37 @@ export function LeadFinderChat() {
 
       const response = data as FindLeadsResponse;
       setParsedCriteria(response.criteria);
+
+      // Ask before spending credits: no search row was created yet.
+      if (response.status === "NEEDS_CLARIFICATION" || (response.questions?.length ?? 0) > 0) {
+        clearTimers();
+        setClarified(true);
+        const pendingSteps = INITIAL_STEPS.map((s) => ({ ...s, status: "pending" as const }));
+        setSteps(pendingSteps);
+        patchAssistantTurn(assistantTurnId, {
+          loading: false,
+          criteria: response.criteria,
+          summary: response.message,
+          steps: pendingSteps,
+          clarification: {
+            questions: response.questions ?? [],
+            leadsRemaining: response.leadsRemaining,
+            batchSize: response.batchSize,
+          },
+        });
+        return;
+      }
+
+      // Async full-pull: poll until COMPLETE/FAILED while showing live progress
+      if (response.async || response.status === "RUNNING") {
+        const searchId = response.searchId;
+        patchAssistantTurn(assistantTurnId, {
+          summary: response.message,
+          criteria: response.criteria,
+        });
+        await pollSearchUntilDone(searchId, assistantTurnId, response.criteria);
+        return;
+      }
 
       const summary = buildAssistantSummary(
         response.criteria ?? null,
@@ -523,6 +890,8 @@ export function LeadFinderChat() {
         },
       });
     } finally {
+      activeSearchIdRef.current = null;
+      setActiveSearchId(null);
       setLoading(false);
     }
   }
@@ -556,6 +925,7 @@ export function LeadFinderChat() {
 
           {turns.map((turn) => {
             if (turn.role === "user") {
+              const isEditing = editingUserTurnId === turn.id;
               return (
                 <motion.div
                   key={turn.id}
@@ -563,9 +933,19 @@ export function LeadFinderChat() {
                   animate={{ opacity: 1, y: 0 }}
                   className="ml-auto max-w-[92%] rounded-xl border border-lp-border-strong bg-lp-panel-strong px-4 py-3 sm:max-w-[85%]"
                 >
-                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
-                    You
-                  </p>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
+                      You{isEditing ? " · editing" : ""}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => beginEditPrompt(turn.id, turn.text)}
+                      disabled={restoring}
+                      className="text-[11px] font-medium text-lp-muted transition-colors hover:text-lp-ice-blue disabled:opacity-40"
+                    >
+                      Edit prompt
+                    </button>
+                  </div>
                   <p className="text-sm leading-relaxed text-lp-off-white">{turn.text}</p>
                 </motion.div>
               );
@@ -574,11 +954,13 @@ export function LeadFinderChat() {
             const stepState = turn.loading ? steps : turn.steps;
             const criteriaState = turn.loading ? parsedCriteria : turn.criteria;
             const showProgress =
-              !turn.error && (turn.loading || stepState.some((s) => s.status !== "pending"));
+              !turn.error &&
+              !turn.clarification &&
+              (turn.loading || stepState.some((s) => s.status !== "pending"));
 
             return (
               <div key={turn.id} className="flex flex-col gap-4">
-                {turn.summary && !turn.loading && (
+                {turn.summary && (
                   <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -588,6 +970,18 @@ export function LeadFinderChat() {
                       {BRAND.name}
                     </p>
                     <p className="text-sm leading-relaxed text-lp-muted">{turn.summary}</p>
+                  </motion.div>
+                )}
+
+                {turn.clarification && turn.clarification.questions.length > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                    <ClarificationCard
+                      questions={turn.clarification.questions}
+                      leadsRemaining={turn.clarification.leadsRemaining}
+                      batchSize={turn.clarification.batchSize}
+                      disabled={loading}
+                      onSubmit={(answer) => answerClarification(turn.id, answer)}
+                    />
                   </motion.div>
                 )}
 
@@ -616,7 +1010,7 @@ export function LeadFinderChat() {
                   />
                 )}
 
-                {turn.result && turn.result.leads.length > 0 && (
+                {turn.result && (turn.result.leads.length > 0 || (turn.result.totalSaved ?? 0) > 0) && (
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                     {turn.result.apolloRelaxNote && (
                       <p className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/90">
@@ -628,7 +1022,16 @@ export function LeadFinderChat() {
                       searchId={turn.result.searchId}
                       message={turn.result.message}
                       onSelectLead={setSelectedLead}
-                      minScoreFilter={filters.minScore ?? 8}
+                      minScoreFilter={0}
+                      totalSaved={turn.result.totalSaved ?? turn.result.leads.length}
+                      pageOffset={turn.result.leadsOffset ?? 0}
+                      canResume={Boolean(turn.result.canResume)}
+                      resuming={resumingSearchId === turn.result.searchId}
+                      loadingPage={loadingMoreSearchId === turn.result.searchId}
+                      onResume={() => handleResumeSearch(turn.id, turn.result!.searchId)}
+                      onPageChange={(nextOffset) =>
+                        handleLeadsPage(turn.id, turn.result!.searchId, nextOffset)
+                      }
                     />
                   </motion.div>
                 )}
@@ -650,15 +1053,37 @@ export function LeadFinderChat() {
             onChange={setComposer}
             onSubmit={() => runSearch()}
             onOpenFilters={() => setFiltersOpen(true)}
+            onStop={activeSearchId || loading ? () => void stopActiveSearch() : undefined}
             loading={loading}
+            editing={Boolean(editingUserTurnId)}
             disabled={platformStatus?.leadSearchReady === false}
             placeholder={
-              inConversation
-                ? "Continue in this chat — e.g. “Only founders in Canada” or “Add healthcare companies”"
-                : undefined
+              editingUserTurnId
+                ? "Edit your prompt, then run again…"
+                : inConversation
+                  ? "Continue in this chat — e.g. “Only founders in Canada” or “Add healthcare companies”"
+                  : undefined
             }
-            submitLabel={inConversation ? "Continue search" : "Find leads"}
+            submitLabel={
+              editingUserTurnId
+                ? "Run edited prompt"
+                : inConversation
+                  ? "Continue search"
+                  : "Find leads"
+            }
           />
+          {editingUserTurnId && !loading && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingUserTurnId(null);
+                setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+              }}
+              className="text-xs text-lp-muted hover:text-lp-ice-blue"
+            >
+              Cancel edit
+            </button>
+          )}
         </div>
       </div>
 

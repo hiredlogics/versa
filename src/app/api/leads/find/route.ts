@@ -1,16 +1,25 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/get-current-user";
 import {
   OnboardingRequiredError,
   requireOnboardingComplete,
 } from "@/lib/context/userLeadContext";
 import { findLeadsInputSchema } from "@/lib/validations/search-criteria";
-import { findLeadsWorkflow, type FindLeadsInput } from "@/lib/services/leads/findLeadsWorkflow";
+import {
+  startFindLeadsWorkflow,
+  runFindLeadsJob,
+  previewFindClarification,
+  type FindLeadsInput,
+} from "@/lib/services/leads/findLeadsWorkflow";
 import { SubscriptionRequiredError, requireActiveSubscription } from "@/lib/billing/subscription";
 import {
   LeadSearchAccessError,
   UsageLimitError,
 } from "@/lib/services/billing/usageLimits";
+import { extractRequestedLeadCount } from "@/lib/clarifyPrompt";
+import { getProcessBatchSize } from "@/lib/services/leads/fetchProgress";
+import { toUserFacingSearchError } from "@/lib/services/leads/searchError";
+import { prisma } from "@/lib/db/prisma";
 
 export const maxDuration = 300;
 
@@ -27,6 +36,8 @@ export async function POST(request: Request) {
       prompt: parsed.prompt || "",
       inputType: parsed.inputType,
       minScore: parsed.minScore,
+      requestedLeadCount: parsed.requestedLeadCount,
+      skipClarification: parsed.skipClarification,
     };
 
     if (parsed.linkedinUrl) {
@@ -42,8 +53,59 @@ export async function POST(request: Request) {
       input.inputType = "company_name";
     }
 
-    const result = await findLeadsWorkflow(user, input);
-    return NextResponse.json(result);
+    if (!input.requestedLeadCount && input.prompt) {
+      input.requestedLeadCount = extractRequestedLeadCount(input.prompt);
+    }
+
+    if (!input.skipClarification) {
+      const preview = await previewFindClarification(user, input);
+      if (preview.clarification.needsClarification) {
+        return NextResponse.json({
+          status: "NEEDS_CLARIFICATION",
+          async: false,
+          leads: [],
+          criteria: preview.clientCriteria,
+          message: preview.clarification.message,
+          questions: preview.clarification.questions,
+          requestedLeadCount: preview.clarification.requestedLeadCount,
+          leadsRemaining: preview.leadsRemaining,
+          batchSize: getProcessBatchSize(),
+        });
+      }
+      if (preview.clarification.requestedLeadCount && !input.requestedLeadCount) {
+        input.requestedLeadCount = preview.clarification.requestedLeadCount;
+      }
+    }
+
+    const started = await startFindLeadsWorkflow(user, input);
+
+    after(async () => {
+      try {
+        await runFindLeadsJob(user, input, started.searchId, {
+          prompt: started.prompt,
+          parseProvider: started.parseProvider,
+          criteria: started.rawCriteria,
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : "Search failed";
+        console.error("[leads/find] background job failed:", msg);
+        await prisma.leadSearch.update({
+          where: { id: started.searchId },
+          data: { status: "FAILED", errorMessage: toUserFacingSearchError(msg) },
+        });
+      }
+    });
+
+    return NextResponse.json({
+      searchId: started.searchId,
+      status: "RUNNING",
+      async: true,
+      criteria: started.clientCriteria,
+      leads: [],
+      message: started.message,
+      leadsRemaining: started.leadsRemaining,
+      batchSize: started.batchSize,
+    });
   } catch (error) {
     if (error instanceof SubscriptionRequiredError) {
       return NextResponse.json(

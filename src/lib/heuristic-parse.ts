@@ -14,6 +14,16 @@ const TITLE_HINTS: { pattern: RegExp; titles: string[] }[] = [
   { pattern: /\bmarketing\b/i, titles: ["Marketing Director", "CMO", "Head of Marketing"] },
   { pattern: /\bsales\b/i, titles: ["Sales Director", "VP Sales", "Head of Sales"] },
   { pattern: /\bengineer/i, titles: ["Software Engineer", "Engineering Manager"] },
+  {
+    pattern: /\b(hr|human resources|people ops|people operations|talent|recruiter|chro)\b/i,
+    titles: [
+      "HR Manager",
+      "Human Resources Manager",
+      "Head of People",
+      "People Operations Manager",
+      "Talent Acquisition Manager",
+    ],
+  },
 ];
 
 const LOCATION_HINTS: { pattern: RegExp; location: string }[] = [
@@ -24,7 +34,7 @@ const LOCATION_HINTS: { pattern: RegExp; location: string }[] = [
   { pattern: /\bpakistan\b/i, location: "Pakistan" },
   { pattern: /\bcalifornia\b/i, location: "California" },
   { pattern: /\btexas\b/i, location: "Texas" },
-  { pattern: /\bnew york\b/i, location: "New York" },
+  { pattern: /\b(new york|nyc|ny)\b/i, location: "New York" },
 ];
 
 const INDUSTRY_HINTS: { pattern: RegExp; term: string }[] = [
@@ -40,6 +50,7 @@ const INDUSTRY_HINTS: { pattern: RegExp; term: string }[] = [
   { pattern: /\bperfume\b/i, term: "beauty" },
   { pattern: /\bsoftware\b/i, term: "software" },
   { pattern: /\bstartup/i, term: "startup" },
+  { pattern: /\b(hr|human resources)\b/i, term: "human resources" },
 ];
 
 function extractTitles(prompt: string, leadContext?: UserLeadContextDTO | null): string[] {
@@ -130,16 +141,24 @@ export function heuristicParsePrompt(
   leadContext?: UserLeadContextDTO | null
 ): SearchCriteria {
   const lower = userPrompt.toLowerCase();
-  const openToWork = /open to work|job seek|between jobs|looking for work/.test(lower);
+  const openToWork =
+    /open\s+to\s+wor+k|open\s+to\s+wrok|job\s*seek|between\s+jobs|looking\s+for\s+(a\s+)?(job|work)|looking\s+.+open\s+to\s+wor/i.test(
+      lower
+    );
   const { min, max } = extractCompanySize(userPrompt, leadContext);
   const location = extractLocation(userPrompt, leadContext);
   const keywords = extractKeywords(userPrompt, leadContext);
 
   const personTitles = extractTitles(userPrompt, leadContext);
+  const hrPrompt = /\b(hr|human resources|people ops|people operations)\b/i.test(userPrompt);
   const parsed = {
     summary: userPrompt.slice(0, 120),
     searchIntent: userPrompt,
-    industry: leadContext?.targetIndustries?.[0] || keywords?.split(" ")[0] || "Any",
+    industry:
+      leadContext?.targetIndustries?.[0] ||
+      (hrPrompt ? "Human Resources" : undefined) ||
+      keywords ||
+      "Any",
     country: location,
     companySizeMin: min,
     companySizeMax: max,
@@ -153,7 +172,8 @@ export function heuristicParsePrompt(
     apollo: {
       personTitles,
       personLocations: [location],
-      qKeywords: openToWork ? undefined : keywords,
+      // Keep keywords even for OTW — Apollo has no open-to-work filter
+      qKeywords: hrPrompt ? "human resources" : keywords,
     },
   };
 

@@ -18,15 +18,26 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    const limitParam = Number(new URL(_req.url).searchParams.get("limit") || "200");
+    const offsetParam = Number(new URL(_req.url).searchParams.get("offset") || "0");
+    const leadLimit = Math.min(2000, Math.max(25, Number.isFinite(limitParam) ? limitParam : 200));
+    const leadOffset = Math.max(0, Number.isFinite(offsetParam) ? offsetParam : 0);
+
     const search = await prisma.leadSearch.findFirst({
       where: scopedLeadSearchWhere(user.id, id),
       include: {
-        leads: { where: { deletedAt: null }, orderBy: { leadScore: "desc" } },
+        leads: {
+          where: { deletedAt: null },
+          orderBy: { leadScore: "desc" },
+          skip: leadOffset,
+          take: leadLimit,
+        },
       },
     });
 
     if (!search) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const { canResumeSearch } = await import("@/lib/services/leads/fetchProgress");
     const parsedCriteria = parseCriteria(search.parsedCriteria);
     const leads = search.leads.map(mapLeadToRecord);
     const averageScore =
@@ -56,6 +67,14 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
         relaxNote: search.relaxNote,
         errorMessage: search.errorMessage,
         aiProviderUsed: search.aiProviderUsed,
+        leadsPreviewLimit: leadLimit,
+        leadsOffset: leadOffset,
+        canResume: canResumeSearch(
+          search.apolloFilters,
+          search.leadsReturned,
+          search.totalAvailable,
+          search.relaxNote
+        ),
       },
       leads,
     });

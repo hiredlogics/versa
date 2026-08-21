@@ -1,4 +1,5 @@
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
+import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 
 export type PriorityLevel = "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
 
@@ -24,8 +25,20 @@ export interface FindLeadsResponse {
   leads: LeadRecord[];
   criteria: ParsedSearchCriteria;
   totalAvailable?: number;
+  /** Actual rows saved for this search (may be >> leads.length preview) */
+  totalSaved?: number;
+  /** Server offset for the current leads batch */
+  leadsOffset?: number;
   apolloRelaxNote?: string;
   message: string;
+  /** When true, client should poll GET /api/searches/:id until COMPLETE/FAILED */
+  async?: boolean;
+  status?: string;
+  canResume?: boolean;
+  questions?: ClarificationQuestion[];
+  requestedLeadCount?: number;
+  leadsRemaining?: number;
+  batchSize?: number;
 }
 
 export interface AdvancedFilters {

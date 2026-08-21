@@ -41,6 +41,12 @@ describe("search-criteria helpers", () => {
     expect(normalizeLocations(["California", "United States"])).toEqual(["California"]);
   });
 
+  it("keeps several sibling regions the user asked for", () => {
+    expect(normalizeLocations(["New York", "California"])).toEqual(["New York", "California"]);
+    expect(normalizeLocations(["NY", "new york", "Texas"])).toEqual(["New York", "Texas"]);
+    expect(normalizeLocations(["New York", "Texas", "Florida", "Ohio"])).toHaveLength(3);
+  });
+
   it("expands US/USA aliases for Apollo", () => {
     expect(normalizeLocations(["US"])).toEqual(["United States"]);
     expect(normalizeLocations(["usa"])).toEqual(["United States"]);
@@ -200,6 +206,63 @@ describe("search-criteria helpers", () => {
     );
     expect(apolloKeywords).toBe("e-commerce");
     expect(searchIntent.toLowerCase()).toMatch(/automation|ai|marketing/);
+  });
+
+  it("keeps NY HR open-to-work filters tight (no keyword drop / no engineer fallback)", () => {
+    const prompt =
+      "please find those people who is looking open to work please those in the NY HR";
+    const criteria = normalizeSearchCriteria(
+      {
+        industry: "Human Resources",
+        country: "New York",
+        companySizeMin: 10,
+        companySizeMax: 500,
+        openToWork: true,
+        summary: "NY HR open to work",
+        searchIntent: "HR professionals in New York who may be open to work",
+        apollo: {
+          personTitles: ["HR"],
+          personLocations: ["NY"],
+          qKeywords: "human resources",
+          employeeRanges: ["11,50", "51,200", "201,500"],
+        },
+      } as never,
+      prompt
+    );
+
+    expect(criteria.openToWork).toBe(true);
+    expect(criteria.apollo?.personLocations).toEqual(["New York"]);
+    expect(criteria.apollo?.qKeywords).toBeTruthy();
+    expect(criteria.apollo?.includeSimilarTitles).toBe(false);
+    expect(criteria.apollo?.personTitles?.some((t) => /hr|people|human resources|talent/i.test(t))).toBe(
+      true
+    );
+    expect(criteria.apollo?.personTitles?.join(" ")).not.toMatch(/Software Engineer/i);
+    expect(criteria.apollo?.employeeRanges).not.toContain("501,1000");
+    // Client-facing copy must stay provider-neutral while keeping the disclaimer.
+    expect(criteria.searchIntent?.toLowerCase()).toContain("cannot be filtered directly");
+    expect(criteria.searchIntent?.toLowerCase()).not.toContain("apollo");
+  });
+});
+
+describe("open-to-work title signals", () => {
+  it("hard-filters to title signals when present, otherwise keeps batch", async () => {
+    const { filterPeopleForOpenToWork, hasOpenToWorkTitleSignal } = await import(
+      "@/lib/open-to-work"
+    );
+    expect(hasOpenToWorkTitleSignal("Engineer #OpenToWork")).toBe(true);
+    expect(hasOpenToWorkTitleSignal("HR Manager")).toBe(false);
+
+    const hard = filterPeopleForOpenToWork([
+      { title: "HR Manager" },
+      { title: "Recruiter — Open to Work" },
+    ]);
+    expect(hard.usedTitleSignals).toBe(true);
+    expect(hard.people).toHaveLength(1);
+
+    const soft = filterPeopleForOpenToWork([{ title: "HR Manager" }, { title: "CHRO" }]);
+    expect(soft.usedTitleSignals).toBe(false);
+    expect(soft.people).toHaveLength(2);
   });
 });
 

@@ -21,7 +21,7 @@ export function PlatformStatusBanner({ status }: { status: PlatformStatus | null
       <p className="mt-1 text-sm leading-relaxed text-amber-200/80">
         {status.isAdmin ? (
           <>
-            Apollo is not configured on this server. Add your platform key in{" "}
+            The lead data provider (Apollo) is not configured on this server. Add your platform key in{" "}
             <Link href="/admin/api-keys" className="font-medium text-lp-ice-blue underline underline-offset-2">
               Admin → API Keys
             </Link>{" "}

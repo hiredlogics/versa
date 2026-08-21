@@ -45,7 +45,7 @@ export function SearchDetailPage() {
     if (!id) return;
     setData(null);
     setError(false);
-    fetch(`/api/searches/${id}`)
+    fetch(`/api/searches/${id}?limit=200&offset=0`)
       .then(async (r) => {
         if (!r.ok) throw new Error("Not found");
         return r.json();
@@ -115,12 +115,28 @@ export function SearchDetailPage() {
           label="Refine search"
           showIcon={false}
         />
+        {search.canResume && (
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await fetch(`/api/searches/${search.id}/resume`, { method: "POST" });
+              if (res.ok) window.location.href = `/app?searchId=${search.id}`;
+              else {
+                const data = await res.json().catch(() => ({}));
+                alert(data.error || "Could not resume");
+              }
+            }}
+            className="rounded-xl border border-lp-border bg-lp-panel px-4 py-2 text-sm text-lp-off-white hover:bg-lp-panel-strong"
+          >
+            Get next 100
+          </button>
+        )}
         <ExportButtons searchId={search.id} />
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SearchMetric label="Leads found" value={search.totalFound.toLocaleString()} />
-        <SearchMetric label="Qualified" value={search.totalQualified.toLocaleString()} />
+        <SearchMetric label="Match pool" value={search.totalFound.toLocaleString()} />
+        <SearchMetric label="Saved leads" value={search.totalQualified.toLocaleString()} />
         <SearchMetric
           label="Avg score"
           value={search.averageScore != null ? String(search.averageScore) : "—"}
@@ -164,8 +180,32 @@ export function SearchDetailPage() {
       <LeadResultsTable
         leads={leads}
         searchId={search.id}
+        message={search.relaxNote ?? undefined}
         onSelectLead={setSelectedLead}
         minScoreFilter={0}
+        totalSaved={search.totalQualified}
+        pageOffset={search.leadsOffset ?? 0}
+        canResume={Boolean(search.canResume)}
+        onResume={async () => {
+          const res = await fetch(`/api/searches/${search.id}/resume`, { method: "POST" });
+          if (res.ok) window.location.href = `/app?searchId=${search.id}`;
+          else {
+            const body = await res.json().catch(() => ({}));
+            alert(body.error || "Could not resume");
+          }
+        }}
+        onPageChange={async (nextOffset) => {
+          const offset = Math.max(0, nextOffset);
+          await fetch(`/api/searches/${search.id}/enrich-page`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ offset, limit: 200 }),
+          }).catch(() => null);
+          const res = await fetch(`/api/searches/${search.id}?limit=200&offset=${offset}`);
+          if (!res.ok) return;
+          const body = (await res.json()) as SearchDetailResponse;
+          setData(body);
+        }}
         showReasoning
       />
 

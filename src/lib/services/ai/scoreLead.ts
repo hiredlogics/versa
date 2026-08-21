@@ -72,8 +72,12 @@ ${ctxBlock}
 Rules:
 - Match saved ICP when prompt is vague.
 - Cap relevance low if title is excluded unless prompt explicitly requests that role.
-- Prefer decision-makers in target titles.
-- For open-to-work / job-seeking intent, boost titles with seeking/available/freelance signals; do not assume unemployment.
+- Prefer decision-makers in target titles — UNLESS this is an open-to-work / hiring search.
+- For open-to-work / job-seeking / "looking for a job" intent:
+  - Score software engineers, developers, and matching titles at least 6–8 when location/role fit.
+  - Do NOT require CEO/founder authority.
+  - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
+  - Explicit seeking/available/freelance title signals can go to 8–10.
 - Include ALL leads in response (use the provided index values).
 
 Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "..." }] }
@@ -188,7 +192,18 @@ export async function scoreLeadsWithAi(
 ): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
   const heuristicFixed = heuristicScores(leads, context);
 
-  if (process.env.SCORING_MODE === "heuristic" || leads.length === 0) {
+  // Large Apollo pulls can't afford per-batch ChatGPT scoring — keep them heuristic-ranked.
+  const aiScoreCap = Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
+  if (
+    process.env.SCORING_MODE === "heuristic" ||
+    leads.length === 0 ||
+    (aiScoreCap > 0 && leads.length > aiScoreCap)
+  ) {
+    if (leads.length > aiScoreCap && process.env.SCORING_MODE !== "heuristic") {
+      console.log(
+        `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap} — using heuristic scores`
+      );
+    }
     return { scores: heuristicFixed, provider: "HEURISTIC" };
   }
 
@@ -213,12 +228,9 @@ export async function scoreLeadsWithAi(
     }
   }
 
+  const aiProviders = [...providers].filter((p) => p !== "HEURISTIC");
   const provider =
-    providers.size === 1
-      ? [...providers][0]
-      : providers.has("HEURISTIC")
-        ? "MIXED"
-        : [...providers][0] || "HEURISTIC";
+    aiProviders.length > 0 ? aiProviders[0] : providers.has("HEURISTIC") ? "HEURISTIC" : "OPENAI";
 
   return { scores, provider };
 }

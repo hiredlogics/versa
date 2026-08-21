@@ -53,7 +53,10 @@ export interface SearchDetailResponse {
     durationMs: number | null;
     relaxNote: string | null;
     errorMessage: string | null;
-    aiProviderUsed: string | null;
+    aiProviderUsed?: string | null;
+    canResume?: boolean;
+    leadsPreviewLimit?: number;
+    leadsOffset?: number;
   };
   leads: LeadRecord[];
 }
