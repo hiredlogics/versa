@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/get-current-user";
 import { prisma } from "@/lib/db/prisma";
-import { balance } from "@/lib/pipeline/credits";
+import { balance, releaseStale } from "@/lib/pipeline/credits";
 import { isStaleRunning, toCreditsDTO } from "@/lib/pipeline/dto";
 import {
   batchStartedEnvelope,
@@ -44,6 +44,11 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     if (search.leadsReturned >= brief.requestedTotal) {
       return fail(409, "You already have every lead you asked for.");
     }
+
+    // The scheduled sweep is only daily on this plan, so free stale holds here
+    // too: a user clicking for the next batch is exactly when a hold left by a
+    // dead batch is costing them credits they cannot spend.
+    await releaseStale(30).catch(() => {});
 
     if (search.status === "RUNNING") {
       const heldHolds = await prisma.creditHold.count({
