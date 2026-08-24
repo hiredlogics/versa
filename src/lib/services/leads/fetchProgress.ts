@@ -1,3 +1,4 @@
+import { LEAD_BATCH_SIZE } from "@/lib/apollo-config";
 import type { ApolloSearchFilters } from "@/lib/types";
 
 export type ApolloFetchProgress = {
@@ -7,7 +8,7 @@ export type ApolloFetchProgress = {
   canResume: boolean;
   peoplePulled: number;
   savedCount?: number;
-  /** Sequential process batches completed (each ~LEAD_PROCESS_BATCH_SIZE). */
+  /** Sequential process batches completed (each ~LEAD_BATCH_SIZE). */
   batchesCompleted?: number;
   /** Raw Apollo people fetched across completed batches. */
   leadsFetched?: number;
@@ -79,24 +80,38 @@ export function estimateResumePage(leadsReturned: number): number {
 
 /** Leads processed per sequential job batch (fetch → unlock → save). */
 export function getProcessBatchSize(): number {
-  return Math.min(
-    5000,
-    Math.max(50, parseInt(process.env.LEAD_PROCESS_BATCH_SIZE || "100", 10))
-  );
+  return LEAD_BATCH_SIZE;
 }
 
 /**
- * Max sequential batches to auto-run per job click (cost control).
- * Default 1 → user must confirm “Get next 100” (Resume) for each batch.
- * 0 = no extra cap beyond hard max / time.
+ * One batch per explicit user action. This is not configurable on purpose: a
+ * loop here can drain a whole credit balance from a single prompt.
  */
 export function getMaxAutoBatches(): number {
-  const raw = parseInt(process.env.LEAD_MAX_AUTO_BATCHES || "1", 10);
-  if (!Number.isFinite(raw) || raw < 0) return 1;
-  return raw;
+  return 1;
 }
 
 /** Soft timeout for unlock within one batch (ms). */
+/**
+ * Save only provider-verified emails. Pattern-guessed ("extrapolated")
+ * addresses bounce, so they are skipped unless this is turned off.
+ */
+export function requireVerifiedEmail(): boolean {
+  const raw = (process.env.LEAD_REQUIRE_VERIFIED_EMAIL || "true").trim().toLowerCase();
+  return raw !== "false" && raw !== "0";
+}
+
+/**
+ * How many people one click may spend unlock credits on. Verified emails are a
+ * minority of any pool, so a single batch often yields nothing — this lets a run
+ * keep looking while still capping what it can spend.
+ */
+export function getUnlockAttemptBudget(batchSize: number): number {
+  const configured = parseInt(process.env.LEAD_UNLOCK_ATTEMPTS_PER_RUN || "", 10);
+  if (Number.isFinite(configured) && configured > 0) return configured;
+  return batchSize * 3;
+}
+
 export function getUnlockBatchTimeoutMs(): number {
   return Math.max(
     30_000,

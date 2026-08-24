@@ -84,8 +84,8 @@ export async function runLeadSearch(
   meta?: { conversationId?: string; conversationTitle?: string }
 ): Promise<{ session: LeadSearchSession; message: string }> {
   const criteria = await parseSearchPrompt(prompt.trim());
-  const { maxResults, minScore: configMinScore, requireEmail: requireEmailFilter } =
-    getLeadSearchConfig();
+  const { minScore: configMinScore, requireEmail: requireEmailFilter } = getLeadSearchConfig();
+  const maxResults = 0;
   const effectiveMinScore = criteria.openToWork ? 6 : (minScore ?? configMinScore);
   const { maxEnrich } = getApolloSearchConfig();
 

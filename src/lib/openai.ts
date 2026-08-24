@@ -268,7 +268,6 @@ export async function scoreLeadsBatch(
 ): Promise<LeadScoreResult[]> {
   if (leads.length === 0) return [];
 
-  const scoringMode = (process.env.SCORING_MODE || "heuristic").toLowerCase();
   const maxAiScore = Math.max(
     0,
     parseInt(process.env.AI_MAX_SCORE_COUNT || "0", 10)
@@ -278,7 +277,7 @@ export async function scoreLeadsBatch(
   const results = heuristicScoreLeadsBatch(leads, context);
   onProgress?.(leads.length, leads.length);
 
-  if (scoringMode === "heuristic" || maxAiScore === 0) {
+  if (maxAiScore === 0) {
     return results;
   }
 

@@ -7,7 +7,7 @@ import {
 } from "@/lib/services/ai/leadReasoning";
 import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
 import { getUserLeadContext } from "@/lib/context/userLeadContext";
-import { shouldIgnoreLeadContext } from "@/lib/apollo-config";
+import { LEAD_BATCH_SIZE, shouldIgnoreLeadContext } from "@/lib/apollo-config";
 import { mapLeadToRecord } from "@/lib/services/searches/searchHistory";
 import type { LeadScoreContext } from "@/lib/types";
 import type { LeadRecord } from "@/lib/types/lead-finder";
@@ -95,6 +95,7 @@ type EnrichableLead = {
   employees: number | null;
   location: string | null;
   email: string | null;
+  emailStatus?: string | null;
   linkedinUrl: string | null;
   hasEmail: boolean;
   leadScore: number;
@@ -208,7 +209,10 @@ export async function enrichAndWhyInMemory(
     lead.industry = full.industry !== "N/A" ? full.industry : lead.industry;
     lead.employees = full.employees || lead.employees;
     lead.location = full.location !== "N/A" ? full.location : lead.location;
-    lead.email = isUsableEmail(full.email) ? full.email : lead.email;
+    if (isUsableEmail(full.email)) {
+      lead.email = full.email;
+      lead.emailStatus = full.emailStatus ?? lead.emailStatus ?? null;
+    }
     lead.linkedinUrl = full.linkedinUrl || lead.linkedinUrl;
     lead.hasEmail = Boolean(isUsableEmail(lead.email));
     if (!before && isUsableEmail(lead.email)) emailsUnlocked += 1;
@@ -223,10 +227,7 @@ export async function enrichAndWhyInMemory(
   );
 
   // AI Why for enriched + high-score first; template for the rest
-  const whyAiMax = Math.max(
-    25,
-    parseInt(process.env.WHY_AI_MAX || "100", 10)
-  );
+  const whyAiMax = LEAD_BATCH_SIZE;
   const forWhy = [...leads].sort((a, b) => {
     const aEnriched = enrichedRawMap.has(a.apolloPersonId) ? 1 : 0;
     const bEnriched = enrichedRawMap.has(b.apolloPersonId) ? 1 : 0;
@@ -382,6 +383,9 @@ export async function prepareLeadPage(input: {
           employees: full.employees || lead.employees,
           location: full.location !== "N/A" ? full.location : lead.location,
           email,
+          emailStatus: isUsableEmail(full.email)
+            ? (full.emailStatus ?? null)
+            : lead.emailStatus,
           linkedinUrl: full.linkedinUrl || lead.linkedinUrl,
           hasEmail,
           rawApolloData: raw ?? undefined,
@@ -401,12 +405,12 @@ export async function prepareLeadPage(input: {
     }
   }
 
-  // Why for everyone on the page that needs it (AI for up to WHY_AI_MAX of them)
+  // Why for everyone on the page that needs it (AI for up to one batch of them)
   const whyTargets = pageLeads.filter((l) => needsWhyUpgrade(l) || profileByApolloId.has(l.apolloPersonId || ""));
   let whyUpdated = 0;
 
   if (whyTargets.length > 0) {
-    const whyAiMax = Math.max(25, parseInt(process.env.WHY_AI_MAX || "100", 10));
+    const whyAiMax = LEAD_BATCH_SIZE;
     const inputs = whyTargets.map((lead) => ({
       name: lead.name,
       title: lead.title,

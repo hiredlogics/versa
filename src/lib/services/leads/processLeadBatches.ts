@@ -8,18 +8,24 @@ import {
   isUsableEmail,
   type EnrichedApolloResult,
 } from "@/lib/apollo";
-import { buildLeadWhyReasoning } from "@/lib/services/ai/leadReasoning";
+import {
+  buildLeadWhyReasoning,
+  generateLeadReasoningBatch,
+} from "@/lib/services/ai/leadReasoning";
 import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
 import { filterLeadsWithUsableEmail } from "@/lib/services/leads/enrichWhyBatch";
 import {
   getMaxAutoBatches,
   getProcessBatchSize,
+  getUnlockAttemptBudget,
   getUnlockBatchTimeoutMs,
+  requireVerifiedEmail,
   withFetchProgress,
 } from "@/lib/services/leads/fetchProgress";
+import { isVerifiedEmail } from "@/lib/email-confidence";
 import { logLeadFetch, logStageTiming, startStageTimer } from "@/lib/services/leads/fetchLog";
 import { filterExcludedLeads } from "@/lib/context/exclusions";
-import { toStoredApolloProfile } from "@/lib/lead-profile";
+import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
 import {
   filterPeopleForOpenToWork,
   OPEN_TO_WORK_APOLLO_DISCLAIMER,
@@ -66,7 +72,7 @@ function batchProgressNote(input: {
   phase: string;
 }): string {
   const poolLabel = input.pool > 0 ? input.pool.toLocaleString() : "?";
-  return `${input.checked.toLocaleString()} / ${poolLabel} checked → ${input.withEmail.toLocaleString()} with valid email so far. ${input.phase} (batch ${input.batchIndex}, size ${input.batchSize}).`;
+  return `${input.checked.toLocaleString()} / ${poolLabel} checked → ${input.withEmail.toLocaleString()} with a verified email so far. ${input.phase} (batch ${input.batchIndex}, size ${input.batchSize}).`;
 }
 
 function applyEnrichmentToLeads(
@@ -79,12 +85,17 @@ function applyEnrichmentToLeads(
     employees: number | null;
     location: string | null;
     email: string | null;
+    emailStatus?: string | null;
     linkedinUrl: string | null;
     hasEmail: boolean;
   }>,
   enriched: EnrichedApolloResult[]
-): Map<string, unknown> {
-  const enrichedRawMap = new Map<string, unknown>();
+): {
+  storedById: Map<string, unknown>;
+  summaryById: Map<string, string | null>;
+} {
+  const storedById = new Map<string, unknown>();
+  const summaryById = new Map<string, string | null>();
   const byId = new Map(enriched.map((r) => [r.person.id, r]));
 
   for (const lead of leads) {
@@ -101,12 +112,14 @@ function applyEnrichmentToLeads(
     if (isUsableEmail(full.email)) {
       lead.email = full.email;
       lead.hasEmail = true;
+      lead.emailStatus = full.emailStatus ?? lead.emailStatus ?? null;
     }
     const stored = toStoredApolloProfile(result.raw);
-    if (stored) enrichedRawMap.set(lead.apolloPersonId, stored);
+    if (stored) storedById.set(lead.apolloPersonId, stored);
+    summaryById.set(lead.apolloPersonId, extractProfileSummary(result.raw));
   }
 
-  return enrichedRawMap;
+  return { storedById, summaryById };
 }
 
 /**
@@ -132,8 +145,8 @@ export async function runSequentialLeadBatches(input: {
 }): Promise<SequentialBatchResult> {
   const batchSize = getProcessBatchSize();
   const maxBatches = getMaxAutoBatches();
+  const verifiedOnly = requireVerifiedEmail();
   const unlockTimeoutMs = getUnlockBatchTimeoutMs();
-  const { fetchAll } = getApolloSearchConfig();
   const maxLeadsThisRun =
     input.maxLeadsThisRun && input.maxLeadsThisRun > 0
       ? input.maxLeadsThisRun
@@ -162,6 +175,8 @@ export async function runSequentialLeadBatches(input: {
   let savedThisRun = 0;
 
   const batchesThisRunCap = maxBatches === 0 ? Number.POSITIVE_INFINITY : maxBatches;
+  const unlockBudget = getUnlockAttemptBudget(batchSize);
+  let unlockAttempts = 0;
   let batchesThisRun = 0;
 
   while (batchesThisRun < batchesThisRunCap) {
@@ -291,7 +306,8 @@ export async function runSequentialLeadBatches(input: {
       continue;
     }
 
-    if (!fetchAll && people.length > batchSize) {
+    // Never carry more people into the paid stage than this batch is allowed.
+    if (people.length > batchSize) {
       people = people.slice(0, batchSize);
     }
 
@@ -345,6 +361,7 @@ export async function runSequentialLeadBatches(input: {
         employees: lead.employees,
         location: lead.location,
         email: lead.email,
+        emailStatus: lead.emailStatus ?? null,
         linkedinUrl: lead.linkedinUrl,
         hasEmail: lead.hasEmail,
         leadScore: scored.scores[i].leadScore,
@@ -354,11 +371,14 @@ export async function runSequentialLeadBatches(input: {
       }))
     );
 
-    // Unlock highest-scored first so credit exhaustion still keeps the best fits
+    // Unlock highest-scored first so credit exhaustion still keeps the best fits,
+    // and never spend more unlock credits than this run is allowed.
     const peopleById = new Map(people.map((p) => [p.id, p]));
     const unlockPeople = workList
       .map((lead) => peopleById.get(lead.apolloPersonId))
-      .filter((p): p is ApolloPerson => Boolean(p));
+      .filter((p): p is ApolloPerson => Boolean(p))
+      .slice(0, Math.max(0, unlockBudget - unlockAttempts));
+    unlockAttempts += unlockPeople.length;
 
     await prisma.leadSearch.update({
       where: { id: input.searchId },
@@ -435,26 +455,43 @@ export async function runSequentialLeadBatches(input: {
       }
     }
 
-    const enrichedRawMap = applyEnrichmentToLeads(workList, enriched);
-    workList = sortLeads(filterLeadsWithUsableEmail(workList));
+    const { storedById, summaryById } = applyEnrichmentToLeads(workList, enriched);
 
-    workList = workList.map((lead) => ({
+    const withAnyEmail = filterLeadsWithUsableEmail(workList);
+    const keep = verifiedOnly
+      ? withAnyEmail.filter((lead) => isVerifiedEmail(lead.email, lead.emailStatus))
+      : withAnyEmail;
+    const skippedUnverified = withAnyEmail.length - keep.length;
+    workList = sortLeads(keep);
+
+    // Only the leads we are about to save get a Why, so the AI call stays small.
+    const remainingSlots = Math.max(0, maxLeadsThisRun - savedThisRun);
+    workList = workList.slice(0, remainingSlots);
+
+    const whyInputs = workList.map((lead) => ({
+      name: lead.name,
+      title: lead.title,
+      company: lead.company,
+      industry: lead.industry ?? "N/A",
+      employees: lead.employees ?? 0,
+      location: lead.location ?? "N/A",
+      hasEmail: true,
+      leadScore: lead.leadScore,
+      profileSummary: summaryById.get(lead.apolloPersonId) ?? null,
+    }));
+
+    const whyResults = await generateLeadReasoningBatch(whyInputs, input.scoreContext, {
+      userId: input.userId,
+      searchId: input.searchId,
+    });
+
+    workList = workList.map((lead, i) => ({
       ...lead,
       email: lead.email!.trim(),
       hasEmail: true,
-      reasoning: buildLeadWhyReasoning(
-        {
-          name: lead.name,
-          title: lead.title,
-          company: lead.company,
-          industry: lead.industry ?? "N/A",
-          employees: lead.employees ?? 0,
-          location: lead.location ?? "N/A",
-          hasEmail: true,
-          leadScore: lead.leadScore,
-        },
-        input.scoreContext
-      ).reasoning,
+      reasoning:
+        whyResults[i]?.reasoning ||
+        buildLeadWhyReasoning(whyInputs[i], input.scoreContext).reasoning,
       recommendedApproach: "",
     }));
 
@@ -469,21 +506,19 @@ export async function runSequentialLeadBatches(input: {
       employees: lead.employees,
       location: lead.location,
       email: lead.email,
+      emailStatus: lead.emailStatus ?? null,
       linkedinUrl: lead.linkedinUrl,
       leadScore: lead.leadScore,
       priorityLevel: lead.priorityLevel,
       reasoning: lead.reasoning,
       recommendedApproach: "",
       hasEmail: true,
-      rawApolloData: (enrichedRawMap.get(lead.apolloPersonId) as object | undefined) ?? undefined,
+      rawApolloData: (storedById.get(lead.apolloPersonId) as object | undefined) ?? undefined,
     }));
 
-    const remainingSlots = Math.max(0, maxLeadsThisRun - savedThisRun);
-    const rowsToSave = leadRows.slice(0, remainingSlots);
-
     let batchSaved = 0;
-    for (let i = 0; i < rowsToSave.length; i += 500) {
-      const chunk = rowsToSave.slice(i, i + 500);
+    for (let i = 0; i < leadRows.length; i += 500) {
+      const chunk = leadRows.slice(i, i + 500);
       const result = await prisma.lead.createMany({ data: chunk });
       batchSaved += result.count;
     }
@@ -531,10 +566,10 @@ export async function runSequentialLeadBatches(input: {
           batchSize,
           phase: creditsExhausted
             ? "Provider credits exhausted — saved this batch and paused."
-            : hitSaveCap || !underAutoCap
-              ? "Batch saved — click Get next 100 for more."
+            : hitSaveCap || !underAutoCap || unlockAttempts >= unlockBudget
+              ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email — click Get next 100 to check more people.`
               : morePages
-                ? "Batch saved — starting next…"
+                ? "Checking more people for verified emails…"
                 : "All available pages processed.",
         }),
       },
@@ -545,6 +580,7 @@ export async function runSequentialLeadBatches(input: {
       batchIndex,
       fetched: people.length,
       savedWithEmail: batchSaved,
+      skippedUnverified,
       leadsFetched,
       leadsWithEmail,
       lastPage,
@@ -553,6 +589,12 @@ export async function runSequentialLeadBatches(input: {
 
     if (creditsExhausted || stopped || hitSaveCap) {
       if (hitSaveCap) stopReason = "credit_cap";
+      break;
+    }
+    // Verified emails are a minority, so a run keeps checking more people until
+    // it fills the batch or spends its unlock budget — whichever comes first.
+    if (unlockAttempts >= unlockBudget) {
+      stopReason = "unlock_budget";
       break;
     }
     if (!morePages) break;

@@ -87,6 +87,7 @@ export function mapLeadToRecord(lead: Lead): LeadRecord {
     employees: lead.employees,
     location: lead.location,
     email: lead.email,
+    emailStatus: lead.emailStatus,
     linkedinUrl: lead.linkedinUrl,
     leadScore: lead.leadScore,
     priorityLevel: lead.priorityLevel as PriorityLevel,

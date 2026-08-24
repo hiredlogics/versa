@@ -31,6 +31,8 @@ yarn-error.log*
 # env files
 .env*.local
 .env
+!.env.example
+!.env.docker.example
 
 # local data
 /data/
@@ -43,3 +45,5 @@ next-env.d.ts
 /.clerk/
 .vercel
 .env*
+!.env.example
+!.env.docker.example

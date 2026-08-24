@@ -4,6 +4,8 @@ export interface ApolloSearchFilters {
   qKeywords?: string;
   employeeRanges?: string[];
   includeSimilarTitles?: boolean;
+  /** Employer domains, e.g. ["apple.com"] for "people who work at Apple". */
+  organizationDomains?: string[];
 }
 
 export interface SearchCriteria {
@@ -39,8 +41,14 @@ export interface ApolloPerson {
   last_name: string;
   title: string;
   email: string | null;
+  /** Apollo email confidence: "verified" | "guessed" | "unavailable" | … */
+  email_status?: string | null;
   linkedin_url: string | null;
   has_email?: boolean;
+  /** Where the person is, which is what person_locations filters on. */
+  city?: string;
+  state?: string;
+  country?: string;
   organization?: {
     name: string;
     industry: string;
@@ -60,6 +68,8 @@ export interface ScoredLead {
   employees: number;
   location: string;
   email: string | null;
+  /** Provider email confidence: "verified" | "guessed" | null when unknown. */
+  emailStatus?: string | null;
   linkedinUrl: string | null;
   score: number;
   reasoning: string;

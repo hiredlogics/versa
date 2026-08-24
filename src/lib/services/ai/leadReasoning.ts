@@ -22,10 +22,7 @@ export interface LeadOutreachOutput {
   emailDraft: string;
 }
 
-const WHY_BATCH_SIZE = Math.min(
-  20,
-  Math.max(5, parseInt(process.env.AI_WHY_BATCH_SIZE || "12", 10))
-);
+const WHY_BATCH_SIZE = 12;
 
 function formatLocation(location: string): string | null {
   const trimmed = location.trim();

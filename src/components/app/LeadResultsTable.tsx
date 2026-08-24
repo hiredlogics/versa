@@ -10,9 +10,18 @@ import {
   createColumnHelper,
   type SortingState,
 } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, ExternalLink, Mail, MailX, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  Mail,
+  MailQuestion,
+  MailX,
+  Search,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ExportButtons } from "@/components/app/ExportButtons";
+import { emailConfidence, emailConfidenceLabel } from "@/lib/email-confidence";
 import type { LeadRecord } from "@/lib/types/lead-finder";
 
 export const LEADS_PAGE_SIZE = 200;
@@ -95,17 +104,39 @@ export function LeadResultsTable({
         cell: ({ row }) => {
           const email = row.original.email;
           const hasEmail = Boolean(email) || row.original.hasEmail;
+          const confidence = emailConfidence(email, row.original.emailStatus);
           return (
             <div className="flex flex-col gap-1">
               {email ? (
-                <a
-                  href={`mailto:${email}`}
-                  className="app-link max-w-[200px] truncate text-xs"
-                  onClick={(e) => e.stopPropagation()}
-                  title={email}
-                >
-                  {email}
-                </a>
+                <>
+                  <a
+                    href={`mailto:${email}`}
+                    className="app-link max-w-[200px] truncate text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                    title={email}
+                  >
+                    {email}
+                  </a>
+                  <span
+                    className={
+                      confidence === "verified"
+                        ? "inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-200"
+                        : "inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200"
+                    }
+                    title={
+                      confidence === "verified"
+                        ? "Confirmed mailbox"
+                        : "Built from the company's email pattern — may bounce"
+                    }
+                  >
+                    {confidence === "verified" ? (
+                      <Mail className="h-3 w-3" aria-hidden />
+                    ) : (
+                      <MailQuestion className="h-3 w-3" aria-hidden />
+                    )}
+                    {emailConfidenceLabel(confidence)}
+                  </span>
+                </>
               ) : (
                 <span className="inline-flex w-fit items-center gap-1 text-xs text-lp-muted-dark">
                   <MailX className="h-3 w-3" aria-hidden />

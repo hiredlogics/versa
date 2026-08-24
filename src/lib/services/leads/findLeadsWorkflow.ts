@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import {
   APOLLO_HARD_MAX_RECORDS,
-  allowFullSearchSave,
   getApolloSearchConfig,
   getLeadSearchConfig,
   shouldIgnoreLeadContext,
@@ -27,11 +26,8 @@ import {
 import { USER_STOPPED_MESSAGE } from "@/lib/services/leads/searchControl";
 import { toUserFacingSearchError } from "@/lib/services/leads/searchError";
 import { logLeadFetch } from "@/lib/services/leads/fetchLog";
-import {
-  extractRequestedLeadCount,
-  needsClarification,
-  type ClarificationNeed,
-} from "@/lib/clarifyPrompt";
+import { extractRequestedLeadCount, type ClarificationNeed } from "@/lib/clarifyPrompt";
+import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
 import type { User, AiProvider } from "@prisma/client";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
 
@@ -142,7 +138,11 @@ export async function previewFindClarification(
   });
 
   const fromPrompt = extractRequestedLeadCount(prompt);
-  const clarification = needsClarification(criteria, prompt);
+  const clarification = await clarifyWithAi(prompt, criteria, {
+    leadContext,
+    userId: user.id,
+    requestedLeadCount: input.requestedLeadCount ?? fromPrompt,
+  });
   if (input.requestedLeadCount || fromPrompt) {
     clarification.requestedLeadCount =
       input.requestedLeadCount ?? fromPrompt ?? clarification.requestedLeadCount;
@@ -341,8 +341,8 @@ export async function runFindLeadsJob(
 
     const countNote =
       result.leadsWithEmail === 0
-        ? `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a usable unlocked email.`
-        : `Saved ${result.leadsWithEmail.toLocaleString()} leads with usable email after checking ${result.leadsFetched.toLocaleString()} / ${result.totalAvailable.toLocaleString()} matches.`;
+        ? `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
+        : `Saved ${result.leadsWithEmail.toLocaleString()} leads with a verified email after checking ${result.leadsFetched.toLocaleString()} / ${result.totalAvailable.toLocaleString()} matches.`;
 
     await prisma.leadSearch.update({
       where: { id: searchId },
@@ -547,7 +547,7 @@ export async function findLeadsWorkflow(user: User, input: FindLeadsInput) {
     criteria: started.rawCriteria,
   });
 
-  const responseLeadLimit = Math.max(25, parseInt(process.env.LEAD_RESPONSE_LIMIT || "200", 10));
+  const responseLeadLimit = 200;
   const search = await prisma.leadSearch.findUnique({ where: { id: started.searchId } });
   const savedLeads = await prisma.lead.findMany({
     where: { searchId: started.searchId },

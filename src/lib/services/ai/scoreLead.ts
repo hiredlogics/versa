@@ -192,14 +192,10 @@ export async function scoreLeadsWithAi(
 ): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
   const heuristicFixed = heuristicScores(leads, context);
 
-  // Large Apollo pulls can't afford per-batch ChatGPT scoring — keep them heuristic-ranked.
+  // Very large pulls can't afford per-batch AI scoring — keep them heuristic-ranked.
   const aiScoreCap = Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
-  if (
-    process.env.SCORING_MODE === "heuristic" ||
-    leads.length === 0 ||
-    (aiScoreCap > 0 && leads.length > aiScoreCap)
-  ) {
-    if (leads.length > aiScoreCap && process.env.SCORING_MODE !== "heuristic") {
+  if (leads.length === 0 || (aiScoreCap > 0 && leads.length > aiScoreCap)) {
+    if (leads.length > aiScoreCap) {
       console.log(
         `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap} — using heuristic scores`
       );

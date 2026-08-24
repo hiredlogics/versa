@@ -1,5 +1,6 @@
 import type { ScoredLead } from "./types";
 import { deriveMatchSignals } from "./lead-signals";
+import { emailConfidence, emailConfidenceLabel } from "./email-confidence";
 
 export function leadsToCSV(leads: ScoredLead[]): string {
   const headers = [
@@ -29,7 +30,7 @@ export function leadsToCSV(leads: ScoredLead[]): string {
       lead.employees,
       lead.location,
       lead.email || "",
-      lead.hasEmail || lead.email ? "Verified" : "Missing",
+      emailConfidenceLabel(emailConfidence(lead.email, lead.emailStatus)),
       lead.linkedinUrl || "",
       lead.score,
       lead.priority,
@@ -69,7 +70,7 @@ export async function leadsToExcelBuffer(leads: ScoredLead[]): Promise<Buffer> {
     Employees: lead.employees,
     Location: lead.location,
     Email: lead.email || "",
-    "Email Status": lead.hasEmail || lead.email ? "Verified" : "Missing",
+    "Email Status": emailConfidenceLabel(emailConfidence(lead.email, lead.emailStatus)),
     LinkedIn: lead.linkedinUrl || "",
     Score: lead.score,
     Priority: lead.priority,

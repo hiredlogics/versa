@@ -320,6 +320,76 @@ const KNOWN_INDUSTRY_PHRASES = [
   "machine learning",
 ];
 
+/**
+ * Company stage/structure words. q_keywords matches company names, so sending
+ * "startups" returns people at firms literally called "* Startups" instead of
+ * actual startups. Stage belongs in employee ranges, never in keywords.
+ */
+const COMPANY_STAGE_WORDS = new Set([
+  "startup",
+  "startups",
+  "start-up",
+  "start-ups",
+  "smb",
+  "smbs",
+  "sme",
+  "smes",
+  "company",
+  "companies",
+  "business",
+  "businesses",
+  "firm",
+  "firms",
+  "enterprise",
+  "enterprises",
+  "organization",
+  "organizations",
+  "organisation",
+  "organisations",
+  "scaleup",
+  "scaleups",
+  "unicorn",
+  "unicorns",
+]);
+
+/** Startup-sized employee buckets, used when the prompt says "startup". */
+export const STARTUP_EMPLOYEE_RANGES = ["1,10", "11,50"];
+
+/** Accept "apple.com", "Apple.com", "https://apple.com/jobs" → "apple.com". */
+export function normalizeDomains(value: unknown): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const entry of asStringArray(value)) {
+    const clean = entry
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .split("/")[0]
+      .trim();
+    if (!clean || !clean.includes(".") || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+    if (out.length >= 10) break;
+  }
+
+  return out;
+}
+
+export function isCompanyStageWord(word: string): boolean {
+  return COMPANY_STAGE_WORDS.has(word.trim().toLowerCase());
+}
+
+/** Drop stage words so they never reach q_keywords. */
+function stripCompanyStageWords(value: string): string {
+  return value
+    .split(/[^a-z0-9+&-]+/i)
+    .filter((word) => word && !isCompanyStageWord(word))
+    .join(" ")
+    .trim();
+}
+
 const NEED_WORDS = new Set([
   "automation",
   "ai",
@@ -347,12 +417,14 @@ export function resolveApolloKeywords(input: {
 }): { apolloKeywords?: string; searchIntent: string } {
   let searchIntent = (input.searchIntent || input.userPrompt || "").trim();
 
-  const industry =
+  const industryInput =
     input.industry && input.industry.trim() && input.industry.trim().toLowerCase() !== "any"
       ? input.industry.trim()
       : "";
 
-  const raw = (input.qKeywords || "").trim();
+  // "AI startups" must search AI, not company names containing "Startups".
+  const industry = stripCompanyStageWords(industryInput);
+  const raw = stripCompanyStageWords((input.qKeywords || "").trim());
 
   // Prefer explicit industry when it looks like a domain, not a need-word blob
   if (industry && !NEED_WORDS.has(industry.toLowerCase())) {
@@ -436,16 +508,27 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   const variants: ApolloQueryVariant[] = [];
   const seen = new Set<string>();
 
+  // When the user named an employer, that is the search. Relaxing may widen
+  // titles or size, but never the company — otherwise "people at Apple" comes
+  // back as people at any tech company.
+  const organizationDomains = normalizeDomains(base.organizationDomains);
+  const pinned: Partial<ApolloSearchFilters> =
+    organizationDomains.length > 0
+      ? { organizationDomains, employeeRanges: undefined, qKeywords: undefined }
+      : {};
+
   function add(level: number, label: string, filters: ApolloSearchFilters) {
+    const merged = { ...filters, ...pinned };
     const key = JSON.stringify({
-      t: filters.personTitles,
-      l: filters.personLocations,
-      k: filters.qKeywords,
-      e: filters.employeeRanges,
+      t: merged.personTitles,
+      l: merged.personLocations,
+      k: merged.qKeywords,
+      e: merged.employeeRanges,
+      d: merged.organizationDomains,
     });
     if (seen.has(key)) return;
     seen.add(key);
-    variants.push({ level, label, filters });
+    variants.push({ level, label, filters: merged });
   }
 
   const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
@@ -582,6 +665,13 @@ export function normalizeSearchCriteria(
     employeeRanges.push("11,50");
   }
 
+  // "Startup" is a size, not a keyword: express it as headcount instead of
+  // letting the word match company names.
+  const wantsStartups = /\bstart-?ups?\b/i.test(`${userPrompt} ${searchIntentBase}`);
+  if (wantsStartups && employeeRanges.length > STARTUP_EMPLOYEE_RANGES.length) {
+    employeeRanges.splice(0, employeeRanges.length, ...STARTUP_EMPLOYEE_RANGES);
+  }
+
   /**
    * Open-to-work is NOT an Apollo API filter (no person_open_to_work / similar param).
    * Previously we dropped qKeywords and forced huge employee ranges, which ballooned
@@ -603,6 +693,10 @@ export function normalizeSearchCriteria(
       ? false
       : apolloIn.includeSimilarTitles !== false;
 
+  const organizationDomains = normalizeDomains(
+    (parsed as { companyDomains?: unknown }).companyDomains
+  );
+
   const apollo: ApolloSearchFilters = {
     personTitles: finalTitles.slice(0, 5),
     personLocations,
@@ -611,6 +705,14 @@ export function normalizeSearchCriteria(
     employeeRanges,
     includeSimilarTitles: includeSimilar,
   };
+
+  // "People at Apple" is answered by the employer, so size and industry guesses
+  // only shrink it — Apple alone fails an "1001,5000" bucket.
+  if (organizationDomains.length > 0) {
+    apollo.organizationDomains = organizationDomains;
+    apollo.employeeRanges = undefined;
+    apollo.qKeywords = undefined;
+  }
 
   const otwIntentSuffix = openToWork
     ? " Note: open-to-work status cannot be filtered directly; matching professionals by title/location/keywords instead."

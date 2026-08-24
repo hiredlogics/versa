@@ -28,6 +28,18 @@ enum SearchStatus {
   RUNNING
   COMPLETE
   FAILED
+  NEEDS_INFO
+}
+
+enum HoldStatus {
+  HELD
+  CHARGED
+  RELEASED
+}
+
+enum WhySource {
+  TEMPLATE
+  AI
 }
 
 enum PriorityLevel {
@@ -64,6 +76,7 @@ model User {
   savedLists    SavedLeadList[]
   apiKeyConfigs ApiKeyConfig[]
   exportLogs    ExportLog[]
+  creditHolds   CreditHold[]
 
   @@index([clerkId])
   @@index([email])
@@ -147,10 +160,14 @@ model StripeEvent {
 }
 
 model UsageRecord {
-  id           String   @id @default(cuid())
-  userId       String
-  periodStart  DateTime
-  periodEnd    DateTime
+  id     String @id @default(cuid())
+  userId String
+  /// timestamp WITHOUT time zone. A JS Date binds as timestamptz in raw SQL and
+  /// is shifted by the session offset, so `WHERE "periodStart" = ${date}` in
+  /// Prisma.sql matches ZERO rows. Query this column through the Prisma client,
+  /// or look the row up first and use its `id` in raw SQL.
+  periodStart DateTime
+  periodEnd   DateTime
   leadsUsed    Int      @default(0)
   searchesUsed Int      @default(0)
   createdAt    DateTime @default(now())
@@ -176,15 +193,49 @@ model LeadSearch {
   errorMessage   String?
   aiProviderUsed AiProvider?
   durationMs     Int?
+  // Brief the AI produced once; every batch re-queries from this, never re-parses.
+  brief          Json?
+  questions      Json?
+  answers        Json?
+  nextPage       Int          @default(1)
+  batchesDone    Int          @default(0)
+  totalPages     Int?
+  statusNote     String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  leads Lead[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leads       Lead[]
+  creditHolds CreditHold[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
+}
+
+/// Credits are deducted before paid work, then charged for what was delivered
+/// or released. Every exit path from a batch must settle its hold.
+model CreditHold {
+  id             String     @id @default(cuid())
+  userId         String
+  searchId       String
+  amount         Int
+  charged        Int?
+  status         HoldStatus @default(HELD)
+  /// "{searchId}:{batchNo}" — the unique constraint is what stops a
+  /// double-clicked button reserving twice.
+  idempotencyKey String     @unique
+  /// A refund must return to the UsageRecord it came from, even if the billing
+  /// period rolls over mid-batch.
+  periodStart    DateTime
+  createdAt      DateTime   @default(now())
+  settledAt      DateTime?
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search LeadSearch @relation(fields: [searchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 model Lead {
@@ -199,6 +250,9 @@ model Lead {
   employees           Int?
   location            String?
   email               String?
+  // Provider email confidence: "verified", "guessed", or null when unknown.
+  emailStatus         String?
+  whySource           WhySource     @default(TEMPLATE)
   linkedinUrl         String?
   leadScore           Int
   priorityLevel       PriorityLevel
@@ -238,7 +292,7 @@ model SavedLeadListItem {
   leadId String
 
   list SavedLeadList @relation(fields: [listId], references: [id], onDelete: Cascade)
-  lead Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@unique([listId, leadId])
 }

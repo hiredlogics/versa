@@ -109,6 +109,8 @@ Data isolation: leads and searches are scoped to `userId`. Users cannot see anot
 - Job loop (per batch of `LEAD_PROCESS_BATCH_SIZE`, default **100**): **fetch → score → unlock highest score first → keep usable email → save → update `_progress` → stop**
 - `LEAD_MAX_AUTO_BATCHES=1`: one batch per user action. The UI then offers **“Get next 100”** (Resume) instead of draining the plan in one click.
 - `maxLeadsThisRun` clamps each run to `min(batch size, remaining plan credits, requested count)`
+- **Verified emails only:** the provider returns confirmed mailboxes plus addresses built from a company pattern (`email_status: "extrapolated"`). Only `verified` is saved (`LEAD_REQUIRE_VERIFIED_EMAIL=true`); an unlabelled address counts as unverified. A batch therefore checks 100 people and saves however many of those are verified.
+- Person location and employer location are stored separately; the lead shows where the **person** is, since that is what `person_locations` filters on
 - No parallel batches; resume starts at the next incomplete page/batch
 - Apollo 422 insufficient credits: stop unlock immediately (do not 10× single-match retry)
 
@@ -168,7 +170,7 @@ Plans (seed / `PLAN_LIMITS`):
 - FR-3.1a If the prompt is missing location, role, or count, the endpoint instead returns `NEEDS_CLARIFICATION` with questions and creates no search row, so no credits are consumed.
 - FR-3.2 Background job paginates Apollo and processes sequential batches (default **100**, one batch per user action).
 - FR-3.2a Each run is clamped to remaining plan credits; within a batch, emails are unlocked in descending `leadScore` order so the best matches get credits first.
-- FR-3.3 Only leads with a **usable unlocked email** are saved (`isUsableEmail`; placeholders like `email_not_unlocked` discarded).
+- FR-3.3 Only leads with a **verified unlocked email** are saved (`isUsableEmail` for format, then `isVerifiedEmail`; placeholders like `email_not_unlocked` and pattern-guessed addresses are discarded).
 - FR-3.4 User can **Stop** a running search and continue with **Get next 100** (Resume) from stored `_progress`.
 - FR-3.5 Progress copy reports checked vs pool vs with-email (e.g. `1,076 / 3,576,776 checked → 0 with valid email`).
 - FR-3.6 Permanent failure after retries sets `FAILED`. In-progress or poll timeout uses “still processing”, not “Search failed”.

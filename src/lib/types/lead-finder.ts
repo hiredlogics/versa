@@ -12,6 +12,8 @@ export interface LeadRecord {
   employees: number | null;
   location: string | null;
   email: string | null;
+  /** Provider email confidence: "verified" | "guessed" | null when unknown. */
+  emailStatus?: string | null;
   linkedinUrl: string | null;
   leadScore: number;
   priorityLevel: PriorityLevel;

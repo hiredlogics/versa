@@ -26,6 +26,10 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   CRITICAL: If industry is Real Estate / property / brokerage, NEVER use CTO, VP Engineering, Head of Product, or other software titles unless the user explicitly asked for tech roles.
 - personLocations: exactly the places the user listed (max 3). Never pair a country with one of its own states/cities (no ["California","United States"]).
 - qKeywords: the INDUSTRY / domain phrase only (keep multi-word intact).
+  NEVER put company stage/size words here: "startup", "startups", "SMB", "SME", "company", "companies", "business", "firm", "enterprise".
+  q_keywords matches COMPANY NAMES, so "startups" returns firms literally named "* Startups".
+  "AI startups" → qKeywords: "artificial intelligence", employeeRanges: ["1,10","11,50"].
+  "healthcare SMBs" → qKeywords: "healthcare", employeeRanges: ["11,50","51,200"].
   Good: "real estate" | "property management" | "healthcare"
   Bad: "automation, real" | "automation real estate AI" | cutting words mid-phrase
   Put needs like "automation", "AI", "chatbots" ONLY in searchIntent (used later for ranking) — never in qKeywords.
@@ -39,6 +43,7 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   Never omit titles or keywords just because openToWork is true — that balloons the Apollo pool.
   For HR roles use titles like ["HR Manager","Human Resources Manager","Head of People"], not bare "HR".
   For New York / NY / NYC use personLocations: ["New York"] (not United States).
+- companyDomains: when the prompt names specific employers ("works at Apple", "people at Stripe"), put their real primary domains here: ["apple.com"], ["stripe.com"]. Leave empty when no employer is named. Never guess a domain you are unsure of.
 - Do not invent unrelated industries, countries, or titles.
 - Respect excluded titles/industries only when the prompt itself states them.
 

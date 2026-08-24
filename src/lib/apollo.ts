@@ -227,15 +227,21 @@ function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string):
     last_name: lastName,
     title: raw.title || "N/A",
     email,
+    email_status: raw.email_status ?? null,
     linkedin_url: raw.linkedin_url || null,
     has_email: Boolean(email || raw.has_email),
+    // Person address and employer address stay separate: mixing them field by
+    // field produced impossible places like "Lahore, Scotland, United Kingdom".
+    city: raw.city || "",
+    state: raw.state || "",
+    country: raw.country || "",
     organization: {
       name: org?.name || "Unknown",
       industry: org?.industry || fallbackIndustry || "N/A",
       estimated_num_employees: org?.estimated_num_employees || 0,
-      city: org?.city || raw.city || "",
-      state: org?.state || raw.state || "",
-      country: org?.country || raw.country || "",
+      city: org?.city || "",
+      state: org?.state || "",
+      country: org?.country || "",
     },
   };
 }
@@ -267,6 +273,9 @@ function buildParamsFromFilters(
   }
   if (filters.qKeywords) {
     params.q_keywords = filters.qKeywords;
+  }
+  if (filters.organizationDomains?.length) {
+    params.q_organization_domains_list = filters.organizationDomains;
   }
 
   return params;
@@ -307,7 +316,8 @@ async function searchWithSmartFallback(
   page: number,
   perPage: number
 ): Promise<ApolloSearchResult> {
-  const smartRelax = process.env.APOLLO_SMART_RELAX !== "false";
+  // Always allowed to widen a too-narrow query; the employer stays pinned.
+  const smartRelax = true;
   const variants = buildApolloSearchVariants(criteria);
 
   logLeadFetch("apollo_filters_input", {
@@ -788,7 +798,6 @@ export async function searchAllPeople(
 
     console.log(
       `[apollo] Total available: ${totalAvailable} — fetching ${totalPages} page(s) × ${perPage}` +
-        (config.fetchAll ? " (FETCH ALL mode)" : "") +
         ` = up to ${Math.min(totalAvailable, totalPages * perPage)} people`
     );
 
@@ -815,9 +824,10 @@ export async function searchAllPeople(
     }
   }
 
-  const pageDelayMs = config.fetchAll
-    ? Math.min(250, Math.max(50, parseInt(process.env.APOLLO_PAGE_DELAY_MS || "120", 10)))
-    : Math.min(800, Math.max(100, parseInt(process.env.APOLLO_PAGE_DELAY_MS || "400", 10)));
+  const pageDelayMs = Math.min(
+    800,
+    Math.max(50, parseInt(process.env.APOLLO_PAGE_DELAY_MS || "120", 10))
+  );
 
   let partial = false;
   let stopped = false;
@@ -888,7 +898,8 @@ export async function searchAllPeople(
 
 export function formatApolloPerson(person: ApolloPerson) {
   const org = person.organization;
-  const location = [org?.city, org?.state, org?.country].filter(Boolean).join(", ");
+  const personLocation = [person.city, person.state, person.country].filter(Boolean).join(", ");
+  const orgLocation = [org?.city, org?.state, org?.country].filter(Boolean).join(", ");
   const email = isUsableEmail(person.email) ? person.email!.trim() : null;
 
   return {
@@ -898,8 +909,10 @@ export function formatApolloPerson(person: ApolloPerson) {
     company: org?.name || "Unknown",
     industry: org?.industry || "N/A",
     employees: org?.estimated_num_employees || 0,
-    location: location || "N/A",
+    // Show where the person is; the employer HQ is only a fallback.
+    location: personLocation || orgLocation || "N/A",
     email,
+    emailStatus: person.email_status ?? null,
     linkedinUrl: person.linkedin_url,
   };
 }

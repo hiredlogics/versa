@@ -13,6 +13,7 @@ export function dbLeadToExport(lead: Lead): ScoredLead {
     employees: lead.employees || 0,
     location: lead.location || "N/A",
     email: lead.email,
+    emailStatus: lead.emailStatus,
     linkedinUrl: lead.linkedinUrl,
     score: lead.leadScore,
     reasoning: lead.reasoning || "",
