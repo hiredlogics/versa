@@ -135,6 +135,19 @@ describe("quality gates", () => {
     expect(result[0].why).toContain("Acme Software");
   });
 
+  it("rejects circular seniority reasoning seen in production", async () => {
+    // Both of these shipped to a customer: 50 leads reasoned as "junior,
+    // therefore job-seeking", including one former VP called entry-level.
+    respond([
+      { id: "a", why: "Her entry-level position may signal a desire to seek new roles at this time." },
+      { id: "b", why: "His varied experience suggests he might be considering new opportunities soon." },
+    ]);
+
+    const result = await writeWhy([lead("a"), lead("b")], brief);
+
+    expect(result.map((r) => r.whySource)).toEqual(["TEMPLATE", "TEMPLATE"]);
+  });
+
   it("rejects a why shorter than 30 characters", async () => {
     respond([{ id: "a", why: "Solid lead." }]);
     const result = await writeWhy([lead("a")], brief);

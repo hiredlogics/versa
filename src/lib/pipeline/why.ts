@@ -10,8 +10,14 @@ export const CHUNK_SIZE = 25;
 export const CONCURRENCY = 4;
 const MIN_WHY_LENGTH = 30;
 
-/** Filler a model reaches for when it has nothing specific to say. */
-const GENERIC_WHY = /matches your (criteria|search)|good fit|relevant role/i;
+/**
+ * Filler a model reaches for when it has nothing specific to say, plus the
+ * circular seniority reasoning a production run produced 50 times: "this person
+ * is junior, therefore they want a job". One lead was described as a former
+ * Vice President at JPMorgan Chase and as "entry-level" in the same sentence.
+ */
+const GENERIC_WHY =
+  /matches your (criteria|search)|good fit|relevant role|(may|might|could) (be )?(open to|seeking|considering|exploring|interested in) new (opportunities|roles|challenges|job)|entry.level (position|status|seniority) (may|might|suggests|could)|desire to seek new/i;
 
 /**
  * Deliberately says nothing about where the data came from. The model must
@@ -28,6 +34,9 @@ Rules:
 - No bullet points. Plain prose.
 - Never claim facts you were not given: no funding rounds, no headcount growth, no job changes.
 - Never write filler like "matches your criteria" or "good fit".
+- Never infer intent, availability, or job-seeking from a seniority level. Being junior is not evidence that someone wants to move, and neither is being senior.
+- Never state a seniority that contradicts the listed job history. Someone who was a Vice President is not entry-level.
+- Never reuse the same reasoning shape across people. If the only thing you can say about someone is their seniority, say what their ROLE means for this search instead.
 - Return every id you were given, unchanged.
 
 Return JSON only: { "leads": [{ "id": "string", "why": "string" }] }`;
