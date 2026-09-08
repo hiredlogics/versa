@@ -111,3 +111,4 @@ Or set Clerk `publicMetadata.role` to `"ADMIN"` on user creation via webhook.
 ## Legacy prototype
 
 The original single-user chat UI and JSON file storage remain under `/api/chat` and `/data/` for reference. The SaaS app uses `/app` and PostgreSQL.
+# versa
