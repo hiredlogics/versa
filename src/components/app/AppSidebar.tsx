@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Search, History, Users, Settings, CreditCard, Gauge, Shield, X } from "lucide-react";
+import { Search, History, Users, Settings, CreditCard, Gauge, Shield, X, UserCheck } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { useAppShellData } from "@/components/app/AppShellDataProvider";
 import { cn } from "@/lib/utils/cn";
@@ -11,6 +11,7 @@ import { BRAND } from "@/config/brand";
 
 const nav = [
   { href: "/app", label: "Lead Finder", icon: Search, exact: true },
+  { href: "/app/open-to-work", label: "Open To Work", icon: UserCheck },
   { href: "/app/searches", label: "Searches", icon: History },
   { href: "/app/leads", label: "All Leads", icon: Users },
   { href: "/app/usage", label: "Plan & Usage", icon: Gauge },
