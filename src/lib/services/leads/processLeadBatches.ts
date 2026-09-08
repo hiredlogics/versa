@@ -29,6 +29,7 @@ import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile
 import {
   filterPeopleForOpenToWork,
   OPEN_TO_WORK_APOLLO_DISCLAIMER,
+  OPEN_TO_WORK_NONE_FOUND,
 } from "@/lib/open-to-work";
 import type { LeadScoreContext, SearchCriteria, ApolloSearchFilters, ApolloPerson } from "@/lib/types";
 
@@ -43,6 +44,9 @@ export type SequentialBatchResult = {
   leadsWithEmail: number;
   peoplePulled: number;
   savedThisRun: number;
+  /** Profiles examined for open-to-work title/headline signals (OTW mode). */
+  otwScanned?: number;
+  otwSignalHits?: number;
   partial: boolean;
   canResume: boolean;
   stopped: boolean;
@@ -173,6 +177,9 @@ export async function runSequentialLeadBatches(input: {
   let stopReason: string | undefined;
   let scoreProvider = "HEURISTIC";
   let savedThisRun = 0;
+  let otwScanned = 0;
+  let otwSignalHits = 0;
+  const openToWorkMode = Boolean(input.criteria.openToWork);
 
   const batchesThisRunCap = maxBatches === 0 ? Number.POSITIVE_INFINITY : maxBatches;
   const unlockBudget = getUnlockAttemptBudget(batchSize);
@@ -207,7 +214,9 @@ export async function runSequentialLeadBatches(input: {
           withEmail: leadsWithEmail,
           batchIndex,
           batchSize,
-          phase: "Fetching matches…",
+          phase: openToWorkMode
+            ? "Fetching matches to scan for open-to-work title/headline signals…"
+            : "Fetching matches…",
         }),
       },
     });
@@ -272,22 +281,24 @@ export async function runSequentialLeadBatches(input: {
     );
 
     let openToWorkNote = "";
-    if (input.criteria.openToWork && people.length > 0) {
-      const otw = filterPeopleForOpenToWork(people);
+    if (openToWorkMode && people.length > 0) {
+      const otw = filterPeopleForOpenToWork(people, { strict: true });
+      otwScanned += otw.scanned;
+      otwSignalHits += otw.signalCount;
       people = otw.people;
       openToWorkNote = otw.note;
-      if (!otw.usedTitleSignals) {
-        // Surface once per job when Apollo can't verify OTW from title text
-        if (!apolloRelaxNote?.includes("open to work")) {
-          apolloRelaxNote = OPEN_TO_WORK_APOLLO_DISCLAIMER;
-        }
+      if (!apolloRelaxNote?.includes("open to work") && !apolloRelaxNote?.includes("Open-to-work")) {
+        apolloRelaxNote = OPEN_TO_WORK_APOLLO_DISCLAIMER;
       }
       logLeadFetch("open_to_work_pre_unlock", {
         searchId: input.searchId,
         batchIndex,
         usedTitleSignals: otw.usedTitleSignals,
         signalCount: otw.signalCount,
+        scanned: otw.scanned,
         remaining: people.length,
+        otwScannedTotal: otwScanned,
+        otwSignalHitsTotal: otwSignalHits,
       });
     }
 
@@ -297,8 +308,30 @@ export async function runSequentialLeadBatches(input: {
         batchIndex,
         lastPage,
         totalPages,
-        openToWorkFiltered: Boolean(input.criteria.openToWork),
+        openToWorkFiltered: openToWorkMode,
       });
+      if (openToWorkMode) {
+        peoplePulled += fetched.people.length;
+        leadsFetched += fetched.people.length;
+        await prisma.leadSearch.update({
+          where: { id: input.searchId },
+          data: {
+            totalAvailable,
+            leadsReturned: leadsWithEmail,
+            relaxNote: batchProgressNote({
+              checked: leadsFetched,
+              pool: totalAvailable,
+              withEmail: leadsWithEmail,
+              batchIndex,
+              batchSize,
+              phase:
+                otwSignalHits > 0
+                  ? openToWorkNote || "Checking more pages for open-to-work signals…"
+                  : `Scanned ${otwScanned.toLocaleString()} profiles — ${otwSignalHits} with open-to-work wording so far. Checking more pages…`,
+            }),
+          },
+        });
+      }
       if (fetched.exhausted || lastPage >= totalPages) break;
       // Advance past empty/dupe region
       startPage = lastPage + 1;
@@ -485,15 +518,20 @@ export async function runSequentialLeadBatches(input: {
       searchId: input.searchId,
     });
 
-    workList = workList.map((lead, i) => ({
-      ...lead,
-      email: lead.email!.trim(),
-      hasEmail: true,
-      reasoning:
+    workList = workList.map((lead, i) => {
+      const baseWhy =
         whyResults[i]?.reasoning ||
-        buildLeadWhyReasoning(whyInputs[i], input.scoreContext).reasoning,
-      recommendedApproach: "",
-    }));
+        buildLeadWhyReasoning(whyInputs[i], input.scoreContext).reasoning;
+      return {
+        ...lead,
+        email: lead.email!.trim(),
+        hasEmail: true,
+        reasoning: openToWorkMode
+          ? `Open-to-work signal in title/headline. ${baseWhy}`
+          : baseWhy,
+        recommendedApproach: "",
+      };
+    });
 
     const leadRows = workList.map((lead) => ({
       userId: input.userId,
@@ -613,6 +651,12 @@ export async function runSequentialLeadBatches(input: {
     stopReason = "max_auto_batches";
   }
 
+  if (openToWorkMode && savedThisRun === 0 && otwScanned > 0) {
+    apolloRelaxNote = `${OPEN_TO_WORK_NONE_FOUND} Scanned ${otwScanned.toLocaleString()} profiles; ${otwSignalHits} had open-to-work wording.`;
+  } else if (openToWorkMode && savedThisRun > 0) {
+    apolloRelaxNote = `${OPEN_TO_WORK_APOLLO_DISCLAIMER} Saved ${savedThisRun} after scanning ${otwScanned.toLocaleString()} profiles (${otwSignalHits} with signals).`;
+  }
+
   const canResume =
     lastPage < totalPages &&
     leadsWithEmail < APOLLO_HARD_MAX_RECORDS &&
@@ -629,6 +673,8 @@ export async function runSequentialLeadBatches(input: {
     leadsWithEmail,
     peoplePulled,
     savedThisRun,
+    otwScanned: openToWorkMode ? otwScanned : undefined,
+    otwSignalHits: openToWorkMode ? otwSignalHits : undefined,
     partial: lastPage < totalPages || Boolean(hitAutoCap) || creditsExhausted,
     canResume: canResume && lastPage < totalPages,
     stopped,

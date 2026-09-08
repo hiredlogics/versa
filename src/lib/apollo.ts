@@ -226,6 +226,7 @@ function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string):
     first_name: raw.first_name || "",
     last_name: lastName,
     title: raw.title || "N/A",
+    headline: raw.headline?.trim() || null,
     email,
     email_status: raw.email_status ?? null,
     linkedin_url: raw.linkedin_url || null,
@@ -319,17 +320,23 @@ async function searchWithSmartFallback(
   // Always allowed to widen a too-narrow query; the employer stays pinned.
   const smartRelax = true;
   const variants = buildApolloSearchVariants(criteria);
+  // OTW keyword hits are rare; accepting a pool of 1 often means unlock finds
+  // no verified email. Prefer a larger pool before stopping (still OTW-biased).
+  const minAcceptPool = criteria.openToWork ? 25 : 1;
 
   logLeadFetch("apollo_filters_input", {
     filters: JSON.parse(formatApolloFiltersLog(criteria)) as Record<string, unknown>,
     variantCount: variants.length,
     smartRelax,
+    minAcceptPool,
   });
   console.log(`[apollo] AI-generated filters:\n${formatApolloFiltersLog(criteria)}`);
 
   if (variants.length === 0) {
     throw new Error("No Apollo search filters generated from prompt");
   }
+
+  let best: ApolloSearchResult | null = null;
 
   for (const variant of variants) {
     const result = await searchPeopleWithFilters(variant.filters, criteria, page, perPage);
@@ -351,22 +358,47 @@ async function searchWithSmartFallback(
     });
 
     if (result.totalEntries > 0 || result.people.length > 0) {
-      if (variant.level > 0) {
-        console.log(
-          `[apollo] Smart relax level ${variant.level}: ${variant.label} → ${result.totalEntries} results`
-        );
+      const candidate: ApolloSearchResult = { ...result, variant };
+      if (!best || candidate.totalEntries > best.totalEntries) {
+        best = candidate;
       }
-      logLeadFetch("apollo_variant_selected", {
-        level: variant.level,
-        label: variant.label,
-        totalEntries: result.totalEntries,
-        relaxed: variant.level > 0,
-      });
-      return { ...result, variant };
+
+      // Accept once the pool is large enough — or immediately for non-OTW.
+      if (!criteria.openToWork || result.totalEntries >= minAcceptPool) {
+        if (variant.level > 0) {
+          console.log(
+            `[apollo] Smart relax level ${variant.level}: ${variant.label} → ${result.totalEntries} results`
+          );
+        }
+        logLeadFetch("apollo_variant_selected", {
+          level: variant.level,
+          label: variant.label,
+          totalEntries: result.totalEntries,
+          relaxed: variant.level > 0,
+        });
+        return candidate;
+      }
+
+      console.log(
+        `[apollo] Level ${variant.level} only ${result.totalEntries} hits (<${minAcceptPool}) — trying wider OTW variant`
+      );
     }
 
     if (!smartRelax) break;
-    console.log(`[apollo] Level ${variant.level} returned 0 — trying: ${variant.label}`);
+  }
+
+  if (best) {
+    console.log(
+      `[apollo] Using best available pool: level ${best.variant.level} "${best.variant.label}" → ${best.totalEntries}`
+    );
+    logLeadFetch("apollo_variant_selected", {
+      level: best.variant.level,
+      label: best.variant.label,
+      totalEntries: best.totalEntries,
+      relaxed: best.variant.level > 0,
+      bestEffort: true,
+    });
+    return best;
   }
 
   logLeadFetch("apollo_all_variants_empty", { variantCount: variants.length });

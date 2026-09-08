@@ -40,6 +40,8 @@ export interface ApolloPerson {
   first_name: string;
   last_name: string;
   title: string;
+  /** LinkedIn-style headline when the provider returns it (OTW signal scan). */
+  headline?: string | null;
   email: string | null;
   /** Apollo email confidence: "verified" | "guessed" | "unavailable" | … */
   email_status?: string | null;

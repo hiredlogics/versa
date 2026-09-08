@@ -188,13 +188,21 @@ export async function runBatch(
     const pagesRemain = totalPages === null || nextPage <= totalPages;
     const reason: BatchReason = sawEmptyPage || !pagesRemain ? "exhausted" : "no_matches_this_pass";
 
+    // Say why nothing survived. "No matches" reads as a broken search; "480 of
+    // 500 never say they are looking" is a fact the user can act on.
+    const skippedForSignal = rejections.no_job_signal ?? 0;
+    const note =
+      skippedForSignal > 0
+        ? `${NOTES[reason]} ${skippedForSignal.toLocaleString()} of ${fetched.toLocaleString()} people checked don't state that they're looking for work, so they were skipped before any credits were spent.`
+        : NOTES[reason];
+
     await prisma.leadSearch.update({
       where: { id: searchId },
       data: {
         status: "COMPLETE",
         nextPage: reason === "exhausted" ? nextPage : nextPage + 1,
         totalPages,
-        statusNote: NOTES[reason],
+        statusNote: note,
       },
     });
 
@@ -202,6 +210,7 @@ export async function runBatch(
     return outcome({
       batchNo,
       reason,
+      note,
       fetched,
       rejections,
       hasMore: reason === "no_matches_this_pass",

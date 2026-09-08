@@ -232,26 +232,69 @@ describe("search-criteria helpers", () => {
 
     expect(criteria.openToWork).toBe(true);
     expect(criteria.apollo?.personLocations).toEqual(["New York"]);
-    expect(criteria.apollo?.qKeywords).toBeTruthy();
+    expect(criteria.apollo?.qKeywords?.toLowerCase()).toContain("open to work");
     expect(criteria.apollo?.includeSimilarTitles).toBe(false);
     expect(criteria.apollo?.personTitles?.some((t) => /hr|people|human resources|talent/i.test(t))).toBe(
       true
     );
     expect(criteria.apollo?.personTitles?.join(" ")).not.toMatch(/Software Engineer/i);
     expect(criteria.apollo?.employeeRanges).not.toContain("501,1000");
-    // Client-facing copy must stay provider-neutral while keeping the disclaimer.
-    expect(criteria.searchIntent?.toLowerCase()).toContain("cannot be filtered directly");
+    // Client-facing copy must stay provider-neutral while explaining strict OTW keep.
+    expect(criteria.searchIntent?.toLowerCase()).toContain(
+      "only people with open-to-work / job-seeking wording"
+    );
     expect(criteria.searchIntent?.toLowerCase()).not.toContain("apollo");
+  });
+
+  it("builds multiple OTW-biased Apollo variants (does not stop at a 1-hit pool)", () => {
+    const criteria = normalizeSearchCriteria(
+      {
+        industry: "Software",
+        country: "California",
+        companySizeMin: 10,
+        companySizeMax: 500,
+        openToWork: true,
+        summary: "SE CA open to work",
+        apollo: {
+          personTitles: ["Software Engineer"],
+          personLocations: ["California"],
+          qKeywords: "open to work",
+          employeeRanges: ["11,50", "51,200", "201,500"],
+        },
+      } as never,
+      "software engineers in California open to work"
+    );
+    const variants = buildApolloSearchVariants(criteria);
+    expect(variants.length).toBeGreaterThan(3);
+    expect(variants.some((v) => /seeking opportunities/i.test(v.filters.qKeywords || ""))).toBe(
+      true
+    );
+    expect(
+      variants.some((v) =>
+        (v.filters.personTitles || []).some((t) => /open to work/i.test(t))
+      )
+    ).toBe(true);
+    // No giant "titles only" fallback that returns employed people with no signals
+    expect(
+      variants.every(
+        (v) =>
+          Boolean(v.filters.qKeywords) ||
+          (v.filters.personTitles || []).some((t) => /open to work|seeking|looking/i.test(t))
+      )
+    ).toBe(true);
   });
 });
 
 describe("open-to-work title signals", () => {
-  it("hard-filters to title signals when present, otherwise keeps batch", async () => {
+  it("hard-filters to title signals when present; soft keeps batch, strict drops all", async () => {
     const { filterPeopleForOpenToWork, hasOpenToWorkTitleSignal } = await import(
       "@/lib/open-to-work"
     );
     expect(hasOpenToWorkTitleSignal("Engineer #OpenToWork")).toBe(true);
     expect(hasOpenToWorkTitleSignal("HR Manager")).toBe(false);
+    expect(
+      hasOpenToWorkTitleSignal({ title: "Engineer", headline: "Actively looking for a new role" })
+    ).toBe(true);
 
     const hard = filterPeopleForOpenToWork([
       { title: "HR Manager" },
@@ -263,6 +306,13 @@ describe("open-to-work title signals", () => {
     const soft = filterPeopleForOpenToWork([{ title: "HR Manager" }, { title: "CHRO" }]);
     expect(soft.usedTitleSignals).toBe(false);
     expect(soft.people).toHaveLength(2);
+
+    const strict = filterPeopleForOpenToWork([{ title: "HR Manager" }, { title: "CHRO" }], {
+      strict: true,
+    });
+    expect(strict.usedTitleSignals).toBe(false);
+    expect(strict.people).toHaveLength(0);
+    expect(strict.scanned).toBe(2);
   });
 });
 

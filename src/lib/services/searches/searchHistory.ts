@@ -157,7 +157,7 @@ export function buildAssistantSummary(
   } else if (openToWork) {
     const role = titles[0] || "professionals";
     const where = location ? ` in ${location}` : "";
-    base = `I interpreted this as ${role}${where} who may be open to work / looking for a job. "Open to work" can't be verified directly, so results are matching professionals ranked for outreach`;
+    base = `I interpreted this as ${role}${where} open to work. Only people with job-seeking wording in title/headline are unlocked and saved`;
   } else {
     const parts: string[] = [];
     if (titles.length) parts.push(titles.join(", "));

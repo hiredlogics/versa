@@ -144,6 +144,48 @@ describe("check", () => {
   });
 });
 
+describe("job-seeking signals only", () => {
+  const seeking: Brief = { ...brief, jobSeekingOnly: true };
+
+  it("keeps people who say it themselves", () => {
+    // Self-written statements are the only honest evidence — there is no
+    // job-seeking field in the data.
+    for (const headline of [
+      "#OpenToWork | HR Manager",
+      "Actively looking for new HR roles",
+      "Available for hire — people ops",
+      "Between jobs, ex-Shopify",
+    ]) {
+      expect(check(candidate({ headline }), seeking).keep).toBe(true);
+    }
+  });
+
+  it("rejects everyone who does not, however senior", () => {
+    // This is the inverse of the bug that shipped: seniority and tenure are not
+    // evidence of wanting to move.
+    expect(check(candidate({ headline: "HR Manager at Acme, 12 years" }), seeking)).toEqual({
+      keep: false,
+      reason: "no_job_signal",
+    });
+    expect(check(candidate({ headline: null }), seeking)).toEqual({
+      keep: false,
+      reason: "no_job_signal",
+    });
+  });
+
+  it("changes nothing when the mode is off", () => {
+    expect(check(candidate({ headline: null }), brief).keep).toBe(true);
+  });
+
+  it("still applies exclusions and title matching first", () => {
+    // A job-seeking signal must not rescue someone the user ruled out.
+    expect(check(candidate({ title: "HR Intern", headline: "#OpenToWork" }), seeking)).toEqual({
+      keep: false,
+      reason: "excluded_title",
+    });
+  });
+});
+
 describe("finalize", () => {
   it("trims before validating so a padded address survives", () => {
     const result = finalize(candidate(), 70, "  dana@acme.com  ");

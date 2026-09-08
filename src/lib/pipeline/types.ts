@@ -26,6 +26,12 @@ export interface Brief {
   excludeTitles: string[];
   excludeIndustries: string[];
   requestedTotal: number;
+  /**
+   * Keep only people who say they are job-seeking in their own title or
+   * headline. High precision, low recall: most job seekers never write it, so
+   * this trades a long unreliable list for a short trustworthy one.
+   */
+  jobSeekingOnly?: boolean;
 }
 
 export type BriefGap = "titles" | "location" | "quantity" | "industry";
@@ -71,6 +77,7 @@ export type RejectReason =
   | "title_mismatch"
   | "size_mismatch"
   | "low_fit"
+  | "no_job_signal"
   | "no_email";
 
 export interface VerifiedLead {

@@ -5,6 +5,7 @@ import type {
   RejectReason,
   VerifiedLead,
 } from "./types";
+import { hasOpenToWorkTitleSignal } from "@/lib/open-to-work";
 
 /**
  * Filters and verification. No AI, no network, no database — given the same
@@ -152,6 +153,12 @@ export function check(candidate: Candidate, brief: Brief): CheckResult {
     return { keep: false, reason: "title_mismatch" };
   }
 
+  // Rejected before any unlock is paid for, so a low-recall filter costs
+  // nothing but the free search calls.
+  if (brief.jobSeekingOnly && !statesJobSeeking(candidate)) {
+    return { keep: false, reason: "no_job_signal" };
+  }
+
   // Unknown headcount passes. Unlike a credit check, the permissive default is
   // correct here: the provider omits this constantly, and rejecting on a blank
   // field discards people who match perfectly well.
@@ -191,6 +198,15 @@ export function check(candidate: Candidate, brief: Brief): CheckResult {
   }
 
   return { keep: true, fit };
+}
+
+/**
+ * Phrases people write about themselves when they are looking. There is no
+ * job-seeking field in the data, so a self-written statement is the only honest
+ * evidence — inferring it from seniority or tenure produces confident nonsense.
+ */
+export function statesJobSeeking(candidate: Pick<Candidate, "title" | "headline">): boolean {
+  return hasOpenToWorkTitleSignal(candidate);
 }
 
 function looksLikeEmail(value: string): boolean {

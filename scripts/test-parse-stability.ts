@@ -64,8 +64,9 @@ async function main() {
   if (run1.criteria.openToWork !== true || run2.criteria.openToWork !== true) {
     errors.push("openToWork should be true for both runs");
   }
-  if (run1.criteria.apollo?.qKeywords || run2.criteria.apollo?.qKeywords) {
-    errors.push("open-to-work searches should keep q_keywords null");
+  if (run1.criteria.apollo?.qKeywords?.toLowerCase().includes("open to work") !== true ||
+      run2.criteria.apollo?.qKeywords?.toLowerCase().includes("open to work") !== true) {
+    errors.push('open-to-work searches should bias q_keywords with "open to work"');
   }
   if (!t1.includes("Software Engineer") || !t1.includes("Developer")) {
     errors.push(`stable engineer titles missing: ${t1.join(", ")}`);

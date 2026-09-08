@@ -1,4 +1,5 @@
 import type { SearchCriteria, ApolloSearchFilters } from "./types";
+import { OPEN_TO_WORK_APOLLO_KEYWORDS } from "@/lib/open-to-work";
 
 type ParsedPrompt = SearchCriteria & {
   apollo?: Partial<ApolloSearchFilters> & {
@@ -533,6 +534,65 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
 
   const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
 
+  // Open-to-work: prioritize keyword/title variants that surface self-stated
+  // seekers. Tiny pools (e.g. 1 hit) must not stop relax — unlock often fails.
+  if (criteria.openToWork && organizationDomains.length === 0) {
+    const otwKeywords = [
+      industryKeyword || OPEN_TO_WORK_APOLLO_KEYWORDS,
+      OPEN_TO_WORK_APOLLO_KEYWORDS,
+      "seeking opportunities",
+      "#OpenToWork",
+      "actively looking",
+    ];
+    // Dedupe keyword list (case-insensitive)
+    const seenKw = new Set<string>();
+    const uniqueOtwKw: string[] = [];
+    for (const kw of otwKeywords) {
+      const key = kw.toLowerCase();
+      if (seenKw.has(key)) continue;
+      seenKw.add(key);
+      uniqueOtwKw.push(kw);
+    }
+
+    let level = 0;
+    for (const kw of uniqueOtwKw) {
+      add(level++, `OTW keyword "${kw}" + titles + size`, {
+        personTitles: titles,
+        personLocations: primaryLocation,
+        qKeywords: kw,
+        employeeRanges,
+        includeSimilarTitles: false,
+      });
+      add(level++, `OTW keyword "${kw}" + titles (no size)`, {
+        personTitles: titles,
+        personLocations: primaryLocation,
+        qKeywords: kw,
+        employeeRanges: undefined,
+        includeSimilarTitles: false,
+      });
+    }
+
+    // People who put job-seeking as their literal title (rare but high precision)
+    add(level++, "OTW as person titles + location", {
+      personTitles: [
+        "Open to Work",
+        "#OpenToWork",
+        "Seeking Opportunities",
+        "Seeking New Opportunities",
+        "Actively Looking",
+      ],
+      personLocations: primaryLocation,
+      qKeywords: undefined,
+      employeeRanges: undefined,
+      includeSimilarTitles: true,
+    });
+
+    // Do NOT fall back to titles+location without OTW bias here — that returns
+    // tens of thousands of employed people with ~0 title signals.
+
+    return variants;
+  }
+
   const exact: ApolloSearchFilters = {
     personTitles: titles,
     personLocations: primaryLocation,
@@ -706,6 +766,17 @@ export function normalizeSearchCriteria(
     includeSimilarTitles: includeSimilar,
   };
 
+  // Bias Apollo text search toward profiles that mention job-seeking. Still not
+  // LinkedIn's private Open to Work flag — only improves odds of title/headline hits.
+  if (openToWork && !apollo.organizationDomains?.length) {
+    const existing = (apollo.qKeywords || "").trim();
+    if (!/open\s*to\s*work/i.test(existing)) {
+      apollo.qKeywords = existing
+        ? `${existing} ${OPEN_TO_WORK_APOLLO_KEYWORDS}`.trim()
+        : OPEN_TO_WORK_APOLLO_KEYWORDS;
+    }
+  }
+
   // "People at Apple" is answered by the employer, so size and industry guesses
   // only shrink it — Apple alone fails an "1001,5000" bucket.
   if (organizationDomains.length > 0) {
@@ -715,7 +786,7 @@ export function normalizeSearchCriteria(
   }
 
   const otwIntentSuffix = openToWork
-    ? " Note: open-to-work status cannot be filtered directly; matching professionals by title/location/keywords instead."
+    ? " Only people with open-to-work / job-seeking wording in title or headline are unlocked and saved."
     : "";
 
   return {

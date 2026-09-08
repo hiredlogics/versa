@@ -1,56 +1,100 @@
 /**
  * Apollo People Search has no native "open to work" / job-seeker filter.
- * The only pre-enrich signal we usually get is the current `title` string
- * (some people put "#OpenToWork" / "seeking opportunities" in their title).
+ * The only honest pre-enrich signal is wording people write in title/headline
+ * (e.g. "#OpenToWork", "seeking opportunities").
  */
 
 export const OPEN_TO_WORK_TITLE_SIGNALS = [
   "open to work",
   "#opentowork",
   "opentowork",
+  "open for work",
   "seeking opportunities",
   "seeking new opportunities",
+  "seeking new",
+  "seeking a new",
   "open to opportunities",
   "looking for opportunities",
   "looking for a new role",
+  "looking for a new",
   "looking for work",
+  "looking for new",
   "between roles",
   "between jobs",
   "career break",
   "actively looking",
+  "actively seeking",
   "available for hire",
+  "available immediately",
+  "immediate joiner",
+  "notice period",
 ] as const;
 
 export const OPEN_TO_WORK_APOLLO_DISCLAIMER =
-  "\"Open to work\" can't be filtered directly — results are narrowed by your other criteria (titles, location, keywords) and ranked for outreach instead.";
+  "\"Open to work\" isn't a provider filter — we only keep people who wrote job-seeking wording in their title/headline, then unlock email for those.";
 
-export function hasOpenToWorkTitleSignal(title: string | null | undefined): boolean {
-  const text = (title || "").toLowerCase();
+export const OPEN_TO_WORK_NONE_FOUND =
+  "No one in this search pool wrote open-to-work / job-seeking wording in their title or headline. Try a tighter role + location, or use LinkedIn Recruiter for LinkedIn's real Open to Work flag.";
+
+/** Bias Apollo text search toward profiles that mention job-seeking (still not a real OTW flag). */
+export const OPEN_TO_WORK_APOLLO_KEYWORDS = "open to work";
+
+export type OpenToWorkPerson = {
+  title?: string | null;
+  headline?: string | null;
+};
+
+export function openToWorkText(person: OpenToWorkPerson): string {
+  return `${person.title ?? ""} ${person.headline ?? ""}`.toLowerCase();
+}
+
+export function hasOpenToWorkTitleSignal(
+  titleOrPerson: string | null | undefined | OpenToWorkPerson
+): boolean {
+  const text =
+    typeof titleOrPerson === "object" && titleOrPerson !== null
+      ? openToWorkText(titleOrPerson)
+      : (titleOrPerson || "").toLowerCase();
   if (!text.trim()) return false;
   return OPEN_TO_WORK_TITLE_SIGNALS.some((signal) => text.includes(signal));
 }
 
-/**
- * Hard filter when Apollo title text exposes an OTW signal.
- * When no one in the batch has a signal (common), keep the batch and return
- * `usedTitleSignals: false` so callers can surface the disclaimer and avoid
- * pretending we verified open-to-work status.
- */
-export function filterPeopleForOpenToWork<T extends { title?: string | null }>(
-  people: T[]
-): {
+export type FilterOpenToWorkResult<T> = {
   people: T[];
   usedTitleSignals: boolean;
   signalCount: number;
+  scanned: number;
   note: string;
-} {
-  const withSignal = people.filter((p) => hasOpenToWorkTitleSignal(p.title));
+};
+
+/**
+ * @param strict When true (OTW searches), never keep people without signals.
+ *   Soft mode (legacy): if nobody signals, keep the whole batch + disclaimer.
+ */
+export function filterPeopleForOpenToWork<T extends OpenToWorkPerson>(
+  people: T[],
+  options?: { strict?: boolean }
+): FilterOpenToWorkResult<T> {
+  const strict = options?.strict === true;
+  const withSignal = people.filter((p) => hasOpenToWorkTitleSignal(p));
+
   if (withSignal.length > 0) {
     return {
       people: withSignal,
       usedTitleSignals: true,
       signalCount: withSignal.length,
-      note: `Pre-unlock filter: kept ${withSignal.length.toLocaleString()} / ${people.length.toLocaleString()} with open-to-work wording in their title.`,
+      scanned: people.length,
+      note: `Open-to-work scan: kept ${withSignal.length.toLocaleString()} / ${people.length.toLocaleString()} with job-seeking wording in title/headline.`,
+    };
+  }
+
+  if (strict) {
+    return {
+      people: [],
+      usedTitleSignals: false,
+      signalCount: 0,
+      scanned: people.length,
+      note: `Open-to-work scan: 0 / ${people.length.toLocaleString()} self-stated job seekers in this batch — checking more pages…`,
     };
   }
 
@@ -58,6 +102,7 @@ export function filterPeopleForOpenToWork<T extends { title?: string | null }>(
     people,
     usedTitleSignals: false,
     signalCount: 0,
+    scanned: people.length,
     note: OPEN_TO_WORK_APOLLO_DISCLAIMER,
   };
 }

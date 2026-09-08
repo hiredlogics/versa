@@ -80,7 +80,7 @@ export function criteriaForClient(criteria: SearchCriteria) {
   const role = titles[0] || "professionals";
   const where = criteria.country ? ` in ${criteria.country}` : "";
   const intentSummary = criteria.openToWork
-    ? `${role}${where} who may be open to work / looking for a job. We can't verify "open to work" status — searching matching professionals by title/location instead`
+    ? `${role}${where} who wrote open-to-work / job-seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
     : criteria.summary || criteria.searchIntent?.slice(0, 160) || "";
 
   return {
@@ -341,7 +341,11 @@ export async function runFindLeadsJob(
 
     const countNote =
       result.leadsWithEmail === 0
-        ? `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
+        ? criteria.openToWork
+          ? (result.otwSignalHits ?? 0) > 0
+            ? `Found ${result.otwSignalHits} profile(s) with open-to-work wording after scanning ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} (pool ≈ ${result.totalAvailable.toLocaleString()}), but none had a verified email to save.`
+            : `Scanned ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} profiles (pool ≈ ${result.totalAvailable.toLocaleString()}) for open-to-work title/headline signals — ${result.otwSignalHits ?? 0} matched.`
+          : `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
         : `Saved ${result.leadsWithEmail.toLocaleString()} leads with a verified email after checking ${result.leadsFetched.toLocaleString()} / ${result.totalAvailable.toLocaleString()} matches.`;
 
     await prisma.leadSearch.update({

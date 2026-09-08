@@ -17,6 +17,10 @@ export const VALID_EMPLOYEE_RANGES = [
   "1001,5000",
 ] as const;
 
+/** Wording that means "these people should be looking for a job". */
+const JOB_SEEKING_INTENT =
+  /open\s*to\s*work|looking for (a )?(job|work|new role)|job\s*seek|between jobs|unemployed|laid off|actively looking|available for hire/i;
+
 /** After this many rounds on the same gap, stop asking and say what we did. */
 export const MAX_CLARIFY_ROUNDS = 3;
 export const DEFAULT_TOTAL = 100;
@@ -227,6 +231,11 @@ export async function understand(
     excludeIndustries: cleanList(raw.excludeIndustries, 10),
     requestedTotal: typeof raw.requestedTotal === "number" ? Math.trunc(raw.requestedTotal) : 0,
   };
+
+  // Detected from the prompt rather than asked of the model: "open to work" is
+  // not a filter the provider offers, so this is a post-fetch narrowing on what
+  // people say about themselves, and the user must be told that.
+  brief.jobSeekingOnly = JOB_SEEKING_INTENT.test(`${input.prompt} ${answerText}`);
 
   // The user may have answered the quantity question directly; trust that over
   // whatever the model echoed back.
