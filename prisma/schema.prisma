@@ -31,6 +31,20 @@ enum SearchStatus {
   NEEDS_INFO
 }
 
+enum BulkExportStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  STOPPED
+  FAILED
+}
+
+enum LinkedInUrlStatus {
+  PENDING
+  FOUND
+  UNAVAILABLE
+}
+
 enum HoldStatus {
   HELD
   CHARGED
@@ -74,6 +88,7 @@ model User {
   leadSearches  LeadSearch[]
   leads         Lead[]
   savedLists    SavedLeadList[]
+  bulkLinkedInExports BulkLinkedInExport[]
   apiKeyConfigs ApiKeyConfig[]
   exportLogs    ExportLog[]
   creditHolds   CreditHold[]
@@ -271,6 +286,53 @@ model Lead {
   @@index([userId, leadScore(sort: Desc)])
   @@index([searchId])
   @@index([email])
+}
+
+model BulkLinkedInExport {
+  id               String           @id @default(cuid())
+  userId           String
+  techStack        String
+  location         String           @default("United States")
+  targetCount      Int
+  maxCredits       Int
+  status           BulkExportStatus @default(PENDING)
+  titleVariants    Json
+  currentVariant   Int              @default(0)
+  currentPage      Int              @default(1)
+  searchedCount    Int              @default(0)
+  uniqueCount      Int              @default(0)
+  enrichedCount    Int              @default(0)
+  urlCount         Int              @default(0)
+  estimatedCredits Int              @default(0)
+  logs             Json?
+  errorMessage     String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  candidates BulkLinkedInExportCandidate[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model BulkLinkedInExportCandidate {
+  id          String            @id @default(cuid())
+  exportId    String
+  apolloId    String
+  name        String
+  title       String
+  company     String?
+  location    String?
+  linkedinUrl String?
+  urlStatus   LinkedInUrlStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  export BulkLinkedInExport @relation(fields: [exportId], references: [id], onDelete: Cascade)
+
+  @@unique([exportId, apolloId])
+  @@index([exportId, urlStatus])
 }
 
 model SavedLeadList {

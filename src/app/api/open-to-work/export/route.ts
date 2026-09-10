@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  MAX_OPEN_TO_WORK_SCAN,
   searchAndVerifyOpenToWorkCandidates,
   convertCandidatesToCsv,
 } from "@/lib/services/apify/open-to-work";
@@ -7,7 +8,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { role, location, count = 10, format = "json" } = body;
+    const { role, location, count = 10, format = "json", enrichLinkedInUrls, enrichLimit } = body;
 
     if (!role || typeof role !== "string" || role.trim().length === 0) {
       return NextResponse.json(
@@ -16,26 +17,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const requestedCount = Math.min(Math.max(Number(count) || 10, 1), 1000);
-    const candidates = await searchAndVerifyOpenToWorkCandidates({
+    const requestedCount = Math.min(Math.max(Number(count) || 10, 1), MAX_OPEN_TO_WORK_SCAN);
+    const result = await searchAndVerifyOpenToWorkCandidates({
       role: role.trim(),
       location: location?.trim() || "United States",
       count: requestedCount,
-      skipApify: requestedCount > 25,
+      enrichLinkedInUrls: enrichLinkedInUrls === true,
+      enrichLimit: Number(enrichLimit),
     });
+    const { candidates } = result;
 
     if (format === "json") {
       return NextResponse.json({
         total: candidates.length,
-        openToWorkCount: candidates.filter((c) => c.isOpenToWork).length,
+        openToWorkCount: candidates.length,
+        scanned: result.scanned,
+        scanLimit: result.scanLimit,
+        enrichedForLinkedInUrl: result.enrichedForLinkedInUrl,
         candidates,
       });
     }
 
     // CSV download
-    const csv = convertCandidatesToCsv(
-      candidates.filter((candidate) => candidate.isOpenToWork)
-    );
+    const csv = convertCandidatesToCsv(candidates);
     const cleanRole = role.toLowerCase().replace(/[^a-z0-9]/g, "-");
     const filename = `open-to-work-${cleanRole}-${new Date().toISOString().split("T")[0]}.csv`;
 

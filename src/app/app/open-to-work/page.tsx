@@ -25,8 +25,17 @@ interface Candidate {
   location: string;
   linkedinUrl?: string;
   isOpenToWork: boolean;
-  otwSignal?: "title" | "apify" | "both";
+  otwSignal?: "apolloKeyword" | "titleHeadline";
+  matchedKeywords?: string[];
+  linkedinEnrichment?: "not_requested" | "found" | "unavailable";
   checkedAt: string;
+}
+
+interface SearchResponse {
+  candidates: Candidate[];
+  scanned: number;
+  scanLimit: number;
+  enrichedForLinkedInUrl: number;
 }
 
 const PRESET_ROLES = [
@@ -39,9 +48,8 @@ const PRESET_ROLES = [
 ];
 
 const SIGNAL_LABEL: Record<string, string> = {
-  both: "Title + Apify ✓",
-  apify: "Apify Confirmed ✓",
-  title: "Title/Headline ✓",
+  apolloKeyword: "Apollo keyword search match",
+  titleHeadline: "Apollo title/headline match",
 };
 
 export default function OpenToWorkPage() {
@@ -53,6 +61,10 @@ export default function OpenToWorkPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [scanned, setScanned] = useState(0);
+  const [enrichLinkedInUrls, setEnrichLinkedInUrls] = useState(false);
+  const [enrichLimit, setEnrichLimit] = useState("50");
+  const [enrichedForLinkedInUrl, setEnrichedForLinkedInUrl] = useState(0);
 
   // Table pagination & filter
   const [tablePage, setTablePage] = useState(1);
@@ -60,7 +72,7 @@ export default function OpenToWorkPage() {
   const PAGE_SIZE = 20;
 
   const effectiveCount = isCustomCount
-    ? Math.min(Math.max(Number(customCount) || 10, 1), 1000)
+    ? Math.min(Math.max(Number(customCount) || 10, 1), 5000)
     : Number(count);
 
   const isBulkMode = effectiveCount > 25;
@@ -81,9 +93,9 @@ export default function OpenToWorkPage() {
 
     const signalLabel = (c: Candidate) => {
       if (!c.isOpenToWork) return "No";
-      if (c.otwSignal === "both") return "Title Signal + Apify";
-      if (c.otwSignal === "apify") return "Apify Confirmed";
-      return "Title/Headline Signal";
+      return c.otwSignal === "titleHeadline"
+        ? "Apollo title/headline match"
+        : "Apollo keyword search match";
     };
 
     const rows = list.map((c) =>
@@ -132,19 +144,23 @@ export default function OpenToWorkPage() {
           location,
           count: effectiveCount,
           format: "json",
+          enrichLinkedInUrls,
+          enrichLimit: Number(enrichLimit),
         }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as SearchResponse & { error?: string };
       if (!res.ok) throw new Error(data.error || "Search failed");
 
       const list: Candidate[] = data.candidates ?? [];
       setCandidates(list);
+      setScanned(data.scanned ?? 0);
+      setEnrichedForLinkedInUrl(data.enrichedForLinkedInUrl ?? 0);
 
       if (list.length === 0) {
-        setError("No candidates found. Try a different role or location.");
+        setError(`No possible Open To Work profiles found after searching ${data.scanned ?? 0} Apollo results. Try a broader role or location.`);
       } else {
-        downloadCsv(list.filter((candidate) => candidate.isOpenToWork), role);
+        downloadCsv(list, role);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -183,9 +199,9 @@ export default function OpenToWorkPage() {
               LinkedIn Open To Work Finder
             </h1>
             <p className="text-sm text-lp-muted">
-              Find and export verified{" "}
+              Find Apollo role and location profiles using job-seeking{" "}
               <span className="font-medium text-emerald-400">#OpenToWork</span>{" "}
-              candidates in bulk directly into CSV.
+              and job-seeking wording, then export the matches to CSV.
             </p>
           </div>
         </div>
@@ -230,7 +246,7 @@ export default function OpenToWorkPage() {
           {/* Count */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-lp-off-white">
-              Number of Candidates
+              Profiles to Scan
             </label>
             <div className="flex gap-2">
               <select
@@ -246,13 +262,15 @@ export default function OpenToWorkPage() {
                 }}
                 className="w-full rounded-xl border border-lp-border bg-lp-graphite px-3 py-2 text-sm text-lp-white focus:border-lp-primary focus:outline-none"
               >
-                <option value="10">10 Candidates (Quick)</option>
-                <option value="25">25 Candidates (with Apify)</option>
-                <option value="50">50 Candidates (Bulk)</option>
-                <option value="100">100 Candidates (Bulk)</option>
-                <option value="250">250 Candidates (Bulk)</option>
-                <option value="500">500 Candidates (Mega Bulk 🚀)</option>
-                <option value="1000">1000 Candidates (Max)</option>
+                <option value="10">Scan 10 profiles</option>
+                <option value="25">Scan 25 profiles</option>
+                <option value="50">Scan 50 profiles</option>
+                <option value="100">Scan 100 profiles</option>
+                <option value="250">Scan 250 profiles</option>
+                <option value="500">Scan 500 profiles</option>
+                <option value="1000">Scan 1000 profiles</option>
+                <option value="2500">Scan 2500 profiles</option>
+                <option value="5000">Scan 5000 profiles (Max)</option>
                 <option value="custom">Custom amount...</option>
               </select>
 
@@ -260,7 +278,7 @@ export default function OpenToWorkPage() {
                 <input
                   type="number"
                   min="1"
-                  max="1000"
+                  max="5000"
                   value={customCount}
                   onChange={(e) => setCustomCount(e.target.value)}
                   placeholder="e.g. 500"
@@ -293,10 +311,35 @@ export default function OpenToWorkPage() {
           <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2 text-xs text-emerald-300">
             <Zap className="h-4 w-4 shrink-0 text-emerald-400" />
             <span>
-              <strong>Bulk Mode Enabled ({effectiveCount} leads):</strong> Multi-page Apollo search is active. Verified Open To Work signals will be scanned and the complete CSV of all {effectiveCount} leads will be generated automatically.
+              <strong>Bulk Search Enabled ({effectiveCount} profiles):</strong> Apollo searches multiple job-seeking phrases while keeping the selected role and location fixed. Results are not verified LinkedIn badges.
             </span>
           </div>
         )}
+
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-3 text-xs text-amber-100">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              id="otw-enrich-linkedin"
+              type="checkbox"
+              checked={enrichLinkedInUrls}
+              onChange={(event) => setEnrichLinkedInUrls(event.target.checked)}
+              className="h-4 w-4 accent-emerald-500"
+            />
+            Get LinkedIn URLs for the final matches
+          </label>
+          <select
+            aria-label="LinkedIn URL enrichment limit"
+            value={enrichLimit}
+            disabled={!enrichLinkedInUrls}
+            onChange={(event) => setEnrichLimit(event.target.value)}
+            className="rounded-md border border-amber-500/30 bg-lp-graphite px-2 py-1 text-xs text-lp-white disabled:opacity-50"
+          >
+            <option value="25">First 25 matches</option>
+            <option value="50">First 50 matches</option>
+            <option value="100">First 100 matches</option>
+          </select>
+          <span className="text-amber-200/80">Optional paid Apollo enrichment; budget up to 1 credit per selected match. No email or phone is requested.</span>
+        </div>
 
         {error && (
           <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
@@ -317,12 +360,12 @@ export default function OpenToWorkPage() {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 {isBulkMode
                   ? `Fetching & Scanning ${effectiveCount} Bulk Leads Across Pages…`
-                  : "Searching & Verifying with Apify…"}
+                  : "Searching Apollo profiles…"}
               </>
             ) : (
               <>
                 <Search className="h-4 w-4" />
-                Find {effectiveCount} Open To Work Candidates
+                Scan {effectiveCount} Profiles for Open To Work
               </>
             )}
           </button>
@@ -336,10 +379,10 @@ export default function OpenToWorkPage() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-base font-semibold text-lp-white">
-                Results for &ldquo;{role}&rdquo; ({candidates.length} Leads)
+                Results for &ldquo;{role}&rdquo; ({candidates.length} Open To Work matches)
               </h2>
               <p className="text-xs text-lp-muted">
-                CSV downloaded automatically. Click below anytime to re-download.
+                Found {scanned.toLocaleString()} unique Apollo keyword-search results. {enrichedForLinkedInUrl > 0 ? `LinkedIn URL lookup requested for ${enrichedForLinkedInUrl.toLocaleString()} final matches.` : "LinkedIn URL lookup was not requested."}
               </p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -357,7 +400,7 @@ export default function OpenToWorkPage() {
                       : "text-lp-muted hover:text-lp-white"
                   }`}
                 >
-                  All ({candidates.length})
+                  Matches ({candidates.length})
                 </button>
                 <button
                   type="button"
@@ -379,7 +422,7 @@ export default function OpenToWorkPage() {
                 type="button"
                 onClick={() =>
                   downloadCsv(
-                    candidates.filter((candidate) => candidate.isOpenToWork),
+                    candidates,
                     role
                   )
                 }
@@ -422,7 +465,7 @@ export default function OpenToWorkPage() {
                       {c.isOpenToWork ? (
                         <div className="flex flex-col gap-0.5">
                           <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                            <CheckCircle className="h-3 w-3" /> OPEN TO WORK
+                            <CheckCircle className="h-3 w-3" /> POSSIBLE OTW
                           </span>
                           {c.otwSignal && (
                             <span className="pl-0.5 text-[10px] text-lp-muted">
