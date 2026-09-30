@@ -20,6 +20,7 @@ export interface LeadOutreachOutput {
   reasoning: string;
   /** Kept for schema compatibility — email drafting disabled */
   emailDraft: string;
+  source: "AI" | "TEMPLATE";
 }
 
 const WHY_BATCH_SIZE = 12;
@@ -104,7 +105,7 @@ export function buildLeadWhyReasoning(
 
   const reasoning = `${who} ${fit}${signalClause}${offer}${profile}${contact}`.replace(/\s+/g, " ").trim();
 
-  return { reasoning, emailDraft: "" };
+  return { reasoning, emailDraft: "", source: "TEMPLATE" };
 }
 
 function buildWhySystem(context: LeadScoreContext): string {
@@ -192,7 +193,7 @@ async function generateWhyChunk(
       !/matches your search intent/i.test(reasoning) &&
       reasoning.length > 40
     ) {
-      results[item.index] = { reasoning, emailDraft: "" };
+      results[item.index] = { reasoning, emailDraft: "", source: "AI" };
     }
   }
   return results;

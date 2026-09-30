@@ -25,6 +25,9 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   SaaS examples: ["CEO","Founder","CTO","VP Sales"]
   CRITICAL: If industry is Real Estate / property / brokerage, NEVER use CTO, VP Engineering, Head of Product, or other software titles unless the user explicitly asked for tech roles.
 - personLocations: exactly the places the user listed (max 3). Never pair a country with one of its own states/cities (no ["California","United States"]).
+- Extract city and state/province separately when they are stated. Use the city
+  as personLocations when one is available; otherwise use the state/province,
+  otherwise the country.
 - qKeywords: the INDUSTRY / domain phrase only (keep multi-word intact).
   NEVER put company stage/size words here: "startup", "startups", "SMB", "SME", "company", "companies", "business", "firm", "enterprise".
   q_keywords matches COMPANY NAMES, so "startups" returns firms literally named "* Startups".
@@ -38,6 +41,9 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   Never invent "20,43" or use hyphens.
   If the prompt says ~20–50 people → ["11,50"]. If 50–200 → ["51,200"]. If vague → ["11,50","51,200","201,500"].
 - industry: primary industry name (e.g. "Real Estate")
+- When the user only asks for a job title and location, set industry to "Any",
+  qKeywords to null, and employeeRanges to []. Do not invent B2B company-size
+  or industry restrictions; they can turn a valid people search into zero hits.
 - openToWork: true ONLY if the user wants job seekers / "open to work" / between jobs.
   CRITICAL: Apollo has NO open-to-work filter. Still emit tight personTitles + personLocations + qKeywords.
   Never omit titles or keywords just because openToWork is true — that balloons the Apollo pool.
@@ -45,6 +51,14 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   For New York / NY / NYC use personLocations: ["New York"] (not United States).
 - companyDomains: when the prompt names specific employers ("works at Apple", "people at Stripe"), put their real primary domains here: ["apple.com"], ["stripe.com"]. Leave empty when no employer is named. Never guess a domain you are unsure of.
 - Do not invent unrelated industries, countries, or titles.
+- Support searches in any country. Preserve the requested country in the country
+  field, and keep the most specific city/state/province in personLocations.
+- Infer the country from a US state or Canadian province when possible: "Atlanta,
+  Georgia" and bare "Georgia" mean United States; "Toronto" / "Ontario" mean
+  Canada.
+- requireEmail: true only when the user asks for emails or contact details
+  ("with emails", "their email addresses", "contact info"). Otherwise false:
+  unlocking emails costs credits, so never assume it.
 - Respect excluded titles/industries only when the prompt itself states them.
 
 Return ONLY valid JSON:
@@ -53,6 +67,8 @@ Return ONLY valid JSON:
   "searchIntent": "full intent including industry AND needs",
   "industry": "primary industry",
   "country": "primary country",
+  "city": "city or null",
+  "state": "state/province or null",
   "companySizeMin": number,
   "companySizeMax": number,
   "openToWork": boolean,

@@ -3,6 +3,8 @@ import { z } from "zod";
 export const parsedSearchCriteriaSchema = z.object({
   industry: z.string().nullable(),
   country: z.string().nullable(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
   companySizeMin: z.number().nullable(),
   companySizeMax: z.number().nullable(),
   jobTitles: z.array(z.string()),
@@ -26,6 +28,8 @@ export const aiParsePromptOutputSchema = z
     searchIntent: z.string().optional(),
     industry: z.union([z.string(), z.null()]).optional(),
     country: z.union([z.string(), z.null()]).optional(),
+    city: z.union([z.string(), z.null()]).optional(),
+    state: z.union([z.string(), z.null()]).optional(),
     companySizeMin: z.union([z.number(), z.null()]).optional(),
     companySizeMax: z.union([z.number(), z.null()]).optional(),
     openToWork: z.boolean().optional(),

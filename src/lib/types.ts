@@ -11,6 +11,9 @@ export interface ApolloSearchFilters {
 export interface SearchCriteria {
   industry: string;
   country: string;
+  /** LLM-extracted location fields retained for display and auditing. */
+  city?: string;
+  state?: string;
   companySizeMin: number;
   companySizeMax: number;
   jobTitles: string[];

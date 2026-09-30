@@ -25,6 +25,8 @@ import {
 import { isVerifiedEmail } from "@/lib/email-confidence";
 import { logLeadFetch, logStageTiming, startStageTimer } from "@/lib/services/leads/fetchLog";
 import { filterExcludedLeads } from "@/lib/context/exclusions";
+import { normalizeLinkedInUrl } from "@/lib/lead-pool";
+import { recordApolloPeopleInPool } from "@/lib/services/leads/leadPool";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
 import {
   filterPeopleForOpenToWork,
@@ -258,6 +260,7 @@ export async function runSequentialLeadBatches(input: {
       stopped = true;
       stopReason = "stopped_by_user";
     }
+    await recordApolloPeopleInPool(fetched.people, "apollo_search");
 
     logStageTiming({
       stage: "fetch",
@@ -488,8 +491,19 @@ export async function runSequentialLeadBatches(input: {
       }
     }
 
+    // Only people Apollo actually matched were checked; the rest are padding.
+    await recordApolloPeopleInPool(
+      enriched.filter((r) => r.raw).map((r) => r.person),
+      "apollo_enrich",
+      { emailChecked: true }
+    );
     const { storedById, summaryById } = applyEnrichmentToLeads(workList, enriched);
 
+    // Skip anyone this search already delivered, e.g. from the lead pool.
+    workList = workList.filter((lead) => {
+      const key = normalizeLinkedInUrl(lead.linkedinUrl);
+      return !key || !input.seenIds.has(key);
+    });
     const withAnyEmail = filterLeadsWithUsableEmail(workList);
     const keep = verifiedOnly
       ? withAnyEmail.filter((lead) => isVerifiedEmail(lead.email, lead.emailStatus))
@@ -518,6 +532,9 @@ export async function runSequentialLeadBatches(input: {
       searchId: input.searchId,
     });
 
+    const whySourceByApolloId = new Map(
+      workList.map((lead, i) => [lead.apolloPersonId, whyResults[i]?.source ?? "TEMPLATE"])
+    );
     workList = workList.map((lead, i) => {
       const baseWhy =
         whyResults[i]?.reasoning ||
@@ -549,6 +566,7 @@ export async function runSequentialLeadBatches(input: {
       leadScore: lead.leadScore,
       priorityLevel: lead.priorityLevel,
       reasoning: lead.reasoning,
+      whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",
       recommendedApproach: "",
       hasEmail: true,
       rawApolloData: (storedById.get(lead.apolloPersonId) as object | undefined) ?? undefined,
@@ -559,6 +577,10 @@ export async function runSequentialLeadBatches(input: {
       const chunk = leadRows.slice(i, i + 500);
       const result = await prisma.lead.createMany({ data: chunk });
       batchSaved += result.count;
+    }
+    for (const lead of workList) {
+      const key = normalizeLinkedInUrl(lead.linkedinUrl);
+      if (key) input.seenIds.add(key);
     }
 
     leadsFetched += people.length;

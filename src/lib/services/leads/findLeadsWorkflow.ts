@@ -5,7 +5,14 @@ import {
   getLeadSearchConfig,
   shouldIgnoreLeadContext,
 } from "@/lib/apollo-config";
-import { runSequentialLeadBatches } from "@/lib/services/leads/processLeadBatches";
+import { runProfileDiscovery } from "@/lib/services/leads/profileDiscovery";
+import {
+  runSequentialLeadBatches,
+  type SequentialBatchResult,
+} from "@/lib/services/leads/processLeadBatches";
+import { serveFromPool, type PoolServeResult } from "@/lib/services/leads/leadPool";
+import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
+import { poolPersonKeys, promptAsksForEmail } from "@/lib/lead-pool";
 import { assertApolloConfigured } from "@/lib/platform-readiness";
 import { parsePromptWithAi } from "@/lib/services/ai/parsePrompt";
 import {
@@ -14,7 +21,6 @@ import {
 } from "@/lib/services/billing/usageLimits";
 import { mapLeadToRecord } from "@/lib/services/searches/searchHistory";
 import { getUserLeadContext } from "@/lib/context/userLeadContext";
-import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
 import {
   withFetchProgress,
   stripFetchProgress,
@@ -28,6 +34,7 @@ import { toUserFacingSearchError } from "@/lib/services/leads/searchError";
 import { logLeadFetch } from "@/lib/services/leads/fetchLog";
 import { extractRequestedLeadCount, type ClarificationNeed } from "@/lib/clarifyPrompt";
 import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
+import { resolveSupportedCountry } from "@/lib/location-policy";
 import type { User, AiProvider } from "@prisma/client";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
 
@@ -86,6 +93,8 @@ export function criteriaForClient(criteria: SearchCriteria) {
   return {
     industry: criteria.industry ?? null,
     country: criteria.country ?? null,
+    city: criteria.city ?? null,
+    state: criteria.state ?? null,
     companySizeMin: criteria.companySizeMin ?? null,
     companySizeMax: criteria.companySizeMax ?? null,
     jobTitles: criteria.jobTitles ?? [],
@@ -98,6 +107,7 @@ export function criteriaForClient(criteria: SearchCriteria) {
     linkedinUrls: [] as string[],
     intentSummary,
     openToWork: Boolean(criteria.openToWork),
+    requireEmail: Boolean(criteria.requireEmail),
     searchIntent: criteria.searchIntent,
     summary: criteria.summary,
   };
@@ -109,6 +119,131 @@ async function wasStoppedByUser(searchId: string): Promise<boolean> {
     select: { errorMessage: true },
   });
   return row?.errorMessage === USER_STOPPED_MESSAGE;
+}
+
+type SearchStepResult = {
+  result: SequentialBatchResult;
+  pool: PoolServeResult;
+  /** Leads that cost Apollo credits this step; these count against the plan. */
+  charged: number;
+};
+
+/**
+ * One user-approved step of a search. Matching people already in the shared
+ * lead pool are delivered first; Apollo is only asked for the remainder. When
+ * the user wants emails, the email-unlock pipeline runs, otherwise the
+ * LinkedIn-profile-only pipeline does.
+ */
+async function runSearchStep(args: {
+  userId: string;
+  searchId: string;
+  criteria: SearchCriteria;
+  prompt: string;
+  wantsEmail: boolean;
+  leadContext: Awaited<ReturnType<typeof getUserLeadContext>> | null;
+  startPage: number;
+  resumeFilters?: ApolloSearchFilters;
+  seenIds: Set<string>;
+  batchesCompleted: number;
+  leadsFetched: number;
+  leadsWithEmail: number;
+  peoplePulled: number;
+  totalAvailable?: number | null;
+  maxLeadsThisRun: number;
+}): Promise<SearchStepResult> {
+  await prisma.leadSearch.update({
+    where: { id: args.searchId },
+    data: { relaxNote: "Checking the saved lead database…" },
+  });
+
+  const pool = await serveFromPool({
+    userId: args.userId,
+    searchId: args.searchId,
+    criteria: args.criteria,
+    prompt: args.prompt,
+    limit: args.maxLeadsThisRun,
+    wantsEmail: args.wantsEmail,
+    seenIds: args.seenIds,
+  });
+
+  const remaining = args.maxLeadsThisRun - pool.saved;
+  const savedSoFar = args.leadsWithEmail + pool.saved;
+
+  const stoppedNow = await wasStoppedByUser(args.searchId);
+  if (remaining <= 0 || pool.creditsExhausted || stoppedNow) {
+    // Nothing left to fetch this step. Apollo pages are untouched, so the
+    // next "Get next 100" starts from the same page.
+    return {
+      pool,
+      charged: pool.unlockedSaved,
+      result: {
+        activeFilters: args.resumeFilters ?? args.criteria.apollo!,
+        lastPage: args.startPage - 1,
+        totalPages: Math.max(args.startPage, 1),
+        totalAvailable: Math.max(args.totalAvailable ?? 0, savedSoFar),
+        batchesCompleted: args.batchesCompleted,
+        leadsFetched: args.leadsFetched,
+        leadsWithEmail: savedSoFar,
+        peoplePulled: args.peoplePulled,
+        savedThisRun: 0,
+        partial: true,
+        canResume: true,
+        stopped: stoppedNow,
+        creditsExhausted: pool.creditsExhausted,
+        scoreProvider: "HEURISTIC",
+        stopReason: stoppedNow
+          ? "stopped_by_user"
+          : pool.creditsExhausted
+            ? "apollo_credits_exhausted"
+            : "credit_cap",
+      },
+    };
+  }
+
+  const common = {
+    userId: args.userId,
+    searchId: args.searchId,
+    criteria: args.criteria,
+    prompt: args.prompt,
+    startPage: args.startPage,
+    resumeFilters: args.resumeFilters,
+    seenIds: args.seenIds,
+    batchesCompleted: args.batchesCompleted,
+    leadsFetched: args.leadsFetched,
+    leadsWithEmail: savedSoFar,
+    peoplePulled: args.peoplePulled,
+    maxLeadsThisRun: remaining,
+    wasStopped: () => wasStoppedByUser(args.searchId),
+  };
+
+  let result: SequentialBatchResult;
+  if (args.wantsEmail) {
+    const scoreContext = buildScoringContextFromLeadContext(
+      args.leadContext,
+      {
+        searchIntent: args.criteria.searchIntent,
+        keywords: args.criteria.keywords,
+        excludedTitles: args.criteria.excludedTitles,
+        excludedIndustries: args.criteria.excludedIndustries,
+      },
+      args.prompt
+    );
+    scoreContext.openToWork = args.criteria.openToWork;
+    scoreContext.requireEmail = true;
+    result = await runSequentialLeadBatches({ ...common, scoreContext });
+  } else {
+    result = await runProfileDiscovery(common);
+  }
+
+  return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
+}
+
+function poolNote(pool: PoolServeResult): string {
+  if (pool.saved === 0) return "";
+  const unlocked = pool.unlockedSaved
+    ? ` (${pool.unlockedSaved.toLocaleString()} needed a new email unlock)`
+    : "";
+  return `${pool.saved.toLocaleString()} came from the saved lead database${unlocked}. `;
 }
 
 /**
@@ -132,10 +267,12 @@ export async function previewFindClarification(
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
   const access = await requireLeadSearchAccess(user, input.requestedLeadCount);
-  const { criteria, provider: parseProvider } = await parsePromptWithAi(prompt, {
+  const parsed = await parsePromptWithAi(prompt, {
     userId: user.id,
     leadContext,
   });
+  const criteria = resolveSupportedCountry(parsed.criteria);
+  const parseProvider = parsed.provider;
 
   const fromPrompt = extractRequestedLeadCount(prompt);
   const clarification = await clarifyWithAi(prompt, criteria, {
@@ -202,11 +339,14 @@ export async function startFindLeadsWorkflow(
   });
 
   try {
-    const { criteria, provider: parseProvider, parseMode } = await parsePromptWithAi(prompt, {
+    const parsed = await parsePromptWithAi(prompt, {
       userId: user.id,
       searchId: search.id,
       leadContext,
     });
+    const criteria = resolveSupportedCountry(parsed.criteria);
+    const parseProvider = parsed.provider;
+    const parseMode = parsed.parseMode;
 
     logLeadFetch("search_started", {
       searchId: search.id,
@@ -280,28 +420,16 @@ export async function runFindLeadsJob(
   const maxLeadsThisRun = Math.min(batchSize, access.leadsRemaining, requestedCap);
 
   const { criteria, parseProvider } = started;
+  const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(started.prompt);
 
   try {
-    const scoreContext = buildScoringContextFromLeadContext(
-      leadContext,
-      {
-        searchIntent: criteria.searchIntent,
-        keywords: criteria.keywords,
-        excludedTitles: criteria.excludedTitles,
-        excludedIndustries: criteria.excludedIndustries,
-      },
-      started.prompt
-    );
-    scoreContext.openToWork = criteria.openToWork;
-    scoreContext.requireEmail = criteria.requireEmail;
-    if (ignoreContext) scoreContext.leadContext = null;
-
-    const result = await runSequentialLeadBatches({
+    const { result, pool, charged } = await runSearchStep({
       userId: user.id,
       searchId,
       criteria,
       prompt: started.prompt,
-      scoreContext,
+      wantsEmail,
+      leadContext,
       startPage: 1,
       seenIds: new Set(),
       batchesCompleted: 0,
@@ -309,10 +437,9 @@ export async function runFindLeadsJob(
       leadsWithEmail: 0,
       peoplePulled: 0,
       maxLeadsThisRun,
-      wasStopped: () => wasStoppedByUser(searchId),
     });
 
-    await incrementUsage(user.id, result.savedThisRun, 1);
+    await incrementUsage(user.id, charged, 1);
 
     if (result.stopped && result.leadsWithEmail === 0 && result.leadsFetched === 0) {
       await prisma.leadSearch.update({
@@ -339,6 +466,10 @@ export async function runFindLeadsJob(
             : " More matches remain — click Get next 100 to continue."
       : "";
 
+    const verifiedEmailCount = await prisma.lead.count({
+      where: { searchId, userId: user.id, deletedAt: null, hasEmail: true },
+    });
+    const apolloRequestNote = `Apollo: ${result.batchesCompleted} search page${result.batchesCompleted === 1 ? "" : "s"}${result.savedThisRun ? ` + ${result.batchesCompleted} bulk enrichment request${result.batchesCompleted === 1 ? "" : "s"} for ${result.savedThisRun} people` : ""}.`;
     const countNote =
       result.leadsWithEmail === 0
         ? criteria.openToWork
@@ -346,7 +477,19 @@ export async function runFindLeadsJob(
             ? `Found ${result.otwSignalHits} profile(s) with open-to-work wording after scanning ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} (pool ≈ ${result.totalAvailable.toLocaleString()}), but none had a verified email to save.`
             : `Scanned ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} profiles (pool ≈ ${result.totalAvailable.toLocaleString()}) for open-to-work title/headline signals — ${result.otwSignalHits ?? 0} matched.`
           : `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
-        : `Saved ${result.leadsWithEmail.toLocaleString()} leads with a verified email after checking ${result.leadsFetched.toLocaleString()} / ${result.totalAvailable.toLocaleString()} matches.`;
+        : `Saved ${result.leadsWithEmail.toLocaleString()} leads (${verifiedEmailCount.toLocaleString()} with verified email). ${apolloRequestNote}`;
+
+    const profileCountNote =
+      result.totalAvailable === 0
+        ? `Apollo returned no people matching the exact requested role and location. No profile lookup credits were spent.`
+        : result.leadsWithEmail === 0 && !wantsEmail
+        ? `Apollo checked ${result.leadsFetched.toLocaleString()} matching people but did not return a LinkedIn profile URL for any of them. No email or workplace enrichment was requested.`
+        : countNote;
+
+    const outcomeNote =
+      pool.saved > 0 && result.savedThisRun === 0 && result.leadsFetched === 0
+        ? `All ${pool.saved.toLocaleString()} leads came from the saved lead database${pool.unlockedSaved ? ` (${pool.unlockedSaved.toLocaleString()} needed a new email unlock)` : ""}, so no new Apollo search was needed.`
+        : `${poolNote(pool)}${profileCountNote}`;
 
     await prisma.leadSearch.update({
       where: { id: searchId },
@@ -364,14 +507,14 @@ export async function runFindLeadsJob(
           batchesCompleted: result.batchesCompleted,
           leadsFetched: result.leadsFetched,
           leadsWithEmail: result.leadsWithEmail,
-          emailsUnlockedCount: result.leadsWithEmail,
+          emailsUnlockedCount: 0,
           totalToUnlock: result.totalAvailable,
         }) as object,
         totalAvailable: result.totalAvailable,
         leadsReturned: result.leadsWithEmail,
         durationMs: Date.now() - start,
         aiProviderUsed: toDbAiProvider(result.scoreProvider, parseProvider),
-        relaxNote: `${countNote}${partialNote}${result.apolloRelaxNote ? ` ${result.apolloRelaxNote}` : ""}`.trim(),
+        relaxNote: `${outcomeNote}${partialNote}${result.apolloRelaxNote ? ` ${result.apolloRelaxNote}` : ""}`.trim(),
       },
     });
   } catch (error) {
@@ -427,8 +570,10 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     summary: (parsed.summary as string) || search.prompt.slice(0, 120),
     searchIntent: (parsed.searchIntent as string) || (parsed.intentSummary as string) || search.prompt,
     openToWork: Boolean(parsed.openToWork),
+    requireEmail: Boolean(parsed.requireEmail),
     apollo: resumeFilters,
   };
+  const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(search.prompt);
 
   await prisma.leadSearch.update({
     where: { id: searchId },
@@ -446,37 +591,23 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     const existingIds = new Set(
       (
         await prisma.lead.findMany({
-          where: { searchId, deletedAt: null, apolloPersonId: { not: null } },
-          select: { apolloPersonId: true },
+          where: { searchId, deletedAt: null },
+          select: { apolloPersonId: true, linkedinUrl: true },
         })
-      )
-        .map((l) => l.apolloPersonId)
-        .filter((id): id is string => Boolean(id))
+      ).flatMap((lead) => poolPersonKeys(lead))
     );
-
-    const scoreContext = buildScoringContextFromLeadContext(
-      leadContext,
-      {
-        searchIntent: criteria.searchIntent,
-        keywords: criteria.keywords,
-        excludedTitles: criteria.excludedTitles,
-        excludedIndustries: criteria.excludedIndustries,
-      },
-      search.prompt
-    );
-    scoreContext.openToWork = criteria.openToWork;
-    if (ignoreContext) scoreContext.leadContext = null;
 
     const batchSize = getProcessBatchSize();
     const resumeAccess = await requireLeadSearchAccess(user, batchSize);
     const maxLeadsThisRun = Math.min(batchSize, resumeAccess.leadsRemaining);
 
-    const result = await runSequentialLeadBatches({
+    const { result, pool, charged } = await runSearchStep({
       userId: user.id,
       searchId,
       criteria,
       prompt: search.prompt,
-      scoreContext,
+      wantsEmail,
+      leadContext,
       startPage,
       resumeFilters,
       seenIds: existingIds,
@@ -484,11 +615,11 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
       leadsFetched: progress?.leadsFetched ?? progress?.peoplePulled ?? 0,
       leadsWithEmail: progress?.leadsWithEmail ?? search.leadsReturned,
       peoplePulled: progress?.peoplePulled ?? search.leadsReturned,
+      totalAvailable: search.totalAvailable,
       maxLeadsThisRun,
-      wasStopped: () => wasStoppedByUser(searchId),
     });
 
-    await incrementUsage(user.id, result.savedThisRun, 0);
+    await incrementUsage(user.id, charged, 0);
 
     const totalSaved = result.leadsWithEmail;
     const partialNote = result.canResume
@@ -516,12 +647,12 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
           batchesCompleted: result.batchesCompleted,
           leadsFetched: result.leadsFetched,
           leadsWithEmail: totalSaved,
-          emailsUnlockedCount: totalSaved,
+          emailsUnlockedCount: 0,
           totalToUnlock: result.totalAvailable,
         }) as object,
         relaxNote: result.canResume
-          ? `Resume added ${result.savedThisRun.toLocaleString()} with email (total ${totalSaved.toLocaleString()} after ${result.leadsFetched.toLocaleString()} checked).${partialNote}`
-          : `Resume finished — ${totalSaved.toLocaleString()} leads with usable email saved for this prompt.`,
+          ? `${poolNote(pool)}Resume added ${(result.savedThisRun + pool.saved).toLocaleString()} leads (total ${totalSaved.toLocaleString()} after ${result.leadsFetched.toLocaleString()} checked).${partialNote}`
+          : `${poolNote(pool)}Resume finished — ${totalSaved.toLocaleString()} leads saved for this prompt.`,
       },
     });
   } catch (error) {

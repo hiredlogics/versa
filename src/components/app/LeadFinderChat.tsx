@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { EmptyLeadState } from "@/components/app/EmptyLeadState";
 import { PromptComposer, type ComposerValues } from "@/components/app/PromptComposer";
-import { PresetFilterChips } from "@/components/app/PresetFilterChips";
 import { AdvancedFiltersDrawer } from "@/components/app/AdvancedFiltersDrawer";
 import { SearchProgress } from "@/components/app/SearchProgress";
 import { LeadResultsTable } from "@/components/app/LeadResultsTable";
@@ -354,8 +353,6 @@ export function LeadFinderChat() {
         });
         loadedRestoreIdRef.current = searchId;
 
-        // Prepare first batch of 200 (emails + Why) without blocking the COMPLETE UI
-        void handleLeadsPage(assistantTurnId, searchId, 0);
         return;
       }
     }
@@ -896,13 +893,6 @@ export function LeadFinderChat() {
     }
   }
 
-  function appendChip(text: string) {
-    setComposer((prev) => ({
-      ...prev,
-      prompt: prev.prompt.trim() ? `${prev.prompt.trim()}, ${text}` : text,
-    }));
-  }
-
   const showEmpty = !inConversation && !loading && !restoring && !restoreSearchId;
 
   return (
@@ -1047,7 +1037,6 @@ export function LeadFinderChat() {
           {composerError && (
             <SearchErrorCard kind={composerError.kind} message={composerError.message} />
           )}
-          <PresetFilterChips onSelect={appendChip} disabled={loading} />
           <PromptComposer
             values={composer}
             onChange={setComposer}

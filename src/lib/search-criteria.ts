@@ -10,6 +10,8 @@ type ParsedPrompt = SearchCriteria & {
   };
   jobTitles?: string[] | string;
   country?: string;
+  city?: string | null;
+  state?: string | null;
   industry?: string;
 };
 
@@ -710,11 +712,10 @@ export function normalizeSearchCriteria(
   const companySizeMin = parsed.companySizeMin ?? 10;
   const companySizeMax = parsed.companySizeMax ?? 500;
 
-  const employeeRanges = normalizeEmployeeRanges(
-    apolloIn.employeeRanges,
-    companySizeMin,
-    companySizeMax
-  );
+  const hasRequestedEmployeeRanges = asStringArray(apolloIn.employeeRanges).length > 0;
+  const employeeRanges = hasRequestedEmployeeRanges
+    ? normalizeEmployeeRanges(apolloIn.employeeRanges, companySizeMin, companySizeMax)
+    : [];
 
   // Prefer slightly broader buckets when AI only returns very-small "1,10" for "small companies"
   if (
@@ -762,7 +763,7 @@ export function normalizeSearchCriteria(
     personLocations,
     // Keep keywords for OTW — dropping them was a major cause of multi-million pools
     qKeywords: apolloKeywords || undefined,
-    employeeRanges,
+    employeeRanges: employeeRanges.length ? employeeRanges : undefined,
     includeSimilarTitles: includeSimilar,
   };
 
@@ -796,7 +797,12 @@ export function normalizeSearchCriteria(
         : isHrRoleSearch(parsed.industry, userPrompt, rawKeywords, finalTitles)
           ? "Human Resources"
           : parsed.industry || "Any",
-    country: personLocations[0] || parsed.country || "United States",
+    // `personLocations` intentionally holds the most specific Apollo filter
+    // (for example, "Atlanta"). It is not the country shown to the user or
+    // used by the country gate in the profile-discovery workflow.
+    country: parsed.country || "United States",
+    city: typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : undefined,
+    state: typeof parsed.state === "string" && parsed.state.trim() ? parsed.state.trim() : undefined,
     companySizeMin: companySizeMin,
     companySizeMax: companySizeMax,
     jobTitles: apollo.personTitles,
