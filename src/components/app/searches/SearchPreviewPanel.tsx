@@ -27,7 +27,7 @@ export function SearchPreviewPanel({ search }: { search: SearchHistoryItem | nul
           initial={{ opacity: 0, x: 12 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 12 }}
-          className="app-panel-strong sticky top-6 hidden h-fit rounded-3xl p-5 xl:block"
+          className="app-panel-strong sticky top-6 hidden max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl p-5 xl:block"
         >
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
@@ -75,7 +75,7 @@ export function SearchPreviewPanel({ search }: { search: SearchHistoryItem | nul
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="app-panel sticky top-6 hidden rounded-3xl p-8 text-center xl:block"
+          className="app-panel sticky top-6 hidden max-h-[calc(100vh-3rem)] overflow-y-auto rounded-3xl p-8 text-center xl:block"
         >
           <p className="text-sm text-lp-muted">Select a search to preview details.</p>
         </motion.div>
