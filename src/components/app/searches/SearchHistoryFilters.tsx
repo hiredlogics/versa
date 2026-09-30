@@ -39,7 +39,7 @@ export function SearchHistoryFilters({
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search by prompt…"
-            className="app-input w-full py-2.5 !pl-10 !pr-4"
+            className="app-input w-full py-2.5 pl-10 pr-4"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
