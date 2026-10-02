@@ -6,7 +6,7 @@ import { SAMPLE_LEADS } from "./constants";
 
 const STEPS = [
   { label: "Prompt parsed", done: true },
-  { label: "Apollo search ready", done: true },
+  { label: "Search ready", done: true },
   { label: "AI scoring enabled", done: true },
   { label: "Qualified leads saved", done: false },
   { label: "Export ready", done: false },
@@ -86,7 +86,7 @@ export function ContactProductPanel() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {["Apollo enriched", "AI scored", "Secure workspace"].map((pill) => (
+        {["Verified data", "AI scored", "Secure workspace"].map((pill) => (
           <span key={pill} className="text-[10px] text-lp-muted border border-lp-border rounded-full px-2 py-0.5">
             {pill}
           </span>

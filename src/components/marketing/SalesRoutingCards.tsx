@@ -6,7 +6,7 @@ import { FadeIn } from "./AnimatedAurora";
 const CARDS = [
   {
     title: "For founders",
-    desc: "Validate your ICP and find early customers.",
+    desc: "Test who buys and find your first customers.",
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M12 3L3 9v12h18V9L12 3z" strokeLinecap="round" strokeLinejoin="round" />

@@ -15,7 +15,7 @@ export function LeadContextBanner() {
         <span className="text-lp-off-white">Each prompt is searched on its own</span>
         <span className="text-lp-muted-dark">
           {" "}
-          — {BRAND.name} pulls every match for that prompt (saved ICP is not mixed in).
+          — {BRAND.name} pulls every match for that prompt (your saved ideal customer profile is not mixed in).
         </span>
       </p>
       <Link

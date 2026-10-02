@@ -363,7 +363,7 @@ export function LeadFinderChat() {
       error: {
         kind: "still_running",
         message:
-          "Still processing lead batches in the background. Open Searches in a few minutes — saved leads appear after each batch of 1,000.",
+          "Still finding leads in the background. Open Searches in a few minutes — new leads appear as they are saved.",
       },
     });
   }

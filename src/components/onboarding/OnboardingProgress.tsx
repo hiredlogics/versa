@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils/cn";
 
-const STEPS = ["Business", "ICP", "Qualification", "Review"];
+const STEPS = ["Business", "Ideal customer", "Qualification", "Review"];
 
 export function OnboardingProgress({ step }: { step: number }) {
   return (

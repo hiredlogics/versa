@@ -10,13 +10,13 @@ const STEPS = [
   },
   {
     num: "02",
-    title: "AI builds Apollo filters",
-    desc: `${BRAND.name} parses your intent into structured search criteria and queries Apollo at scale.`,
+    title: "We find matching people",
+    desc: `${BRAND.name} turns your description into a focused search across millions of B2B profiles.`,
   },
   {
     num: "03",
-    title: "Enrich & score every lead",
-    desc: "Contacts are enriched, ranked 1–10, and annotated with signals and outreach angles.",
+    title: "Score every lead",
+    desc: "Each lead is ranked 1–10, with the reasons it fits and a suggested outreach angle.",
   },
   {
     num: "04",
