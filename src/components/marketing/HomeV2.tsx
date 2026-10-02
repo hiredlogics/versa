@@ -43,11 +43,11 @@ const PLANS: Array<{
   highlight?: boolean;
 }> = [
   {
-    name: "Free Trial",
+    name: "Free account",
     price: "$0",
-    desc: "A focused way to try VARSA.",
-    features: ["25 leads each month", "3 searches each month", "Ranked results", "CSV export"],
-    cta: "Start free",
+    desc: "Create your account, then choose a plan to start searching.",
+    features: ["Account and workspace setup", "Secure sign-in", "Upgrade anytime", "Secure payments"],
+    cta: "Create account",
   },
   {
     name: "Starter",
@@ -82,7 +82,7 @@ const FAQS = [
   { q: "What does the score mean?", a: "Scores run from 1–10 and help you compare fit. The explanation beside each score gives the useful context." },
   { q: "Are contacts verified?", a: "Results label verified email availability so you can quickly understand what is ready for outreach." },
   { q: "Can I save my buyer context?", a: "Yes. VARSA keeps your buyer context available for your next search." },
-  { q: "Is there a free trial?", a: "Yes. The free trial includes 25 leads and 3 searches per month. Upgrade whenever you need more." },
+  { q: "Is there a free trial?", a: "There's no free trial. Creating an account is free; choose a plan to start searching, and change plans whenever you need more." },
 ];
 
 const SAMPLE_LEADS = [
@@ -190,7 +190,7 @@ function Hero() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            Start free with 25 leads and 3 searches each month.
+            Create your account, then choose the plan that fits.
           </motion.p>
         </div>
 
@@ -285,7 +285,7 @@ function PricingSection() {
       <SectionHeader
         badge="Pricing"
         title="Choose room to grow"
-        subtitle="Start with the free trial. Change plans whenever your work calls for more."
+        subtitle="Create your account, then choose a plan. Change plans whenever your work calls for more."
       />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((plan, i) => (

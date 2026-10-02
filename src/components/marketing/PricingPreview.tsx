@@ -16,7 +16,7 @@ const PLANS: Array<{
   href?: string;
 }> = [
   {
-    name: "Free Trial",
+    name: "Free account",
     price: "$0",
     desc: "Create your account, then choose a plan to unlock the workspace",
     features: ["Account + workspace setup", "Secure sign-in", "Upgrade anytime", "Secure payments"],
