@@ -20,7 +20,7 @@ export const BRAND = {
   onboardingHeadline: "Teach VARSA your ideal buyer.",
   onboardingSubheadline:
     "Saved buyer context helps VARSA interpret vague prompts and score leads against your ICP.",
-  emptyStateHeadline: "What buyers should we find today?",
+  emptyStateHeadline: "Who should we find today?",
   billingSubheadline: "Manage your VARSA subscription and lead credits.",
   searchSteps: {
     understand: "VARSA is structuring your buyer intent.",

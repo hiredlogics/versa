@@ -899,7 +899,7 @@ export function LeadFinderChat() {
     <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col">
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
-          {showEmpty && <EmptyLeadState />}
+          {showEmpty && <EmptyLeadState onSelect={(prompt) => setComposer((current) => ({ ...current, prompt }))} />}
 
           {restoring && !inConversation && (
             <div className="app-panel rounded-xl p-6 text-center">
