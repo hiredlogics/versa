@@ -15,9 +15,9 @@ export function SettingsField({
 }) {
   return (
     <label className={cn("block space-y-2", className)}>
-      <span className="text-sm font-medium text-[#111111]">{label}</span>
+      <span className="text-sm font-medium text-lp-white">{label}</span>
       {children}
-      {hint && !error && <span className="block text-xs text-[#9A9A9A]">{hint}</span>}
+      {hint && !error && <span className="block text-xs text-lp-muted">{hint}</span>}
       {error && (
         <span className="block text-xs text-rose-600" role="alert">
           {error}

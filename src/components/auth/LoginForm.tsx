@@ -26,6 +26,8 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [verificationStep, setVerificationStep] = useState<"first" | "second" | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
 
   useEffect(() => {
     if (authLoaded && isSignedIn) {
@@ -58,18 +60,34 @@ export function LoginForm() {
 
     setLoading(true);
     try {
-      await signIn.create({
+      const result = await signIn.create({
         identifier: parsed.data.email,
         password: parsed.data.password,
       });
 
-      if (signIn.status === "complete" && signIn.createdSessionId) {
-        await setActive({ session: signIn.createdSessionId });
+      if (result.status === "complete" && result.createdSessionId) {
+        await setActive({ session: result.createdSessionId });
         router.push("/auth/continue");
         return;
       }
-
-      setFormError("Invalid email or password.");
+      if (result.status === "needs_second_factor") {
+        await result.prepareSecondFactor({ strategy: "email_code" });
+        setVerificationStep("second");
+        return;
+      }
+      if (result.status === "needs_first_factor" || result.status === "needs_identifier") {
+        const emailFactor = result.supportedFirstFactors?.find(
+          (factor) => factor.strategy === "email_code"
+        );
+        if (!emailFactor || emailFactor.strategy !== "email_code") {
+          setFormError("Additional verification is required. Please try again or contact support.");
+          return;
+        }
+        await result.prepareFirstFactor({ strategy: "email_code", emailAddressId: emailFactor.emailAddressId });
+        setVerificationStep("first");
+        return;
+      }
+      setFormError("Additional verification is required. Please try again or contact support.");
     } catch (err) {
       const message = getClerkErrorMessage(err, "Invalid email or password.");
       if (message === "redirect") {
@@ -77,6 +95,28 @@ export function LoginForm() {
         return;
       }
       setFormError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerification(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isLoaded || !signIn || !verificationStep) return;
+    setFormError(null);
+    setLoading(true);
+    try {
+      const result = verificationStep === "second"
+        ? await signIn.attemptSecondFactor({ strategy: "email_code", code: verificationCode })
+        : await signIn.attemptFirstFactor({ strategy: "email_code", code: verificationCode });
+      if (result.status === "complete" && result.createdSessionId) {
+        await setActive({ session: result.createdSessionId });
+        router.push("/auth/continue");
+        return;
+      }
+      setFormError("Additional verification is required. Please try again or contact support.");
+    } catch (err) {
+      setFormError(getClerkErrorMessage(err, "The verification code could not be confirmed."));
     } finally {
       setLoading(false);
     }
@@ -91,6 +131,17 @@ export function LoginForm() {
         Sign in to continue building qualified lead pipelines from one intelligent prompt.
       </p>
 
+      {verificationStep ? (
+        <form onSubmit={handleVerification} noValidate className="mt-6 space-y-4">
+          <div>
+            <label htmlFor="login-code" className="mb-1.5 block text-xs font-medium text-lp-muted">Enter the 6-digit code</label>
+            <input id="login-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} className="auth-input w-full" aria-describedby={formError ? "login-code-error" : undefined} />
+          </div>
+          {formError && <p id="login-code-error" className="text-center text-xs text-rose-400" role="alert">{formError}</p>}
+          <button type="submit" disabled={loading || verificationCode.length !== 6} className="auth-submit-btn flex w-full items-center justify-center gap-2 btn-lift">{loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{loading ? "Verifying…" : "Verify"}</button>
+          <button type="button" onClick={() => { setVerificationStep(null); setVerificationCode(""); setFormError(null); }} className="w-full text-sm text-lp-ice-blue hover:underline">Back</button>
+        </form>
+      ) : <>
       <div className="mt-6">
         <OAuthButtons mode="login" />
       </div>
@@ -151,6 +202,7 @@ export function LoginForm() {
           {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      </>}
 
       <p className="mt-6 text-center text-sm text-lp-muted">
         New to {BRAND.name}?{" "}
@@ -159,7 +211,7 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <p className="mt-4 text-center text-[11px] leading-relaxed text-lp-muted-dark">
+      <p className="mt-4 text-center text-xs leading-relaxed text-lp-muted-dark">
         Protected by secure authentication, encrypted sessions, and workspace-level access controls.
       </p>
     </AuthCard>
