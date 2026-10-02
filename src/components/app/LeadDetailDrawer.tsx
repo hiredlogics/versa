@@ -16,12 +16,21 @@ export function LeadDetailDrawer({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+
   async function copyEmail() {
     if (!lead?.email) return;
-    await navigator.clipboard.writeText(lead.email);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await navigator.clipboard.writeText(lead.email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
   }
+
+  const emailStatusLabel =
+    lead?.emailStatus === "verified" ? "Verified" : lead?.emailStatus ? "Unverified" : null;
+
   return (
     <AnimatePresence>
       {lead && (
@@ -50,9 +59,10 @@ export function LeadDetailDrawer({
               <button
                 type="button"
                 onClick={onClose}
+                aria-label="Close"
                 className="rounded-lg border border-lp-border p-2 text-lp-muted hover:text-lp-white"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden />
               </button>
             </div>
 
@@ -77,7 +87,24 @@ export function LeadDetailDrawer({
                 </h3>
                 <InfoRow icon={Mail} label="Email">
                   {lead.email ? (
-                    <span className="flex flex-wrap items-center gap-2"><a href={`mailto:${lead.email}`} className="app-link">{lead.email}</a><span className="rounded-full bg-lp-panel px-2 py-0.5 text-xs text-lp-muted">{lead.emailStatus === "verified" ? "Verified" : "Guessed"}</span><button type="button" onClick={copyEmail} className="inline-flex items-center gap-1 text-xs text-lp-ice-blue hover:underline"><Copy className="h-3 w-3" />{copied ? "Copied" : "Copy"}</button></span>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <a href={`mailto:${lead.email}`} className="app-link">
+                        {lead.email}
+                      </a>
+                      {emailStatusLabel && (
+                        <span className="rounded-full bg-lp-panel px-2 py-0.5 text-xs text-lp-muted">
+                          {emailStatusLabel}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={copyEmail}
+                        className="inline-flex items-center gap-1 text-xs text-lp-ice-blue hover:underline"
+                      >
+                        <Copy className="h-3 w-3" aria-hidden />
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </span>
                   ) : (
                     "Not available"
                   )}

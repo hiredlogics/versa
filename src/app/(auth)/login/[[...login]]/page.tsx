@@ -4,8 +4,18 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { AuthRedirectIfSignedIn } from "@/components/auth/AuthRedirectIfSignedIn";
 import { redirectIfAuthenticated } from "@/lib/auth/post-auth-redirect";
 import type { Metadata } from "next";
+import { BRAND } from "@/config/brand";
 
-export const metadata: Metadata = { title: "Log in", description: "Sign in to your Varsā workspace.", openGraph: { title: "Log in to Varsā", description: "Sign in to your Varsā workspace.", images: ["/og.png"] }, twitter: { card: "summary_large_image" } };
+export const metadata: Metadata = {
+  title: "Log in",
+  description: `Sign in to your ${BRAND.name} workspace.`,
+  openGraph: {
+    title: `Log in to ${BRAND.name}`,
+    description: `Sign in to your ${BRAND.name} workspace.`,
+    images: ["/og.png"],
+  },
+  twitter: { card: "summary_large_image" },
+};
 
 export const dynamic = "force-dynamic";
 

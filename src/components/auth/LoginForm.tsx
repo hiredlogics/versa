@@ -16,6 +16,19 @@ import { PasswordInput } from "./PasswordInput";
 import { SecurityBadge } from "./SecurityBadge";
 import { BRAND } from "@/config/brand";
 
+type SecondFactorStrategy = "totp" | "phone_code" | "email_code";
+
+const SECOND_FACTOR_PREFERENCE: SecondFactorStrategy[] = ["totp", "phone_code", "email_code"];
+
+const CODE_SOURCE: Record<SecondFactorStrategy, string> = {
+  totp: "from your authenticator app",
+  phone_code: "we sent to your phone",
+  email_code: "we sent to your email",
+};
+
+const VERIFICATION_REQUIRED =
+  "Additional verification is required. Please try again or contact support.";
+
 export function LoginForm() {
   const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -27,6 +40,8 @@ export function LoginForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [verificationStep, setVerificationStep] = useState<"first" | "second" | null>(null);
+  const [secondFactorStrategy, setSecondFactorStrategy] =
+    useState<SecondFactorStrategy>("email_code");
   const [verificationCode, setVerificationCode] = useState("");
 
   useEffect(() => {
@@ -71,23 +86,40 @@ export function LoginForm() {
         return;
       }
       if (result.status === "needs_second_factor") {
-        await result.prepareSecondFactor({ strategy: "email_code" });
+        const available = result.supportedSecondFactors ?? [];
+        const strategy = SECOND_FACTOR_PREFERENCE.find((s) =>
+          available.some((factor) => factor.strategy === s)
+        );
+        if (!strategy) {
+          setFormError(VERIFICATION_REQUIRED);
+          return;
+        }
+        // Authenticator apps generate codes locally; only phone and email codes are sent.
+        if (strategy === "phone_code") {
+          await result.prepareSecondFactor({ strategy: "phone_code" });
+        } else if (strategy === "email_code") {
+          await result.prepareSecondFactor({ strategy: "email_code" });
+        }
+        setSecondFactorStrategy(strategy);
         setVerificationStep("second");
         return;
       }
-      if (result.status === "needs_first_factor" || result.status === "needs_identifier") {
+      if (result.status === "needs_first_factor") {
         const emailFactor = result.supportedFirstFactors?.find(
           (factor) => factor.strategy === "email_code"
         );
         if (!emailFactor || emailFactor.strategy !== "email_code") {
-          setFormError("Additional verification is required. Please try again or contact support.");
+          setFormError(VERIFICATION_REQUIRED);
           return;
         }
-        await result.prepareFirstFactor({ strategy: "email_code", emailAddressId: emailFactor.emailAddressId });
+        await result.prepareFirstFactor({
+          strategy: "email_code",
+          emailAddressId: emailFactor.emailAddressId,
+        });
         setVerificationStep("first");
         return;
       }
-      setFormError("Additional verification is required. Please try again or contact support.");
+      setFormError(VERIFICATION_REQUIRED);
     } catch (err) {
       const message = getClerkErrorMessage(err, "Invalid email or password.");
       if (message === "redirect") {
@@ -106,15 +138,16 @@ export function LoginForm() {
     setFormError(null);
     setLoading(true);
     try {
-      const result = verificationStep === "second"
-        ? await signIn.attemptSecondFactor({ strategy: "email_code", code: verificationCode })
-        : await signIn.attemptFirstFactor({ strategy: "email_code", code: verificationCode });
+      const result =
+        verificationStep === "second"
+          ? await signIn.attemptSecondFactor({ strategy: secondFactorStrategy, code: verificationCode })
+          : await signIn.attemptFirstFactor({ strategy: "email_code", code: verificationCode });
       if (result.status === "complete" && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
         router.push("/auth/continue");
         return;
       }
-      setFormError("Additional verification is required. Please try again or contact support.");
+      setFormError(VERIFICATION_REQUIRED);
     } catch (err) {
       setFormError(getClerkErrorMessage(err, "The verification code could not be confirmed."));
     } finally {
@@ -134,12 +167,46 @@ export function LoginForm() {
       {verificationStep ? (
         <form onSubmit={handleVerification} noValidate className="mt-6 space-y-4">
           <div>
-            <label htmlFor="login-code" className="mb-1.5 block text-xs font-medium text-lp-muted">Enter the 6-digit code</label>
-            <input id="login-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} className="auth-input w-full" aria-describedby={formError ? "login-code-error" : undefined} />
+            <label htmlFor="login-code" className="mb-1.5 block text-xs font-medium text-lp-muted">
+              Enter the 6-digit code{" "}
+              {verificationStep === "second" ? CODE_SOURCE[secondFactorStrategy] : CODE_SOURCE.email_code}
+            </label>
+            <input
+              id="login-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+              className="auth-input w-full"
+              aria-invalid={!!formError}
+              aria-describedby={formError ? "login-code-error" : undefined}
+            />
           </div>
-          {formError && <p id="login-code-error" className="text-center text-xs text-rose-400" role="alert">{formError}</p>}
-          <button type="submit" disabled={loading || verificationCode.length !== 6} className="auth-submit-btn flex w-full items-center justify-center gap-2 btn-lift">{loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{loading ? "Verifying…" : "Verify"}</button>
-          <button type="button" onClick={() => { setVerificationStep(null); setVerificationCode(""); setFormError(null); }} className="w-full text-sm text-lp-ice-blue hover:underline">Back</button>
+          {formError && (
+            <p id="login-code-error" className="text-center text-xs text-rose-400" role="alert">
+              {formError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading || verificationCode.length !== 6}
+            className="auth-submit-btn flex w-full items-center justify-center gap-2 btn-lift"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {loading ? "Verifying…" : "Verify"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setVerificationStep(null);
+              setVerificationCode("");
+              setFormError(null);
+            }}
+            className="w-full text-sm text-lp-ice-blue hover:underline"
+          >
+            Back
+          </button>
         </form>
       ) : <>
       <div className="mt-6">
