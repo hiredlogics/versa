@@ -93,7 +93,7 @@ export function ProductMockup() {
       <SignalCard label="Score" value="9.4" accent="emerald" className="absolute -left-2 top-8 md:-left-8" delay={0.6} />
       <SignalCard label="Match" value="Founder matched" accent="violet" className="absolute -right-2 top-20 md:-right-6" delay={0.9} />
       <SignalCard label="Signal" value="AI automation" accent="cyan" className="absolute -left-4 bottom-24 md:-left-10" delay={1.2} />
-      <SignalCard label="Data" value="Apollo enriched" accent="blue" className="absolute -right-3 bottom-16 md:-right-8" delay={1.5} />
+      <SignalCard label="Data" value="Verified data" accent="blue" className="absolute -right-3 bottom-16 md:-right-8" delay={1.5} />
     </div>
   );
 }

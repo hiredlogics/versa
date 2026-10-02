@@ -19,7 +19,7 @@ const PLANS: Array<{
     name: "Free Trial",
     price: "$0",
     desc: "Create your account, then choose a plan to unlock the workspace",
-    features: ["Account + workspace setup", "Secure Clerk auth", "Upgrade anytime", "Stripe-managed billing"],
+    features: ["Account + workspace setup", "Secure sign-in", "Upgrade anytime", "Secure payments"],
     cta: "Create account",
     href: "/register",
     highlight: false,
@@ -71,7 +71,7 @@ export function PricingPreview() {
       <SectionHeader
         badge="Pricing"
         title="Simple plans. Serious pipeline."
-        subtitle="Authenticate with Clerk, subscribe through Stripe, then run lead searches from one intelligent prompt."
+        subtitle="Sign in securely, choose a plan, then run lead searches from one intelligent prompt."
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
         {PLANS.map((plan, i) => (

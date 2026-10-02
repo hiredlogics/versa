@@ -3,9 +3,9 @@ import { FadeIn } from "./AnimatedAurora";
 import { SectionHeader, SectionShell } from "./SectionShell";
 
 const FEATURES = [
-  { icon: Sparkles, title: "Prompt to filters", desc: "Natural language becomes Apollo-ready search criteria instantly." },
+  { icon: Sparkles, title: "Describe your target", desc: "Plain language becomes useful search criteria instantly." },
   { icon: Zap, title: "AI scoring", desc: "Every lead ranked 1–10 with reasoning and outreach angles." },
-  { icon: Shield, title: "Enterprise-ready", desc: "Secure, multi-tenant, usage limits, and admin controls." },
+  { icon: Shield, title: "Enterprise-ready", desc: "Secure workspaces, usage limits, and admin controls." },
   { icon: Download, title: "Export anywhere", desc: "CSV and Excel exports for your CRM workflow." },
 ];
 
