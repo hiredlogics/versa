@@ -44,7 +44,7 @@ export function SearchHistoryCard({
       onClick={onSelect}
       className={cn(
         "group app-panel rounded-3xl p-5 transition-all duration-300 md:p-6",
-        "hover:-translate-y-0.5 hover:border-lp-border-strong hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
+        "hover:border-lp-border-strong hover:shadow-[0_12px_40px_rgba(0,0,0,0.35)]",
         selected && "border-lp-border-strong ring-1 ring-lp-cold-blue/20",
         onSelect && "cursor-pointer"
       )}

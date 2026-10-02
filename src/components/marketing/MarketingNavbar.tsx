@@ -27,12 +27,6 @@ export function MarketingNavbar() {
   return (
     <header className="lp-nav-enter fixed top-0 inset-x-0 z-50">
       <div className="lp-nav-glass absolute inset-0" aria-hidden />
-      <div className="lp-nav-top-line pointer-events-none absolute inset-x-0 top-0 h-px" aria-hidden />
-      <div className="lp-nav-glow-center pointer-events-none absolute inset-x-0 top-0 h-16" aria-hidden />
-      <div
-        className="lp-nav-glow-cta pointer-events-none absolute right-[12%] top-1/2 h-24 w-24 -translate-y-1/2 rounded-full blur-2xl"
-        aria-hidden
-      />
 
       <div className="relative mx-auto flex h-[76px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo size="lg" animated variant="nav" className="relative z-10 shrink-0" />
