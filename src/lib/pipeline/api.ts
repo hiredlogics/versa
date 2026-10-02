@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { InsufficientCreditsError, NoSubscriptionError, balance } from "./credits";
+import { InsufficientCreditsError, balance } from "./credits";
 import { toCreditsDTO } from "./dto";
 import { providerDeps } from "@/lib/providers/people-data";
 import { runBatch } from "./run";
@@ -76,9 +76,6 @@ export async function creditsPayload(userId: string) {
 
 /** Maps the errors every route can raise onto the agreed status codes. */
 export async function toErrorResponse(error: unknown, userId?: string) {
-  if (error instanceof NoSubscriptionError) {
-    return fail(402, error.message, userId ? { credits: await creditsPayload(userId) } : undefined);
-  }
   if (error instanceof InsufficientCreditsError) {
     return fail(402, error.message, userId ? { credits: await creditsPayload(userId) } : undefined);
   }

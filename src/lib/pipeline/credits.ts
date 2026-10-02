@@ -22,14 +22,6 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
-/** Distinct from a credits problem: the user has no plan to spend against. */
-export class NoSubscriptionError extends Error {
-  constructor() {
-    super("Active subscription required. Choose a plan to continue.");
-    this.name = "NoSubscriptionError";
-  }
-}
-
 export interface CreditBalance {
   planName: string;
   limit: number;
@@ -71,11 +63,18 @@ async function resolvePlan(tx: Tx, userId: string, now: Date): Promise<ResolvedP
     Boolean(subscription) &&
     ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription!.status);
 
+  const fallback = calendarPeriod(now);
+
+  // Without an active paid plan the user is on the free trial, counted per calendar month.
   if (isBillingEnforced() && !active) {
-    throw new NoSubscriptionError();
+    return {
+      start: fallback.start,
+      end: fallback.end,
+      limit: PLAN_LIMITS.freeTrial.monthlyLeads,
+      planName: PLAN_LIMITS.freeTrial.name,
+    };
   }
 
-  const fallback = calendarPeriod(now);
   const start = subscription?.currentPeriodStart ?? fallback.start;
   const end = subscription?.currentPeriodEnd ?? fallback.end;
 

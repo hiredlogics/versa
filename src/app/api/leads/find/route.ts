@@ -11,7 +11,7 @@ import {
   previewFindClarification,
   type FindLeadsInput,
 } from "@/lib/services/leads/findLeadsWorkflow";
-import { SubscriptionRequiredError, requireActiveSubscription } from "@/lib/billing/subscription";
+import { SubscriptionRequiredError, ensureAppAccess } from "@/lib/billing/subscription";
 import {
   LeadSearchAccessError,
   UsageLimitError,
@@ -26,7 +26,7 @@ export const maxDuration = 300;
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
-    await requireActiveSubscription(user.id);
+    await ensureAppAccess(user.id);
     await requireOnboardingComplete(user.id);
 
     const body = await request.json();

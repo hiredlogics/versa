@@ -1,6 +1,11 @@
 import { getLegacyUsageSummary } from "@/lib/billing/billingDashboard";
 import { isBillingEnforced } from "@/lib/billing/constants";
-import { getSubscriptionForUser, isActiveSubscription } from "@/lib/billing/subscription";
+import { PLAN_LIMITS } from "@/lib/billing/planLimits";
+import {
+  getSubscriptionForUser,
+  isActiveSubscription,
+  isOnFreeTrial,
+} from "@/lib/billing/subscription";
 import { getUserLeadContext } from "@/lib/context/userLeadContext";
 import { getPlatformReadiness } from "@/lib/platform-readiness";
 import type { UserLeadContextDTO } from "@/lib/validations/onboarding-context";
@@ -40,10 +45,13 @@ export async function getAppShellData(userId: string, isAdmin: boolean): Promise
   ]);
 
   const billingEnforced = isBillingEnforced();
-  const isActive = billingEnforced ? isActiveSubscription(subscription) : true;
+  const onFreeTrial = isOnFreeTrial(subscription);
+  const isActive = billingEnforced ? onFreeTrial || isActiveSubscription(subscription) : true;
 
   return {
-    planName: subscription?.planName ?? subscription?.plan.name ?? "Plan",
+    planName: onFreeTrial
+      ? PLAN_LIMITS.freeTrial.name
+      : (subscription?.planName ?? subscription?.plan.name ?? "Plan"),
     isActive,
     usage: {
       ...usage,
