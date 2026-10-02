@@ -15,7 +15,7 @@ import { readFileSync } from "fs";
 import { prisma } from "@/lib/db/prisma";
 import { poolInputFromCsvRow, splitLocation, type PoolPersonInput } from "@/lib/lead-pool";
 import { upsertPoolPeople } from "@/lib/services/leads/leadPool";
-import { parseCsv } from "@/lib/screenshot/leadSource";
+import { parseCsv } from "@/lib/csv";
 
 function readCsv(path: string): Record<string, string>[] {
   const [header, ...rows] = parseCsv(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));

@@ -78,7 +78,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       searchId: search.id,
       status: "RUNNING",
       async: true,
-      message: "Resume started — pulling the next batch of Apollo matches.",
+      message: "Resume started — finding the next batch of matches.",
       leadsReturned: search.leadsReturned,
       totalAvailable: search.totalAvailable,
     });
