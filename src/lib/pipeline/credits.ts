@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { ACTIVE_SUBSCRIPTION_STATUSES, isBillingEnforced } from "@/lib/billing/constants";
-import { PLAN_LIMITS } from "@/lib/billing/planLimits";
+import { FREE_TRIAL_PERIOD, PLAN_LIMITS } from "@/lib/billing/planLimits";
 
 /**
  * Credits are deducted before paid work and settled afterwards: charged for what
@@ -65,11 +65,11 @@ async function resolvePlan(tx: Tx, userId: string, now: Date): Promise<ResolvedP
 
   const fallback = calendarPeriod(now);
 
-  // Without an active paid plan the user is on the free trial, counted per calendar month.
+  // Without an active paid plan the user is on the one-time free trial.
   if (isBillingEnforced() && !active) {
     return {
-      start: fallback.start,
-      end: fallback.end,
+      start: new Date(FREE_TRIAL_PERIOD.start),
+      end: new Date(FREE_TRIAL_PERIOD.end),
       limit: PLAN_LIMITS.freeTrial.monthlyLeads,
       planName: PLAN_LIMITS.freeTrial.name,
     };

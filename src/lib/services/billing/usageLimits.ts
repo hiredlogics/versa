@@ -2,11 +2,13 @@ import { prisma } from "@/lib/db/prisma";
 import type { Plan, Subscription, User } from "@prisma/client";
 import { APOLLO_HARD_MAX_RECORDS } from "@/lib/apollo-config";
 import { isBillingEnforced } from "@/lib/billing/constants";
+import { FREE_TRIAL_PERIOD } from "@/lib/billing/planLimits";
 import type { LeadSearchAccessCode } from "@/lib/billing/billingTypes";
 import {
   ensureDefaultPlanSubscription,
   getEffectivePlan,
   getSubscriptionForUser,
+  isOnFreeTrial,
   paidSubscriptionOrNull,
 } from "@/lib/billing/subscription";
 import type { SubscriptionWithPlan } from "@/lib/billing/subscription";
@@ -53,6 +55,24 @@ export function getUsagePeriod(subscription: Pick<Subscription, "currentPeriodSt
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
   return { start, end, periodKey: formatPeriodKey(start) };
+}
+
+/** Paid plans count usage per billing period; the free trial is counted once and never resets. */
+export function usagePeriodFor(
+  subscription: Pick<
+    Subscription,
+    "status" | "stripeSubscriptionId" | "currentPeriodStart" | "currentPeriodEnd"
+  > | null,
+  date = new Date()
+) {
+  if (isOnFreeTrial(subscription)) {
+    return {
+      start: new Date(FREE_TRIAL_PERIOD.start),
+      end: new Date(FREE_TRIAL_PERIOD.end),
+      periodKey: FREE_TRIAL_PERIOD.periodKey,
+    };
+  }
+  return getUsagePeriod(paidSubscriptionOrNull(subscription), date);
 }
 
 export async function getOrCreateUsageRecord(
@@ -118,7 +138,7 @@ export async function buildUsageSnapshot(userId: string, subscription: Subscript
 
   try {
     const plan = (await getEffectivePlan(subscription)) ?? (await getUserPlanLimits(user));
-    const period = getUsagePeriod(paidSubscriptionOrNull(subscription));
+    const period = usagePeriodFor(subscription);
     const usage = await getOrCreateUsageRecord(userId, period.start, period.end);
     return buildUsageSnapshotFromRecord(usage, plan, period);
   } catch {
@@ -144,7 +164,7 @@ export async function requireLeadSearchAccess(user: User, requestedMaxLeads?: nu
   // Users without an active paid plan search on the free trial's limits.
   const subscription = await getSubscriptionForUser(user.id);
   const plan = await getUserPlanLimits(user);
-  const period = getUsagePeriod(paidSubscriptionOrNull(subscription));
+  const period = usagePeriodFor(subscription);
   const usage = await getOrCreateUsageRecord(user.id, period.start, period.end);
 
   if (!isBillingEnforced()) {
@@ -226,7 +246,7 @@ export async function checkLeadsAllowed(user: User, count: number) {
 
 export async function incrementUsage(userId: string, leads: number, searches = 1) {
   const subscription = await getSubscriptionForUser(userId);
-  const period = getUsagePeriod(paidSubscriptionOrNull(subscription));
+  const period = usagePeriodFor(subscription);
   const plan =
     (await getEffectivePlan(subscription)) ??
     (await prisma.plan.findUnique({ where: { slug: "starter" } }));

@@ -46,7 +46,7 @@ const PLANS: Array<{
     name: "Free Trial",
     price: "$0",
     desc: "A focused way to try VARSA.",
-    features: ["25 leads each month", "3 searches each month", "Ranked results", "CSV export"],
+    features: ["25 free leads, one time", "3 searches", "Ranked results", "CSV export"],
     cta: "Start free",
   },
   {
@@ -82,7 +82,7 @@ const FAQS = [
   { q: "What does the score mean?", a: "Scores run from 1–10 and help you compare fit. The explanation beside each score gives the useful context." },
   { q: "Are contacts verified?", a: "Results label verified email availability so you can quickly understand what is ready for outreach." },
   { q: "Can I save my buyer context?", a: "Yes. VARSA keeps your buyer context available for your next search." },
-  { q: "Is there a free trial?", a: "Yes. The free trial includes 25 leads and 3 searches per month. Upgrade whenever you need more." },
+  { q: "Is there a free trial?", a: "Yes. Every new account gets 25 free leads and 3 searches, once. After that, choose a plan to keep searching." },
 ];
 
 const SAMPLE_LEADS = [
@@ -190,7 +190,7 @@ function Hero() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
           >
-            Start free with 25 leads and 3 searches each month.
+            Start free with 25 leads. No card needed.
           </motion.p>
         </div>
 
@@ -307,7 +307,7 @@ function PricingSection() {
               <p className="mt-1 text-xs text-lp-muted">{plan.desc}</p>
               <p className="mt-4 text-4xl font-bold text-lp-white">
                 {plan.price}
-                <span className="text-sm font-normal text-lp-muted">/mo</span>
+                {plan.price !== "$0" && <span className="text-sm font-normal text-lp-muted">/mo</span>}
               </p>
               <ul className="mt-6 flex-1 space-y-2.5">
                 {plan.features.map((feature) => (

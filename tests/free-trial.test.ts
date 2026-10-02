@@ -4,7 +4,9 @@ import {
   LeadSearchAccessError,
   incrementUsage,
   requireLeadSearchAccess,
+  usagePeriodFor,
 } from "@/lib/services/billing/usageLimits";
+import { FREE_TRIAL_PERIOD } from "@/lib/billing/planLimits";
 import { getPostAuthRedirectPath, isOnFreeTrial } from "@/lib/billing/subscription";
 import { getFullBillingStatus } from "@/lib/billing/billingDashboard";
 
@@ -84,13 +86,28 @@ describe("free trial with billing enforced", () => {
     expect((await accessError(10)).code).toBe("LEAD_LIMIT_REACHED");
   });
 
-  it("blocks a fourth search in the same month", async () => {
+  it("blocks a fourth search, ever", async () => {
     for (let i = 0; i < 3; i++) {
       await requireLeadSearchAccess(user, 1);
       await incrementUsage(user.id, 1, 1);
     }
 
     expect((await accessError(1)).code).toBe("SEARCH_LIMIT_REACHED");
+  });
+
+  it("is a one-time allowance that never resets", async () => {
+    const january = usagePeriodFor(null, new Date(Date.UTC(2026, 0, 15)));
+    const july = usagePeriodFor(null, new Date(Date.UTC(2027, 6, 15)));
+    expect(january.start.getTime()).toBe(FREE_TRIAL_PERIOD.start.getTime());
+    expect(july.start.getTime()).toBe(january.start.getTime());
+
+    await requireLeadSearchAccess(user, 25);
+    await incrementUsage(user.id, 25, 1);
+
+    const records = await prisma.usageRecord.findMany({ where: { userId: user.id } });
+    expect(records).toHaveLength(1);
+    expect(records[0].periodStart.getTime()).toBe(FREE_TRIAL_PERIOD.start.getTime());
+    expect(records[0].leadsUsed).toBe(25);
   });
 
   it("keeps a paying user on their own plan", async () => {

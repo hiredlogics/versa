@@ -19,7 +19,7 @@ const PLANS: Array<{
     name: "Free Trial",
     price: "$0",
     desc: "Try VARSA free, then choose a plan when you need more",
-    features: ["25 leads/month", "3 searches/month", "AI lead scoring", "CSV export"],
+    features: ["25 free leads, one time", "3 searches", "AI lead scoring", "CSV export"],
     cta: "Start free",
     href: "/register",
     highlight: false,
@@ -71,7 +71,7 @@ export function PricingPreview() {
       <SectionHeader
         badge="Pricing"
         title="Simple plans. Serious pipeline."
-        subtitle="Start free with 25 leads a month. Upgrade when you're ready to search at scale."
+        subtitle="Start free with 25 leads. Upgrade when you're ready to search at scale."
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
         {PLANS.map((plan, i) => (
@@ -92,7 +92,7 @@ export function PricingPreview() {
               <p className="mt-1 text-xs text-lp-muted">{plan.desc}</p>
               <p className="mt-4 text-4xl font-bold text-lp-white">
                 {plan.price}
-                <span className="text-sm font-normal text-lp-muted">/mo</span>
+                {plan.price !== "$0" && <span className="text-sm font-normal text-lp-muted">/mo</span>}
               </p>
               <ul className="mt-6 flex-1 space-y-2.5">
                 {plan.features.map((f) => (

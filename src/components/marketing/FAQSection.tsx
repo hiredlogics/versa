@@ -26,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "Every account starts with a free trial — 25 leads and 3 searches per month. Upgrade anytime when you're ready to scale.",
+    a: "Yes. Every new account gets 25 free leads and 3 searches, once. After that, choose a plan to keep searching.",
   },
 ];
 
