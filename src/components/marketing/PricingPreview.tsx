@@ -16,11 +16,11 @@ const PLANS: Array<{
   href?: string;
 }> = [
   {
-    name: "Free account",
+    name: "Free Trial",
     price: "$0",
-    desc: "Create your account, then choose a plan to unlock the workspace",
-    features: ["Account + workspace setup", "Secure sign-in", "Upgrade anytime", "Secure payments"],
-    cta: "Create account",
+    desc: "Try VARSA free, then choose a plan when you need more",
+    features: ["25 leads/month", "3 searches/month", "AI lead scoring", "CSV export"],
+    cta: "Start free",
     href: "/register",
     highlight: false,
   },
@@ -71,7 +71,7 @@ export function PricingPreview() {
       <SectionHeader
         badge="Pricing"
         title="Simple plans. Serious pipeline."
-        subtitle="Sign in securely, choose a plan, then run lead searches from one intelligent prompt."
+        subtitle="Start free with 25 leads a month. Upgrade when you're ready to search at scale."
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
         {PLANS.map((plan, i) => (

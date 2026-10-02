@@ -26,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "There's no free trial. Creating an account is free; choose a plan to start searching, and change plans whenever you need more.",
+    a: "Every account starts with a free trial — 25 leads and 3 searches per month. Upgrade anytime when you're ready to scale.",
   },
 ];
 

@@ -65,7 +65,7 @@ export function MarketingNavbar() {
             Log in
           </Link>
           <Link href="/register" className="lp-btn-cta text-sm">
-            Get started
+            Start free
           </Link>
         </div>
 
@@ -124,7 +124,7 @@ export function MarketingNavbar() {
                   onClick={() => setOpen(false)}
                   className="lp-btn-cta w-full text-center py-3.5 text-sm"
                 >
-                  Get started
+                  Start free
                 </Link>
               </div>
             </div>
