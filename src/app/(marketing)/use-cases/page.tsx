@@ -1,4 +1,7 @@
 import { GlassCard } from "@/components/ui/Card";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Use cases", description: "Lead discovery workflows for growing teams.", openGraph: { title: "Varsā Use cases", description: "Lead discovery workflows for growing teams.", images: ["/og.png"] }, twitter: { card: "summary_large_image" } };
 
 const cases = [
   { title: "SaaS sales teams", desc: "Find CTOs and founders at mid-market software companies." },

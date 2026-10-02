@@ -9,7 +9,7 @@ const inter = Inter({
   display: "swap",
   variable: "--font-inter",
   preload: true,
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -18,11 +18,13 @@ export const metadata: Metadata = {
   metadataBase: process.env.NEXT_PUBLIC_APP_URL
     ? new URL(process.env.NEXT_PUBLIC_APP_URL)
     : undefined,
+  openGraph: { images: ["/og.png"] },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning data-theme="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <ThemeScript />
       </head>
