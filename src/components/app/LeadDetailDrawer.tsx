@@ -1,7 +1,8 @@
 "use client";
 
-import { X, Mail, ExternalLink, Building2, MapPin, Users } from "lucide-react";
+import { X, Mail, ExternalLink, Building2, MapPin, Users, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import { ScoreBadge } from "@/components/ui/Badge";
 import { LeadSignalBadges } from "@/components/app/LeadSignalBadges";
 import type { LeadRecord } from "@/lib/types/lead-finder";
@@ -14,6 +15,13 @@ export function LeadDetailDrawer({
   lead: LeadRecord | null;
   onClose: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+  async function copyEmail() {
+    if (!lead?.email) return;
+    await navigator.clipboard.writeText(lead.email);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
   return (
     <AnimatePresence>
       {lead && (
@@ -69,9 +77,7 @@ export function LeadDetailDrawer({
                 </h3>
                 <InfoRow icon={Mail} label="Email">
                   {lead.email ? (
-                    <a href={`mailto:${lead.email}`} className="app-link">
-                      {lead.email}
-                    </a>
+                    <span className="flex flex-wrap items-center gap-2"><a href={`mailto:${lead.email}`} className="app-link">{lead.email}</a><span className="rounded-full bg-lp-panel px-2 py-0.5 text-xs text-lp-muted">{lead.emailStatus === "verified" ? "Verified" : "Guessed"}</span><button type="button" onClick={copyEmail} className="inline-flex items-center gap-1 text-xs text-lp-ice-blue hover:underline"><Copy className="h-3 w-3" />{copied ? "Copied" : "Copy"}</button></span>
                   ) : (
                     "Not available"
                   )}
@@ -143,7 +149,7 @@ function InfoRow({
     <div className="flex items-start gap-3 text-sm">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-lp-muted-dark" />
       <div>
-        <p className="text-[11px] text-lp-muted-dark">{label}</p>
+        <p className="text-xs text-lp-muted-dark">{label}</p>
         <p className="text-lp-off-white">{children}</p>
       </div>
     </div>

@@ -122,6 +122,9 @@ export function AdvancedFiltersDrawer({
         </div>
 
         <div className="flex gap-2 border-t border-lp-border p-5">
+          <Button variant="secondary" className="flex-1" onClick={() => onChange({})}>
+            Reset
+          </Button>
           <Button variant="secondary" className="flex-1" onClick={onClose}>
             Cancel
           </Button>
