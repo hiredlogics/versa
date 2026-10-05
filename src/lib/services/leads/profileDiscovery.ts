@@ -192,6 +192,8 @@ export async function runProfileDiscovery(input: {
       recommendedApproach: "",
       matchedSkills: [],
       missingSkills: [],
+      openToWorkLevel: null,
+      openToWorkReasons: [],
       hasEmail: verified,
       rawApolloData: toStoredApolloProfile(raw) ?? undefined,
     };

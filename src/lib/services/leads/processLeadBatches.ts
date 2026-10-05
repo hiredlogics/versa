@@ -28,6 +28,7 @@ import { filterExcludedLeads } from "@/lib/context/exclusions";
 import { normalizeLinkedInUrl } from "@/lib/lead-pool";
 import { recordApolloPeopleInPool } from "@/lib/services/leads/leadPool";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
+import { scoreOpenToWork } from "@/lib/open-to-work-score";
 import {
   filterPeopleForOpenToWork,
   OPEN_TO_WORK_APOLLO_DISCLAIMER,
@@ -555,7 +556,28 @@ export async function runSequentialLeadBatches(input: {
       };
     });
 
-    const leadRows = workList.map((lead) => ({
+    const otwScores = await Promise.all(
+      workList.map(async (lead, idx) => {
+        const stored = storedById.get(lead.apolloPersonId) as
+          | {
+              headline?: string | null;
+              employment_history?: import("@/lib/lead-profile").ApolloEmploymentEntry[];
+              github_url?: string | null;
+            }
+          | undefined;
+        const allowGithub = idx < 50;
+        return scoreOpenToWork({
+          title: lead.title,
+          headline: stored?.headline ?? null,
+          company: lead.company,
+          employmentHistory: stored?.employment_history ?? null,
+          githubUrl: allowGithub ? stored?.github_url ?? null : null,
+          rawApolloData: stored,
+        });
+      })
+    );
+
+    const leadRows = workList.map((lead, i) => ({
       userId: input.userId,
       searchId: input.searchId,
       apolloPersonId: lead.apolloPersonId,
@@ -573,6 +595,8 @@ export async function runSequentialLeadBatches(input: {
       reasoning: lead.reasoning,
       matchedSkills: lead.matchedSkills ?? [],
       missingSkills: lead.missingSkills ?? [],
+      openToWorkLevel: otwScores[i]?.level ?? null,
+      openToWorkReasons: otwScores[i]?.reasons ?? [],
       whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",
       recommendedApproach: "",
       hasEmail: true,

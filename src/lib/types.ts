@@ -90,6 +90,8 @@ export interface ScoredLead {
   hasEmail?: boolean;
   matchedSkills?: string[];
   missingSkills?: string[];
+  openToWorkLevel?: string | null;
+  openToWorkReasons?: string[];
   searchPrompt?: string;
   searchTitle?: string;
   history?: LeadHistoryEntry[];

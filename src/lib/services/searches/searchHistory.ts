@@ -96,6 +96,8 @@ export function mapLeadToRecord(lead: Lead): LeadRecord {
     hasEmail: lead.hasEmail,
     matchedSkills: lead.matchedSkills ?? [],
     missingSkills: lead.missingSkills ?? [],
+    openToWorkLevel: lead.openToWorkLevel ?? null,
+    openToWorkReasons: lead.openToWorkReasons ?? [],
   };
 }
 

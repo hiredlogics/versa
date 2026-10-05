@@ -70,11 +70,20 @@ export function LeadResultsTable({
   // No default sort: the server already returns leads best-score-first, and Score is not a column.
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"default" | "open_to_work">("default");
 
-  const filteredLeads = useMemo(
-    () => leads.filter((l) => l.leadScore >= minScoreFilter),
-    [leads, minScoreFilter]
-  );
+  const filteredLeads = useMemo(() => {
+    let list = leads.filter((l) => l.leadScore >= minScoreFilter);
+    if (sortBy === "open_to_work") {
+      const rank = (level?: string | null) => {
+        if (level === "likely") return 3;
+        if (level === "maybe") return 2;
+        return 1;
+      };
+      list = [...list].sort((a, b) => rank(b.openToWorkLevel) - rank(a.openToWorkLevel));
+    }
+    return list;
+  }, [leads, minScoreFilter, sortBy]);
 
   const savedCount = totalSaved ?? filteredLeads.length;
   const offset = Math.max(0, pageOffset);
@@ -90,7 +99,33 @@ export function LeadResultsTable({
     () => [
       columnHelper.accessor("name", {
         header: "Name",
-        cell: (info) => <span className="font-medium text-lp-white">{info.getValue()}</span>,
+        cell: (info) => {
+          const otwLevel = info.row.original.openToWorkLevel;
+          const otwReasons = info.row.original.openToWorkReasons ?? [];
+          const tooltip = [
+            ...otwReasons,
+            "Estimate from public signals. Not LinkedIn's Open to Work badge.",
+          ].join(" · ");
+
+          return (
+            <div className="flex flex-col gap-1">
+              <span className="font-medium text-lp-white">{info.getValue()}</span>
+              {otwLevel && otwLevel !== "unlikely" && (
+                <span
+                  className={
+                    otwLevel === "likely"
+                      ? "inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+                      : "inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300"
+                  }
+                  title={tooltip}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+                  {otwLevel === "likely" ? "Likely looking" : "Maybe"}
+                </span>
+              )}
+            </div>
+          );
+        },
       }),
       columnHelper.accessor("reasoning", {
         header: "Why",
@@ -246,6 +281,15 @@ export function LeadResultsTable({
               className="app-input w-full py-1.5 pl-8 text-xs sm:w-48"
             />
           </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "default" | "open_to_work")}
+            className="app-input rounded-lg border border-lp-border bg-lp-panel py-1.5 text-xs text-lp-off-white"
+            aria-label="Sort order"
+          >
+            <option value="default">Default order</option>
+            <option value="open_to_work">Most likely to be looking</option>
+          </select>
           <ExportButtons searchId={searchId} />
         </div>
       </div>

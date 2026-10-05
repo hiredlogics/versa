@@ -263,6 +263,8 @@ model Lead {
   rawApolloData       Json?
   matchedSkills       String[]      @default([])
   missingSkills       String[]      @default([])
+  openToWorkLevel     String?
+  openToWorkReasons   String[]      @default([])
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   deletedAt           DateTime?
@@ -403,4 +405,14 @@ model AdminAuditLog {
   createdAt  DateTime @default(now())
 
   @@index([adminId, createdAt(sort: Desc)])
+}
+
+model GithubActivityCache {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  recentEvents Int
+  checkedAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([username])
 }

@@ -22,6 +22,8 @@ export interface LeadRecord {
   hasEmail: boolean;
   matchedSkills?: string[];
   missingSkills?: string[];
+  openToWorkLevel?: string | null;
+  openToWorkReasons?: string[];
 }
 
 export interface FindLeadsResponse {

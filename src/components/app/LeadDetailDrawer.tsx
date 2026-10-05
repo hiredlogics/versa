@@ -92,6 +92,39 @@ export function LeadDetailDrawer({
                 <LeadSignalBadges lead={lead} />
               </section>
 
+              {lead.openToWorkLevel && lead.openToWorkLevel !== "unlikely" && (
+                <section className="space-y-2 rounded-lg border border-lp-border bg-lp-panel/60 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-lp-muted-dark">
+                      Likely looking signal
+                    </h3>
+                    <span
+                      className={
+                        lead.openToWorkLevel === "likely"
+                          ? "inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+                          : "inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300"
+                      }
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+                      {lead.openToWorkLevel === "likely" ? "Likely looking" : "Maybe"}
+                    </span>
+                  </div>
+                  {lead.openToWorkReasons && lead.openToWorkReasons.length > 0 && (
+                    <ul className="space-y-1 text-xs text-lp-off-white">
+                      {lead.openToWorkReasons.map((reason, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-lp-ice-blue">•</span>
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-[10px] text-lp-muted-dark italic">
+                    Estimate from public signals. Not LinkedIn&apos;s Open to Work badge.
+                  </p>
+                </section>
+              )}
+
               <section className="space-y-3">
                 <h3 className="text-xs font-medium uppercase tracking-wider text-lp-muted-dark">
                   Contact
