@@ -63,7 +63,7 @@ export function AppSidebar({
   const sidebar = (
     <aside className="flex h-full w-60 flex-col border-r border-lp-border bg-lp-graphite">
       <div className="border-b border-lp-border p-4">
-        <Logo size="lg" animated variant="nav" href="/app" showText className="origin-left" />
+        <Logo size="lg" animated variant="nav" href="/" showText className="origin-left" />
         <p className="mt-2 text-[11px] text-lp-muted-dark">{BRAND.tagline}</p>
       </div>
       <NavLinks onNavigate={onMobileClose} />

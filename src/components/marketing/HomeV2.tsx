@@ -130,7 +130,7 @@ function SampleResultsCard() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden px-4 pb-16 pt-28 md:pb-28 md:pt-36">
+    <section className="relative overflow-hidden px-4 pb-14 pt-28 md:pb-20 md:pt-36">
       <VersaBackground fixed={false} variant="default" className="-z-10" showScanline />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-10">
         <div>
@@ -372,7 +372,7 @@ function FAQSection() {
 
 function FinalCtaSection() {
   return (
-    <section className="relative overflow-hidden border-t border-lp-border bg-lp-black px-4 py-24 md:py-32">
+    <section className="relative overflow-hidden border-t border-lp-border bg-lp-black px-4 py-16 md:py-24">
       <AnimatedAurora />
       <FadeIn className="relative mx-auto max-w-3xl text-center">
         <h2 className="text-3xl font-bold tracking-tight text-lp-white md:text-5xl">
