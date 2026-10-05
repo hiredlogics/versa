@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/Button";
 import { ExportButtons } from "@/components/app/ExportButtons";
 import { emailConfidence, emailConfidenceLabel } from "@/lib/email-confidence";
 import type { LeadRecord } from "@/lib/types/lead-finder";
+import { formatSkillsBreakdown } from "@/lib/services/ai/scoreLead";
 
 export const LEADS_PAGE_SIZE = 200;
 
@@ -93,11 +94,25 @@ export function LeadResultsTable({
       }),
       columnHelper.accessor("reasoning", {
         header: "Why",
-        cell: (info) => (
+        cell: (info) => {
+          const breakdown = formatSkillsBreakdown(
+            info.row.original.leadScore,
+            info.row.original.matchedSkills,
+            info.row.original.missingSkills
+          );
+          return (
+            <div className="flex max-w-[360px] flex-col gap-1">
+              {breakdown && (
+                <span className="text-xs font-medium text-lp-white">
+                  {breakdown}
+                </span>
+              )}
           <span className="line-clamp-3 max-w-[360px] text-xs leading-relaxed text-lp-muted">
             {info.getValue() || "Personalized fit note pending"}
           </span>
-        ),
+            </div>
+          );
+        },
       }),
       columnHelper.accessor("email", {
         header: "Email",

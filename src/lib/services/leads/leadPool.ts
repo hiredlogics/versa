@@ -334,6 +334,8 @@ export async function serveFromPool(input: {
           ? `${row.title}${location ? ` in ${location}` : ""}. Public open-to-work signal: "${row.openToWorkSignal}".`
           : `${row.title}${location ? ` in ${location}` : ""}, matching the requested role and location.`,
         recommendedApproach: "",
+        matchedSkills: [],
+        missingSkills: [],
         hasEmail: withEmail,
         // Copy the cached profile snapshot into rawApolloData so downstream
         // features (scoring, open-to-work) have access to job history.

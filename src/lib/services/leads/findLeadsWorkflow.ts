@@ -251,6 +251,28 @@ async function runSearchStep(args: {
 
   let result: SequentialBatchResult;
   if (args.wantsEmail) {
+    let targetSkills: string[] | undefined = undefined;
+    const searchRow = await prisma.leadSearch.findUnique({
+      where: { id: args.searchId },
+      select: { jobRequirements: true },
+    });
+    const jobReq = searchRow?.jobRequirements as {
+      mustHaveSkills?: string[];
+      niceToHaveSkills?: string[];
+    } | null;
+
+    if (jobReq && (jobReq.mustHaveSkills?.length || jobReq.niceToHaveSkills?.length)) {
+      targetSkills = [
+        ...(jobReq.mustHaveSkills ?? []),
+        ...(jobReq.niceToHaveSkills ?? []),
+      ].filter(Boolean);
+    } else if (args.criteria.keywords) {
+      const kw = args.criteria.keywords.split(/[,\s]+/).map((k) => k.trim()).filter((k) => k.length > 1);
+      if (kw.length > 0) {
+        targetSkills = kw.slice(0, 8);
+      }
+    }
+
     const scoreContext = buildScoringContextFromLeadContext(
       args.leadContext,
       {
@@ -258,6 +280,7 @@ async function runSearchStep(args: {
         keywords: args.criteria.keywords,
         excludedTitles: args.criteria.excludedTitles,
         excludedIndustries: args.criteria.excludedIndustries,
+        targetSkills,
       },
       args.prompt
     );

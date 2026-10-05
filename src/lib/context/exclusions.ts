@@ -94,6 +94,7 @@ export function buildScoringContextFromLeadContext(
     keywords?: string;
     excludedTitles?: string[];
     excludedIndustries?: string[];
+    targetSkills?: string[];
   },
   originalPrompt: string
 ): import("@/lib/types").LeadScoreContext {
@@ -104,5 +105,6 @@ export function buildScoringContextFromLeadContext(
     leadContext: ctx,
     excludedTitles: parsed.excludedTitles ?? ctx?.excludedTitles ?? [],
     excludedIndustries: parsed.excludedIndustries ?? ctx?.excludedIndustries ?? [],
+    targetSkills: parsed.targetSkills,
   };
 }

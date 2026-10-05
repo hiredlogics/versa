@@ -7,6 +7,7 @@ import { ScoreBadge } from "@/components/ui/Badge";
 import { LeadSignalBadges } from "@/components/app/LeadSignalBadges";
 import type { LeadRecord } from "@/lib/types/lead-finder";
 import { priorityLabel } from "@/lib/types/lead-finder";
+import { formatSkillsBreakdown } from "@/lib/services/ai/scoreLead";
 
 export function LeadDetailDrawer({
   lead,
@@ -30,6 +31,9 @@ export function LeadDetailDrawer({
 
   const emailStatusLabel =
     lead?.emailStatus === "verified" ? "Verified" : lead?.emailStatus ? "Unverified" : null;
+  const skillsBreakdown = lead
+    ? formatSkillsBreakdown(lead.leadScore, lead.matchedSkills, lead.missingSkills)
+    : null;
 
   return (
     <AnimatePresence>
@@ -67,11 +71,18 @@ export function LeadDetailDrawer({
             </div>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
-              <section className="flex items-center gap-3">
+              <section className="space-y-2">
+                <div className="flex items-center gap-3">
                 <ScoreBadge score={lead.leadScore} />
                 <span className="rounded-full border border-lp-border bg-lp-panel px-2.5 py-0.5 text-xs text-lp-muted">
                   {priorityLabel(lead.priorityLevel)} priority
                 </span>
+                </div>
+                {skillsBreakdown && (
+                  <p className="text-xs font-medium text-lp-off-white">
+                    {skillsBreakdown}
+                  </p>
+                )}
               </section>
 
               <section className="space-y-2">

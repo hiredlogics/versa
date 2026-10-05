@@ -190,6 +190,8 @@ export async function runProfileDiscovery(input: {
       reasoning: reason.reasoning,
       whySource: reason.source,
       recommendedApproach: "",
+      matchedSkills: [],
+      missingSkills: [],
       hasEmail: verified,
       rawApolloData: toStoredApolloProfile(raw) ?? undefined,
     };

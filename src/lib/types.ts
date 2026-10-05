@@ -88,6 +88,8 @@ export interface ScoredLead {
   recommendedApproach?: string | null;
   openToWork?: boolean;
   hasEmail?: boolean;
+  matchedSkills?: string[];
+  missingSkills?: string[];
   searchPrompt?: string;
   searchTitle?: string;
   history?: LeadHistoryEntry[];
@@ -164,4 +166,5 @@ export interface LeadScoreContext {
   leadContext?: import("@/lib/validations/onboarding-context").UserLeadContextDTO | null;
   excludedTitles?: string[];
   excludedIndustries?: string[];
+  targetSkills?: string[];
 }

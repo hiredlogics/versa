@@ -20,6 +20,8 @@ export interface LeadRecord {
   reasoning: string | null;
   recommendedApproach: string | null;
   hasEmail: boolean;
+  matchedSkills?: string[];
+  missingSkills?: string[];
 }
 
 export interface FindLeadsResponse {

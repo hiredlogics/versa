@@ -68,6 +68,25 @@ describe("CSV writer", () => {
     expect(row[4]).toBe("");
     expect(row[5]).toBe("");
   });
+
+  it("exports Matched Skills and Missing Skills columns", () => {
+    const [header, row1] = rows(
+      leadsToCSV([
+        lead({
+          matchedSkills: ["Spark", "AWS"],
+          missingSkills: ["Airflow"],
+        }),
+      ])
+    );
+    expect(header[10]).toBe("Matched Skills");
+    expect(header[11]).toBe("Missing Skills");
+    expect(row1[10]).toBe("Spark, AWS");
+    expect(row1[11]).toBe("Airflow");
+
+    const [, row2] = rows(leadsToCSV([lead()]));
+    expect(row2[10]).toBe("");
+    expect(row2[11]).toBe("");
+  });
 });
 
 describe("name and location splitting", () => {

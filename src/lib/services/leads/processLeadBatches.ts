@@ -351,6 +351,9 @@ export async function runSequentialLeadBatches(input: {
       const full = formatApolloPerson(p);
       return {
         ...full,
+        headline: p.headline ?? null,
+        employmentHistory: p.employment_history ?? null,
+        rawApolloData: p,
         hasEmail: Boolean(isUsableEmail(full.email) || p.has_email),
       };
     });
@@ -403,6 +406,8 @@ export async function runSequentialLeadBatches(input: {
         leadScore: scored.scores[i].leadScore,
         priorityLevel: toDbPriority(scored.scores[i].priorityLevel),
         reasoning: scored.scores[i].reasoning,
+        matchedSkills: scored.scores[i].matchedSkills ?? [],
+        missingSkills: scored.scores[i].missingSkills ?? [],
         recommendedApproach: "",
       }))
     );
@@ -566,6 +571,8 @@ export async function runSequentialLeadBatches(input: {
       leadScore: lead.leadScore,
       priorityLevel: lead.priorityLevel,
       reasoning: lead.reasoning,
+      matchedSkills: lead.matchedSkills ?? [],
+      missingSkills: lead.missingSkills ?? [],
       whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",
       recommendedApproach: "",
       hasEmail: true,

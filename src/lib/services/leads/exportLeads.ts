@@ -43,6 +43,8 @@ export function dbLeadToExport(lead: LeadWithSearch): ExportLead {
     emailStatus: lead.emailStatus,
     linkedinUrl: lead.linkedinUrl,
     score: lead.leadScore,
+    matchedSkills: lead.matchedSkills ?? [],
+    missingSkills: lead.missingSkills ?? [],
     reasoning: lead.reasoning || "",
     recommendedApproach: lead.recommendedApproach,
     priority: mapPriority(lead.priorityLevel),

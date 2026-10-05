@@ -261,6 +261,8 @@ model Lead {
   recommendedApproach String?
   hasEmail            Boolean       @default(false)
   rawApolloData       Json?
+  matchedSkills       String[]      @default([])
+  missingSkills       String[]      @default([])
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   deletedAt           DateTime?

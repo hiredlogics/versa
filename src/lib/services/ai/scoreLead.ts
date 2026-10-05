@@ -12,6 +12,9 @@ export type ScoredLeadInput = {
   employees: number;
   location: string;
   hasEmail?: boolean;
+  headline?: string | null;
+  employmentHistory?: Array<{ title?: string; organization_name?: string }> | null;
+  rawApolloData?: unknown;
 };
 
 export type LeadScoreOutput = {
@@ -19,6 +22,8 @@ export type LeadScoreOutput = {
   priorityLevel: "Low" | "Medium" | "High" | "Very High";
   reasoning: string;
   recommendedApproach: string;
+  matchedSkills?: string[];
+  missingSkills?: string[];
 };
 
 /** Keep each OpenAI score call small enough to finish under AI_TIMEOUT_MS. */
@@ -46,6 +51,30 @@ function toDbPriority(p: LeadScoreOutput["priorityLevel"]): PriorityLevel {
 
 export { toDbPriority };
 
+/**
+ * Formats a clean skill match summary, e.g. "8/10 · Has Spark, AWS · No sign of Airflow".
+ * Returns null when both lists are empty.
+ */
+export function formatSkillsBreakdown(
+  leadScore: number,
+  matchedSkills?: string[] | null,
+  missingSkills?: string[] | null
+): string | null {
+  const matched = (matchedSkills ?? []).map((s) => (s ?? "").trim()).filter(Boolean);
+  const missing = (missingSkills ?? []).map((s) => (s ?? "").trim()).filter(Boolean);
+  if (matched.length === 0 && missing.length === 0) {
+    return null;
+  }
+  const parts: string[] = [`${leadScore}/10`];
+  if (matched.length > 0) {
+    parts.push(`Has ${matched.join(", ")}`);
+  }
+  if (missing.length > 0) {
+    parts.push(`No sign of ${missing.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
 function buildScoringSystem(context: LeadScoreContext): string {
   const ctx = context.leadContext;
   const ctxBlock = ctx
@@ -63,11 +92,25 @@ Saved business context:
 `
     : "";
 
+  const skillsBlock = context.targetSkills?.length
+    ? `
+Target/Required Skills for this search:
+${context.targetSkills.map((s) => `- ${s}`).join("\n")}
+
+Skills Breakdown Instructions:
+- For each lead, judge matchedSkills and missingSkills ONLY from evidence in their current title, headline, and past jobHistory text.
+- matchedSkills: target skills that have clear evidence in the text.
+- missingSkills: target skills with no sign or mention in the text.
+- Instruct: a skill is "matched" ONLY with evidence in that text; otherwise it goes to missingSkills. Never invent skills.
+`
+    : "";
+
   return `Score B2B leads 1-10 for the user's search.
 
 Search intent: "${context.searchIntent || context.keywords || ""}"
 Current prompt: "${context.originalPrompt || ""}"
 ${ctxBlock}
+${skillsBlock}
 
 Rules:
 - Match saved ICP when prompt is vague.
@@ -80,7 +123,7 @@ Rules:
   - Explicit seeking/available/freelance title signals can go to 8–10.
 - Include ALL leads in response (use the provided index values).
 
-Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "..." }] }
+Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
 priorityLevel: Low|Medium|High|Very High`;
 }
 
@@ -102,6 +145,8 @@ function applyCaps(
       leadScore: capped,
       priorityLevel: toPriority(capped),
       reasoning: `${output.reasoning}. Capped due to exclusion rules.`,
+      matchedSkills: output.matchedSkills ?? [],
+      missingSkills: output.missingSkills ?? [],
     };
   }
   return output;
@@ -115,6 +160,8 @@ function heuristicScores(leads: ScoredLeadInput[], context: LeadScoreContext): L
       priorityLevel: toPriority(h.score),
       reasoning: h.reasoning,
       recommendedApproach: "Personalize outreach based on their role and company context.",
+      matchedSkills: [],
+      missingSkills: [],
     };
     return applyCaps(base, lead, context);
   });
@@ -136,16 +183,30 @@ async function scoreChunkWithAi(
   heuristicChunk: LeadScoreOutput[],
   meta?: { userId?: string; searchId?: string }
 ): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
-  const payload = chunk.map((l, i) => ({
-    index: i,
-    name: l.name,
-    title: l.title,
-    company: l.company,
-    industry: l.industry,
-    employees: l.employees,
-    location: l.location,
-    hasEmail: l.hasEmail ?? false,
-  }));
+  const payload = chunk.map((l, i) => {
+    const raw = l.rawApolloData as {
+      headline?: string;
+      employment_history?: Array<{ title?: string; organization_name?: string }>;
+    } | undefined;
+    const history = (l.employmentHistory ?? raw?.employment_history ?? [])
+      .slice(0, 5)
+      .map((e) => [e.title, e.organization_name].filter(Boolean).join(" at "))
+      .filter(Boolean)
+      .join("; ");
+
+    return {
+      index: i,
+      name: l.name,
+      title: l.title,
+      headline: l.headline || raw?.headline || undefined,
+      company: l.company,
+      industry: l.industry,
+      employees: l.employees,
+      location: l.location,
+      hasEmail: l.hasEmail ?? false,
+      jobHistory: history || undefined,
+    };
+  });
 
   try {
     const { content, provider } = await aiChat({
@@ -165,12 +226,18 @@ async function scoreChunkWithAi(
     const scores = [...heuristicChunk];
     for (const item of parsed.leads || []) {
       if (item.index >= 0 && item.index < chunk.length) {
-        const base = {
+        const base: LeadScoreOutput = {
           leadScore: Math.min(10, Math.max(1, item.leadScore || 5)),
           priorityLevel: item.priorityLevel || toPriority(item.leadScore),
           reasoning: item.reasoning || "AI scored",
           recommendedApproach:
             item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
+          matchedSkills: Array.isArray(item.matchedSkills)
+            ? item.matchedSkills.map(String).filter(Boolean)
+            : [],
+          missingSkills: Array.isArray(item.missingSkills)
+            ? item.missingSkills.map(String).filter(Boolean)
+            : (context.targetSkills ?? []),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
       }
