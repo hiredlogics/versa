@@ -33,8 +33,9 @@ export async function POST(request: Request) {
     const parsed = findLeadsInputSchema.parse(body);
 
     const input: FindLeadsInput = {
-      prompt: parsed.prompt || "",
+      prompt: parsed.prompt || parsed.jobDescription || "",
       inputType: parsed.inputType,
+      jobDescription: parsed.jobDescription,
       minScore: parsed.minScore,
       requestedLeadCount: parsed.requestedLeadCount,
       skipClarification: parsed.skipClarification,
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
       input.companyName = parsed.companyName;
       input.inputType = "company_name";
     }
+    if (parsed.jobDescription && parsed.inputType === "job_description") {
+      input.jobDescription = parsed.jobDescription;
+      input.inputType = "job_description";
+    }
 
     if (!input.requestedLeadCount && input.prompt) {
       input.requestedLeadCount = extractRequestedLeadCount(input.prompt);
@@ -65,6 +70,7 @@ export async function POST(request: Request) {
           async: false,
           leads: [],
           criteria: preview.clientCriteria,
+          jobRequirements: preview.jobRequirements,
           message: preview.clarification.message,
           questions: preview.clarification.questions,
           requestedLeadCount: preview.clarification.requestedLeadCount,
@@ -101,6 +107,7 @@ export async function POST(request: Request) {
       status: "RUNNING",
       async: true,
       criteria: started.clientCriteria,
+      jobRequirements: started.jobRequirements,
       leads: [],
       message: started.message,
       leadsRemaining: started.leadsRemaining,

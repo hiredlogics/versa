@@ -35,8 +35,13 @@ import { logLeadFetch } from "@/lib/services/leads/fetchLog";
 import { extractRequestedLeadCount, type ClarificationNeed } from "@/lib/clarifyPrompt";
 import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
 import { resolveSupportedCountry } from "@/lib/location-policy";
-import type { User, AiProvider } from "@prisma/client";
+import { Prisma, type User, type AiProvider } from "@prisma/client";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
+import {
+  parseJobDescription,
+  buildSearchPromptFromJobDescription,
+  type ParsedJobDescription,
+} from "@/lib/services/ai/parseJobDescription";
 
 export { USER_STOPPED_MESSAGE, canResumeSearch };
 
@@ -46,6 +51,8 @@ export interface FindLeadsInput {
   linkedinUrl?: string;
   companyUrl?: string;
   companyName?: string;
+  jobDescription?: string;
+  jobRequirements?: ParsedJobDescription | null;
   minScore?: number;
   /** User-requested lead count for this run (clamped to credits + one batch). */
   requestedLeadCount?: number;
@@ -72,6 +79,32 @@ function buildPrompt(input: FindLeadsInput): string {
     return `Find decision makers at ${input.companyName}. ${input.prompt || ""}`.trim();
   }
   return input.prompt;
+}
+
+async function resolvePromptAndRequirements(
+  input: FindLeadsInput,
+  userId?: string
+): Promise<{ prompt: string; jobRequirements: ParsedJobDescription | null }> {
+  if (input.inputType === "job_description") {
+    const rawText = input.jobDescription || input.prompt || "";
+    if (input.jobRequirements !== undefined) {
+      const prompt = input.jobRequirements
+        ? buildSearchPromptFromJobDescription(input.jobRequirements)
+        : rawText;
+      return { prompt, jobRequirements: input.jobRequirements };
+    }
+    const extracted = await parseJobDescription(rawText, { userId });
+    if (extracted) {
+      return {
+        prompt: buildSearchPromptFromJobDescription(extracted),
+        jobRequirements: extracted,
+      };
+    }
+    // Fall back to treating the text as a normal prompt
+    return { prompt: rawText, jobRequirements: null };
+  }
+
+  return { prompt: buildPrompt(input), jobRequirements: null };
 }
 
 function toDbAiProvider(provider: string, fallback: string): AiProvider {
@@ -260,9 +293,11 @@ export async function previewFindClarification(
   parseProvider: string;
   clarification: ClarificationNeed;
   leadsRemaining: number;
+  jobRequirements?: ParsedJobDescription | null;
 }> {
   assertApolloConfigured();
-  const prompt = buildPrompt(input);
+  const { prompt, jobRequirements } = await resolvePromptAndRequirements(input, user.id);
+  input.jobRequirements = jobRequirements;
   const ignoreContext = shouldIgnoreLeadContext();
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
@@ -292,6 +327,7 @@ export async function previewFindClarification(
     parseProvider,
     clarification,
     leadsRemaining: access.leadsRemaining,
+    jobRequirements,
   };
 }
 
@@ -313,10 +349,11 @@ export async function startFindLeadsWorkflow(
   async: true;
   leadsRemaining: number;
   batchSize: number;
+  jobRequirements?: ParsedJobDescription | null;
 }> {
   assertApolloConfigured();
 
-  const prompt = buildPrompt(input);
+  const { prompt, jobRequirements } = await resolvePromptAndRequirements(input, user.id);
   const ignoreContext = shouldIgnoreLeadContext();
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
   const batchSize = getProcessBatchSize();
@@ -335,6 +372,7 @@ export async function startFindLeadsWorkflow(
       inputType: input.inputType || "prompt",
       status: "RUNNING",
       relaxNote: "Parsing your prompt…",
+      jobRequirements: (jobRequirements as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     },
   });
 
@@ -383,6 +421,7 @@ export async function startFindLeadsWorkflow(
       async: true,
       leadsRemaining: access.leadsRemaining,
       batchSize,
+      jobRequirements,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Search failed";

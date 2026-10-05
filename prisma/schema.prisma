@@ -197,6 +197,7 @@ model LeadSearch {
   brief          Json?
   questions      Json?
   answers        Json?
+  jobRequirements Json?
   nextPage       Int          @default(1)
   batchesDone    Int          @default(0)
   totalPages     Int?

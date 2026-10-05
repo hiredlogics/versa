@@ -20,8 +20,10 @@ import {
   ClarificationCard,
   type ClarificationAnswer,
 } from "@/components/app/ClarificationCard";
+import { Sparkles } from "lucide-react";
 import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
+import type { ParsedJobDescription } from "@/lib/services/ai/parseJobDescription";
 import {
   buildPromptWithFilters,
   type AdvancedFilters,
@@ -78,6 +80,7 @@ type AssistantTurn = {
   summary?: string;
   steps: SearchStep[];
   criteria?: ParsedSearchCriteria;
+  jobRequirements?: ParsedJobDescription | null;
   result?: FindLeadsResponse;
   error?: { kind: SearchErrorKind; message: string };
   loading?: boolean;
@@ -149,6 +152,8 @@ export function LeadFinderChat() {
     linkedinUrl: "",
     companyUrl: "",
     companyName: "",
+    jobDescription: "",
+    mode: "describe",
   });
   // Default 5 — open-to-work / role searches rarely clear an 8+ buyer score
   const [filters, setFilters] = useState<AdvancedFilters>({ minScore: 5 });
@@ -270,6 +275,7 @@ export function LeadFinderChat() {
         patchAssistantTurn(assistantTurnId, {
           summary: search.relaxNote,
           criteria: search.parsedCriteria ?? fallbackCriteria,
+          jobRequirements: (search.jobRequirements as ParsedJobDescription | null) ?? undefined,
         });
       }
 
@@ -292,6 +298,7 @@ export function LeadFinderChat() {
           criteria: partial.criteria,
           summary: search.relaxNote || lastNote,
           result: partial,
+          jobRequirements: (search.jobRequirements as ParsedJobDescription | null) ?? undefined,
         });
       }
 
@@ -350,6 +357,7 @@ export function LeadFinderChat() {
           criteria: result.criteria,
           summary,
           result,
+          jobRequirements: (search.jobRequirements as ParsedJobDescription | null) ?? undefined,
         });
         loadedRestoreIdRef.current = searchId;
 
@@ -535,6 +543,7 @@ export function LeadFinderChat() {
             criteria,
             result,
             loading: false,
+            jobRequirements: (search.jobRequirements as ParsedJobDescription | null) ?? null,
           },
         ]);
 
@@ -702,8 +711,10 @@ export function LeadFinderChat() {
       setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
     } else {
       snapshot = override ? { ...composer, prompt: override.prompt } : { ...composer };
+      const isJobDesc = snapshot.mode === "job_description";
+      const currentText = isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : snapshot.prompt;
       const hasInput =
-        snapshot.prompt.trim() ||
+        currentText.trim() ||
         snapshot.linkedinUrl ||
         snapshot.companyUrl ||
         snapshot.companyName;
@@ -718,7 +729,7 @@ export function LeadFinderChat() {
 
       priorUserTexts = turns.filter((turn): turn is UserTurn => turn.role === "user").map((turn) => turn.text);
       displayText =
-        snapshot.prompt.trim() ||
+        (isJobDesc ? (snapshot.jobDescription || snapshot.prompt).trim() : snapshot.prompt.trim()) ||
         snapshot.linkedinUrl ||
         snapshot.companyUrl ||
         snapshot.companyName;
@@ -740,7 +751,7 @@ export function LeadFinderChat() {
         },
       ]);
 
-      setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+      setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "", jobDescription: "", mode: "describe" });
     }
 
     const fullPrompt = buildConversationPrompt(priorUserTexts, snapshot.prompt, filters, snapshot);
@@ -777,8 +788,10 @@ export function LeadFinderChat() {
 
     startStepAnimation();
 
-    let inputType: "prompt" | "linkedin" | "company_url" | "company_name" = "prompt";
-    if (snapshot.linkedinUrl) inputType = "linkedin";
+    let inputType: "prompt" | "linkedin" | "company_url" | "company_name" | "job_description" = "prompt";
+    const isJobDesc = snapshot.mode === "job_description";
+    if (isJobDesc) inputType = "job_description";
+    else if (snapshot.linkedinUrl) inputType = "linkedin";
     else if (snapshot.companyUrl) inputType = "company_url";
     else if (snapshot.companyName) inputType = "company_name";
 
@@ -787,7 +800,8 @@ export function LeadFinderChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: fullPrompt,
+          prompt: isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : fullPrompt,
+          jobDescription: isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : undefined,
           linkedinUrl: snapshot.linkedinUrl || undefined,
           companyUrl: snapshot.companyUrl || undefined,
           companyName: snapshot.companyName || undefined,
@@ -820,6 +834,12 @@ export function LeadFinderChat() {
 
       const response = data as FindLeadsResponse;
       setParsedCriteria(response.criteria);
+
+      if ((response as { jobRequirements?: ParsedJobDescription }).jobRequirements) {
+        patchAssistantTurn(assistantTurnId, {
+          jobRequirements: (response as { jobRequirements?: ParsedJobDescription }).jobRequirements,
+        });
+      }
 
       // Ask before spending credits: no search row was created yet.
       if (response.status === "NEEDS_CLARIFICATION" || (response.questions?.length ?? 0) > 0) {
@@ -960,6 +980,89 @@ export function LeadFinderChat() {
                       {BRAND.name}
                     </p>
                     <p className="text-sm leading-relaxed text-lp-muted">{turn.summary}</p>
+                  </motion.div>
+                )}
+
+                {turn.jobRequirements && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="app-panel max-w-[92%] rounded-xl p-4 sm:max-w-[85%] space-y-3 border-lp-border/80"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-lp-cold-blue" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-lp-ice-blue">
+                          Extracted Requirements
+                        </span>
+                      </div>
+                      {turn.jobRequirements.seniority && (
+                        <span className="rounded-full border border-lp-cold-blue/30 bg-lp-cold-blue/10 px-2.5 py-0.5 text-[11px] font-medium text-lp-ice-blue">
+                          {turn.jobRequirements.seniority}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-medium text-lp-white">Role:</span>
+                      <span className="rounded bg-white/10 px-2 py-0.5 font-medium text-lp-white">
+                        {turn.jobRequirements.title}
+                      </span>
+                      {turn.jobRequirements.location && (
+                        <>
+                          <span className="text-lp-muted">·</span>
+                          <span className="text-lp-muted">Location:</span>
+                          <span className="rounded bg-white/5 px-2 py-0.5 text-lp-off-white">
+                            {turn.jobRequirements.location}
+                            {turn.jobRequirements.remote ? " (Remote)" : ""}
+                          </span>
+                        </>
+                      )}
+                      {turn.jobRequirements.minYearsExperience != null && (
+                        <>
+                          <span className="text-lp-muted">·</span>
+                          <span className="text-lp-muted">
+                            {turn.jobRequirements.minYearsExperience}+ yrs exp
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {turn.jobRequirements.mustHaveSkills?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
+                          Must-have skills
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {turn.jobRequirements.mustHaveSkills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-md border border-lp-cold-blue/30 bg-lp-cold-blue/10 px-2.5 py-0.5 text-xs font-medium text-lp-ice-blue"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {turn.jobRequirements.niceToHaveSkills?.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
+                          Nice-to-have skills
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {turn.jobRequirements.niceToHaveSkills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-md border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-lp-muted"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
 

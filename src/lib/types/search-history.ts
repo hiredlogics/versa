@@ -57,6 +57,7 @@ export interface SearchDetailResponse {
     canResume?: boolean;
     leadsPreviewLimit?: number;
     leadsOffset?: number;
+    jobRequirements?: unknown;
   };
   leads: LeadRecord[];
 }

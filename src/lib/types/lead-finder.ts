@@ -41,6 +41,7 @@ export interface FindLeadsResponse {
   requestedLeadCount?: number;
   leadsRemaining?: number;
   batchSize?: number;
+  jobRequirements?: unknown;
 }
 
 export interface AdvancedFilters {

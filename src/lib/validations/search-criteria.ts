@@ -69,18 +69,40 @@ export const aiParsePromptOutputSchema = z
 
 export type AiParsePromptOutput = z.infer<typeof aiParsePromptOutputSchema>;
 
-export const findLeadsInputSchema = z.object({
-  prompt: z.string().optional(),
-  linkedinUrl: z.string().url().optional(),
-  companyUrl: z.string().optional(),
-  companyName: z.string().optional(),
-  inputType: z.enum(["prompt", "linkedin", "company_url", "company_name", "persona"]).default("prompt"),
-  minScore: z.number().min(1).max(10).optional(),
-  /** How many leads the user wants this run (clamped to remaining credits + batch size). */
-  requestedLeadCount: z.number().int().min(1).max(50_000).optional(),
-  /** When true, skip clarification and start the job (user already answered). */
-  skipClarification: z.boolean().optional(),
-});
+export const findLeadsInputSchema = z
+  .object({
+    prompt: z.string().optional(),
+    linkedinUrl: z.string().url().optional(),
+    companyUrl: z.string().optional(),
+    companyName: z.string().optional(),
+    jobDescription: z
+      .string()
+      .max(20_000, "Job description must be 20,000 characters or fewer")
+      .optional(),
+    inputType: z
+      .enum(["prompt", "linkedin", "company_url", "company_name", "persona", "job_description"])
+      .default("prompt"),
+    minScore: z.number().min(1).max(10).optional(),
+    /** How many leads the user wants this run (clamped to remaining credits + batch size). */
+    requestedLeadCount: z.number().int().min(1).max(50_000).optional(),
+    /** When true, skip clarification and start the job (user already answered). */
+    skipClarification: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.inputType === "job_description") {
+      const text = data.jobDescription ?? data.prompt ?? "";
+      if (text.length > 20_000) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.too_big,
+          maximum: 20_000,
+          type: "string",
+          inclusive: true,
+          message: "Job description must be 20,000 characters or fewer",
+          path: ["jobDescription"],
+        });
+      }
+    }
+  });
 
 export const leadScoreResultSchema = z.object({
   leadScore: z.number().min(1).max(10),
