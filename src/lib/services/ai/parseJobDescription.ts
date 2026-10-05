@@ -1,18 +1,10 @@
-import { z } from "zod";
 import { aiChat } from "@/lib/services/ai/aiRouter";
+import {
+  parsedJobDescriptionSchema,
+  type ParsedJobDescription,
+} from "@/lib/validations/search-criteria";
 
-export const parsedJobDescriptionSchema = z.object({
-  title: z.string().min(1),
-  alternativeTitles: z.array(z.string()).default([]),
-  seniority: z.string().nullable().optional(),
-  location: z.string().nullable().optional(),
-  remote: z.boolean().nullable().optional(),
-  minYearsExperience: z.number().nullable().optional(),
-  mustHaveSkills: z.array(z.string()).default([]),
-  niceToHaveSkills: z.array(z.string()).default([]),
-});
-
-export type ParsedJobDescription = z.infer<typeof parsedJobDescriptionSchema>;
+export type { ParsedJobDescription };
 
 const SYSTEM_PROMPT = `You are an expert technical recruiter analyzing a job description.
 Extract structured search requirements as JSON:

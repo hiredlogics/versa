@@ -15,9 +15,18 @@ type LeadWithSearch = Lead & {
   search?: Pick<LeadSearch, "prompt" | "parsedCriteria"> | null;
 };
 
-/** A compact, safe label that keeps the originating search visible in ATS tags. */
+/** e.g. "ai-engineer-lahore": first target title plus city (or country). */
 export function searchTagFor(search: LeadWithSearch["search"]): string | null {
-  return search ? slugify(search.prompt, 30) || null : null;
+  if (!search) return null;
+  const criteria = (search.parsedCriteria ?? {}) as {
+    jobTitles?: string[];
+    city?: string;
+    country?: string;
+  };
+  const title = criteria.jobTitles?.find((t) => t.trim())?.trim();
+  if (!title) return null;
+  const place = criteria.city?.trim() || criteria.country?.trim() || "";
+  return slugify(`${title} ${place}`, 30) || null;
 }
 
 export function dbLeadToExport(lead: LeadWithSearch): ExportLead {
@@ -83,7 +92,9 @@ export async function exportUserLeads(params: {
   });
 
   const exportLeads = leads.map(dbLeadToExport);
-  const fileTag = params.searchId ? slugify(leads[0].search?.prompt ?? "", 40) || "leads" : null;
+  const fileTag = params.searchId
+    ? searchTagFor(leads[0].search) ?? (slugify(leads[0].search?.prompt ?? "", 40) || null)
+    : null;
 
   if (params.format === "xlsx") {
     return { buffer: await leadsToExcelBuffer(exportLeads), count: leads.length, fileTag };

@@ -1,3 +1,4 @@
+import type { ParsedJobDescription } from "@/lib/validations/search-criteria";
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
 import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 
@@ -45,7 +46,7 @@ export interface FindLeadsResponse {
   requestedLeadCount?: number;
   leadsRemaining?: number;
   batchSize?: number;
-  jobRequirements?: unknown;
+  jobRequirements?: ParsedJobDescription | null;
 }
 
 export interface AdvancedFilters {

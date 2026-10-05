@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pool:import": "tsx scripts/import-lead-pool.ts",
+    "layoffs:import": "tsx scripts/import-layoffs.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",

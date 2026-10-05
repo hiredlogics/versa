@@ -12,6 +12,7 @@ import { findMatchedPoolPeople, recordApolloPeopleInPool } from "@/lib/services/
 import { normalizeLinkedInUrl } from "@/lib/lead-pool";
 import { isVerifiedEmail } from "@/lib/email-confidence";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
+import { scoreOpenToWorkForLeads } from "@/lib/services/leads/openToWorkSignals";
 import { buildLeadWhyReasoning, generateLeadReasoningBatch } from "@/lib/services/ai/leadReasoning";
 import type { ApolloSearchFilters, LeadScoreContext, SearchCriteria } from "@/lib/types";
 
@@ -169,6 +170,14 @@ export async function runProfileDiscovery(input: {
     const reasons = await generateLeadReasoningBatch(whyInputs, scoreContext, {
       userId: input.userId, searchId: input.searchId,
     });
+    const storedProfiles = profiles.map(({ raw }) => toStoredApolloProfile(raw));
+    const otwScores = await scoreOpenToWorkForLeads(
+      profiles.map(({ person }, index) => ({
+        title: person.title,
+        company: person.company,
+        profile: storedProfiles[index],
+      }))
+    );
     const rows = profiles.map(({ person, raw }, index) => {
       const verified = isVerifiedEmail(person.email, person.emailStatus);
       const reason = reasons[index] ?? buildLeadWhyReasoning(whyInputs[index], scoreContext);
@@ -192,10 +201,10 @@ export async function runProfileDiscovery(input: {
       recommendedApproach: "",
       matchedSkills: [],
       missingSkills: [],
-      openToWorkLevel: null,
-      openToWorkReasons: [],
+      openToWorkLevel: otwScores[index].level,
+      openToWorkReasons: otwScores[index].reasons,
       hasEmail: verified,
-      rawApolloData: toStoredApolloProfile(raw) ?? undefined,
+      rawApolloData: storedProfiles[index] ?? undefined,
     };
     });
     if (rows.length) await prisma.lead.createMany({ data: rows });

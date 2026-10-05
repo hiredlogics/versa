@@ -7,7 +7,8 @@ import { ScoreBadge } from "@/components/ui/Badge";
 import { LeadSignalBadges } from "@/components/app/LeadSignalBadges";
 import type { LeadRecord } from "@/lib/types/lead-finder";
 import { priorityLabel } from "@/lib/types/lead-finder";
-import { formatSkillsBreakdown } from "@/lib/services/ai/scoreLead";
+import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
+import { OPEN_TO_WORK_NOTE, OpenToWorkBadge } from "@/components/app/OpenToWorkBadge";
 
 export function LeadDetailDrawer({
   lead,
@@ -73,15 +74,13 @@ export function LeadDetailDrawer({
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
               <section className="space-y-2">
                 <div className="flex items-center gap-3">
-                <ScoreBadge score={lead.leadScore} />
-                <span className="rounded-full border border-lp-border bg-lp-panel px-2.5 py-0.5 text-xs text-lp-muted">
-                  {priorityLabel(lead.priorityLevel)} priority
-                </span>
+                  <ScoreBadge score={lead.leadScore} />
+                  <span className="rounded-full border border-lp-border bg-lp-panel px-2.5 py-0.5 text-xs text-lp-muted">
+                    {priorityLabel(lead.priorityLevel)} priority
+                  </span>
                 </div>
                 {skillsBreakdown && (
-                  <p className="text-xs font-medium text-lp-off-white">
-                    {skillsBreakdown}
-                  </p>
+                  <p className="text-xs font-medium text-lp-off-white">{skillsBreakdown}</p>
                 )}
               </section>
 
@@ -92,36 +91,25 @@ export function LeadDetailDrawer({
                 <LeadSignalBadges lead={lead} />
               </section>
 
-              {lead.openToWorkLevel && lead.openToWorkLevel !== "unlikely" && (
+              {lead.openToWorkLevel && (
                 <section className="space-y-2 rounded-lg border border-lp-border bg-lp-panel/60 p-3.5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-lp-muted-dark">
-                      Likely looking signal
+                      Looking for a job?
                     </h3>
-                    <span
-                      className={
-                        lead.openToWorkLevel === "likely"
-                          ? "inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
-                          : "inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300"
-                      }
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-                      {lead.openToWorkLevel === "likely" ? "Likely looking" : "Maybe"}
-                    </span>
+                    <OpenToWorkBadge level={lead.openToWorkLevel} />
                   </div>
                   {lead.openToWorkReasons && lead.openToWorkReasons.length > 0 && (
                     <ul className="space-y-1 text-xs text-lp-off-white">
-                      {lead.openToWorkReasons.map((reason, idx) => (
-                        <li key={idx} className="flex items-start gap-1.5">
+                      {lead.openToWorkReasons.map((reason) => (
+                        <li key={reason} className="flex items-start gap-1.5">
                           <span className="text-lp-ice-blue">•</span>
                           <span>{reason}</span>
                         </li>
                       ))}
                     </ul>
                   )}
-                  <p className="text-[10px] text-lp-muted-dark italic">
-                    Estimate from public signals. Not LinkedIn&apos;s Open to Work badge.
-                  </p>
+                  <p className="text-[10px] italic text-lp-muted-dark">{OPEN_TO_WORK_NOTE}</p>
                 </section>
               )}
 

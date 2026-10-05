@@ -155,35 +155,33 @@ describe("findLeadsInputSchema job_description validation", () => {
     expect(parsed.success).toBe(true);
   });
 
-  it("accepts prompt as job description when inputType is job_description", () => {
+  it("accepts a follow-up that sends back the requirements instead of the text", () => {
     const parsed = findLeadsInputSchema.safeParse({
       inputType: "job_description",
-      prompt: "Looking for a Staff Engineer with 8+ years experience in distributed systems.",
+      prompt: "only in Berlin",
+      jobRequirements: { title: "Staff Engineer", mustHaveSkills: ["Go"] },
     });
 
     expect(parsed.success).toBe(true);
   });
 
+  it("rejects a job description search with no description and no requirements", () => {
+    const parsed = findLeadsInputSchema.safeParse({
+      inputType: "job_description",
+      prompt: "Staff Engineer",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
   it("rejects job descriptions over 20,000 characters with clear error message", () => {
-    const overlyLongText = "A".repeat(20_001);
-
-    const parsedWithJobDesc = findLeadsInputSchema.safeParse({
+    const parsed = findLeadsInputSchema.safeParse({
       inputType: "job_description",
-      jobDescription: overlyLongText,
+      jobDescription: "A".repeat(20_001),
     });
-    expect(parsedWithJobDesc.success).toBe(false);
-    if (!parsedWithJobDesc.success) {
-      const msgs = parsedWithJobDesc.error.issues.map((i) => i.message);
-      expect(msgs).toContain("Job description must be 20,000 characters or fewer");
-    }
-
-    const parsedWithPrompt = findLeadsInputSchema.safeParse({
-      inputType: "job_description",
-      prompt: overlyLongText,
-    });
-    expect(parsedWithPrompt.success).toBe(false);
-    if (!parsedWithPrompt.success) {
-      const msgs = parsedWithPrompt.error.issues.map((i) => i.message);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      const msgs = parsed.error.issues.map((i) => i.message);
       expect(msgs).toContain("Job description must be 20,000 characters or fewer");
     }
   });

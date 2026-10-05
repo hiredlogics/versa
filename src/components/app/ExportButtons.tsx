@@ -34,6 +34,7 @@ export function ExportButtons({ searchId }: { searchId: string }) {
         variant="secondary"
         size="sm"
         className="gap-1.5"
+        title="CSV ready to import into Greenhouse, Lever, Workable and other hiring tools"
         onClick={() => {
           window.location.href = `/api/export/csv?searchId=${id}&format=ats`;
         }}

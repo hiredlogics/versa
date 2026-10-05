@@ -23,7 +23,7 @@ import {
 import { Sparkles } from "lucide-react";
 import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
-import type { ParsedJobDescription } from "@/lib/services/ai/parseJobDescription";
+import type { ParsedJobDescription } from "@/lib/validations/search-criteria";
 import {
   buildPromptWithFilters,
   type AdvancedFilters,
@@ -68,10 +68,21 @@ const EMPTY_CRITERIA: ParsedSearchCriteria = {
   intentSummary: "",
 };
 
+const EMPTY_COMPOSER: ComposerValues = {
+  prompt: "",
+  linkedinUrl: "",
+  companyUrl: "",
+  companyName: "",
+  jobDescription: "",
+  mode: "describe",
+};
+
 type UserTurn = {
   id: string;
   role: "user";
   text: string;
+  /** Set when this turn was a pasted job description (text is the description). */
+  isJobDescription?: boolean;
 };
 
 type AssistantTurn = {
@@ -92,6 +103,22 @@ type AssistantTurn = {
 };
 
 type ChatTurn = UserTurn | AssistantTurn;
+
+/** Earlier user lines to merge into a follow-up. Pasted job descriptions are left out. */
+function priorUserTextsOf(history: ChatTurn[]): string[] {
+  return history
+    .filter((turn): turn is UserTurn => turn.role === "user" && !turn.isJobDescription)
+    .map((turn) => turn.text);
+}
+
+/** The latest job requirements in the conversation, so follow-ups keep the same job. */
+function latestJobRequirements(history: ChatTurn[]): ParsedJobDescription | undefined {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const turn = history[i];
+    if (turn.role === "assistant" && turn.jobRequirements) return turn.jobRequirements;
+  }
+  return undefined;
+}
 
 function newId() {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -147,14 +174,7 @@ export function LeadFinderChat() {
   const restoreSearchId = urlSearchId ?? pendingRestoreId;
 
   const [turns, setTurns] = useState<ChatTurn[]>([]);
-  const [composer, setComposer] = useState<ComposerValues>({
-    prompt: "",
-    linkedinUrl: "",
-    companyUrl: "",
-    companyName: "",
-    jobDescription: "",
-    mode: "describe",
-  });
+  const [composer, setComposer] = useState<ComposerValues>(EMPTY_COMPOSER);
   // Default 5 — open-to-work / role searches rarely clear an 8+ buyer score
   const [filters, setFilters] = useState<AdvancedFilters>({ minScore: 5 });
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -214,7 +234,7 @@ export function LeadFinderChat() {
     setComposerError(null);
     setRestoreError(null);
     setSelectedLead(null);
-    setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+    setComposer(EMPTY_COMPOSER);
     setPendingRestoreId(null);
     setClarified(false);
     loadedRestoreIdRef.current = null;
@@ -634,7 +654,7 @@ export function LeadFinderChat() {
     }
 
     let snapshot: ComposerValues;
-    let priorUserTexts: string[];
+    let history: ChatTurn[];
     let displayText: string;
     let assistantTurnId: string;
 
@@ -646,11 +666,10 @@ export function LeadFinderChat() {
       if (userTurn.role !== "user") return;
 
       displayText = userTurn.text;
-      snapshot = { prompt: displayText, linkedinUrl: "", companyUrl: "", companyName: "" };
-      priorUserTexts = turns
-        .slice(0, assistantIndex - 1)
-        .filter((turn): turn is UserTurn => turn.role === "user")
-        .map((turn) => turn.text);
+      snapshot = userTurn.isJobDescription
+        ? { ...EMPTY_COMPOSER, jobDescription: displayText, mode: "job_description" }
+        : { ...EMPTY_COMPOSER, prompt: displayText };
+      history = turns.slice(0, assistantIndex - 1);
       assistantTurnId = retryAssistantTurnId;
     } else if (editingUserTurnId) {
       snapshot = { ...composer };
@@ -681,10 +700,7 @@ export function LeadFinderChat() {
         return;
       }
 
-      priorUserTexts = turns
-        .slice(0, editIndex)
-        .filter((turn): turn is UserTurn => turn.role === "user")
-        .map((turn) => turn.text);
+      history = turns.slice(0, editIndex);
 
       assistantTurnId = newId();
 
@@ -708,7 +724,7 @@ export function LeadFinderChat() {
       });
 
       setEditingUserTurnId(null);
-      setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+      setComposer(EMPTY_COMPOSER);
     } else {
       snapshot = override ? { ...composer, prompt: override.prompt } : { ...composer };
       const isJobDesc = snapshot.mode === "job_description";
@@ -727,7 +743,7 @@ export function LeadFinderChat() {
         return;
       }
 
-      priorUserTexts = turns.filter((turn): turn is UserTurn => turn.role === "user").map((turn) => turn.text);
+      history = turns;
       displayText =
         (isJobDesc ? (snapshot.jobDescription || snapshot.prompt).trim() : snapshot.prompt.trim()) ||
         snapshot.linkedinUrl ||
@@ -739,7 +755,7 @@ export function LeadFinderChat() {
 
       setTurns((prev) => [
         ...prev,
-        { id: userTurnId, role: "user", text: displayText },
+        { id: userTurnId, role: "user", text: displayText, isJobDescription: isJobDesc },
         {
           id: assistantTurnId,
           role: "assistant",
@@ -751,10 +767,16 @@ export function LeadFinderChat() {
         },
       ]);
 
-      setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "", jobDescription: "", mode: "describe" });
+      setComposer(EMPTY_COMPOSER);
     }
 
-    const fullPrompt = buildConversationPrompt(priorUserTexts, snapshot.prompt, filters, snapshot);
+    const fullPrompt = buildConversationPrompt(priorUserTextsOf(history), snapshot.prompt, filters, snapshot);
+    // A new pasted description is parsed on the server; a follow-up reuses the parsed one.
+    const newJobDescription =
+      snapshot.mode === "job_description"
+        ? (snapshot.jobDescription || snapshot.prompt).trim()
+        : undefined;
+    const jobRequirements = newJobDescription ? undefined : latestJobRequirements(history);
 
     setComposerError(null);
     setRestoreError(null);
@@ -789,8 +811,7 @@ export function LeadFinderChat() {
     startStepAnimation();
 
     let inputType: "prompt" | "linkedin" | "company_url" | "company_name" | "job_description" = "prompt";
-    const isJobDesc = snapshot.mode === "job_description";
-    if (isJobDesc) inputType = "job_description";
+    if (newJobDescription || jobRequirements) inputType = "job_description";
     else if (snapshot.linkedinUrl) inputType = "linkedin";
     else if (snapshot.companyUrl) inputType = "company_url";
     else if (snapshot.companyName) inputType = "company_name";
@@ -800,8 +821,9 @@ export function LeadFinderChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : fullPrompt,
-          jobDescription: isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : undefined,
+          prompt: newJobDescription ? undefined : fullPrompt,
+          jobDescription: newJobDescription,
+          jobRequirements,
           linkedinUrl: snapshot.linkedinUrl || undefined,
           companyUrl: snapshot.companyUrl || undefined,
           companyName: snapshot.companyName || undefined,
@@ -835,10 +857,8 @@ export function LeadFinderChat() {
       const response = data as FindLeadsResponse;
       setParsedCriteria(response.criteria);
 
-      if ((response as { jobRequirements?: ParsedJobDescription }).jobRequirements) {
-        patchAssistantTurn(assistantTurnId, {
-          jobRequirements: (response as { jobRequirements?: ParsedJobDescription }).jobRequirements,
-        });
+      if (response.jobRequirements) {
+        patchAssistantTurn(assistantTurnId, { jobRequirements: response.jobRequirements });
       }
 
       // Ask before spending credits: no search row was created yet.
@@ -1169,7 +1189,7 @@ export function LeadFinderChat() {
               type="button"
               onClick={() => {
                 setEditingUserTurnId(null);
-                setComposer({ prompt: "", linkedinUrl: "", companyUrl: "", companyName: "" });
+                setComposer(EMPTY_COMPOSER);
               }}
               className="text-xs text-lp-muted hover:text-lp-ice-blue"
             >

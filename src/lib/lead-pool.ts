@@ -112,6 +112,23 @@ const EMAIL_RANK: Record<ReturnType<typeof emailConfidence>, number> = {
   verified: 2,
 };
 
+function isEmptyProfileValue(value: unknown): boolean {
+  return value == null || value === "" || (Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * Field by field: a newer non-empty value wins, an empty one never erases saved data.
+ * Search results often have no job history, so they must not wipe an enriched profile.
+ */
+export function mergeProfiles(existing: object | null, incoming: object | null): object | null {
+  if (!existing || !incoming) return incoming ?? existing;
+  const merged: Record<string, unknown> = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (!isEmptyProfileValue(value)) merged[key] = value;
+  }
+  return merged;
+}
+
 /**
  * Combine what the pool already knows with a new sighting. Non-empty values
  * win over empty ones, newer non-empty values win over older ones, and an email
@@ -139,8 +156,7 @@ export function mergePoolPerson(
   const sources = new Set(existing?.sources ?? []);
   sources.add(incoming.source);
 
-  // Merge rule: a newer non-null profile replaces an older one; never overwrite with null.
-  const mergedProfile = incoming.profile ?? existing?.profile ?? null;
+  const mergedProfile = mergeProfiles(existing?.profile ?? null, incoming.profile ?? null);
 
   return {
     apolloPersonId: clean(incoming.apolloPersonId) ?? existing?.apolloPersonId ?? null,

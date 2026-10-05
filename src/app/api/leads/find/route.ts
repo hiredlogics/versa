@@ -33,9 +33,10 @@ export async function POST(request: Request) {
     const parsed = findLeadsInputSchema.parse(body);
 
     const input: FindLeadsInput = {
-      prompt: parsed.prompt || parsed.jobDescription || "",
+      prompt: parsed.prompt || "",
       inputType: parsed.inputType,
       jobDescription: parsed.jobDescription,
+      jobRequirements: parsed.jobRequirements,
       minScore: parsed.minScore,
       requestedLeadCount: parsed.requestedLeadCount,
       skipClarification: parsed.skipClarification,
@@ -53,11 +54,6 @@ export async function POST(request: Request) {
       input.companyName = parsed.companyName;
       input.inputType = "company_name";
     }
-    if (parsed.jobDescription && parsed.inputType === "job_description") {
-      input.jobDescription = parsed.jobDescription;
-      input.inputType = "job_description";
-    }
-
     if (!input.requestedLeadCount && input.prompt) {
       input.requestedLeadCount = extractRequestedLeadCount(input.prompt);
     }

@@ -81,30 +81,53 @@ function buildPrompt(input: FindLeadsInput): string {
   return input.prompt;
 }
 
+/**
+ * For job description searches: read the description once (or reuse the requirements a
+ * follow-up sends back), then search with a short prompt built from them. `input.prompt`
+ * is only the user's follow-up text here, never the description itself.
+ */
 async function resolvePromptAndRequirements(
   input: FindLeadsInput,
   userId?: string
 ): Promise<{ prompt: string; jobRequirements: ParsedJobDescription | null }> {
-  if (input.inputType === "job_description") {
-    const rawText = input.jobDescription || input.prompt || "";
-    if (input.jobRequirements !== undefined) {
-      const prompt = input.jobRequirements
-        ? buildSearchPromptFromJobDescription(input.jobRequirements)
-        : rawText;
-      return { prompt, jobRequirements: input.jobRequirements };
-    }
-    const extracted = await parseJobDescription(rawText, { userId });
-    if (extracted) {
-      return {
-        prompt: buildSearchPromptFromJobDescription(extracted),
-        jobRequirements: extracted,
-      };
-    }
-    // Fall back to treating the text as a normal prompt
-    return { prompt: rawText, jobRequirements: null };
+  if (input.inputType !== "job_description") {
+    return { prompt: buildPrompt(input), jobRequirements: null };
   }
 
-  return { prompt: buildPrompt(input), jobRequirements: null };
+  const jobRequirements =
+    input.jobRequirements !== undefined
+      ? input.jobRequirements
+      : await parseJobDescription(input.jobDescription ?? "", { userId });
+  // If the description could not be read, search with its text like a normal prompt.
+  const base = jobRequirements
+    ? buildSearchPromptFromJobDescription(jobRequirements)
+    : (input.jobDescription ?? "").trim();
+  const prompt = [base, input.prompt.trim()].filter(Boolean).join(". ");
+  return { prompt, jobRequirements };
+}
+
+type JobSkillLists = { mustHaveSkills?: string[]; niceToHaveSkills?: string[] };
+
+/**
+ * Skills to judge each lead against: the job description's skills when the search has
+ * them, otherwise the comma-separated keywords (so "machine learning" stays one skill).
+ */
+export function targetSkillsForSearch(
+  jobRequirements: JobSkillLists | null | undefined,
+  keywords: string | undefined
+): string[] | undefined {
+  const fromJob = [
+    ...(jobRequirements?.mustHaveSkills ?? []),
+    ...(jobRequirements?.niceToHaveSkills ?? []),
+  ];
+  const source = fromJob.length > 0 ? fromJob : (keywords ?? "").split(/[,;]/);
+  const unique = new Map<string, string>();
+  for (const raw of source) {
+    const skill = raw.trim();
+    if (skill.length > 1 && !unique.has(skill.toLowerCase())) unique.set(skill.toLowerCase(), skill);
+  }
+  const skills = [...unique.values()].slice(0, 16);
+  return skills.length > 0 ? skills : undefined;
 }
 
 function toDbAiProvider(provider: string, fallback: string): AiProvider {
@@ -251,27 +274,14 @@ async function runSearchStep(args: {
 
   let result: SequentialBatchResult;
   if (args.wantsEmail) {
-    let targetSkills: string[] | undefined = undefined;
     const searchRow = await prisma.leadSearch.findUnique({
       where: { id: args.searchId },
       select: { jobRequirements: true },
     });
-    const jobReq = searchRow?.jobRequirements as {
-      mustHaveSkills?: string[];
-      niceToHaveSkills?: string[];
-    } | null;
-
-    if (jobReq && (jobReq.mustHaveSkills?.length || jobReq.niceToHaveSkills?.length)) {
-      targetSkills = [
-        ...(jobReq.mustHaveSkills ?? []),
-        ...(jobReq.niceToHaveSkills ?? []),
-      ].filter(Boolean);
-    } else if (args.criteria.keywords) {
-      const kw = args.criteria.keywords.split(/[,\s]+/).map((k) => k.trim()).filter((k) => k.length > 1);
-      if (kw.length > 0) {
-        targetSkills = kw.slice(0, 8);
-      }
-    }
+    const targetSkills = targetSkillsForSearch(
+      searchRow?.jobRequirements as JobSkillLists | null,
+      args.criteria.keywords
+    );
 
     const scoreContext = buildScoringContextFromLeadContext(
       args.leadContext,
@@ -332,7 +342,11 @@ export async function previewFindClarification(
   const criteria = resolveSupportedCountry(parsed.criteria);
   const parseProvider = parsed.provider;
 
-  const fromPrompt = extractRequestedLeadCount(prompt);
+  // Count only what the user typed: numbers inside a job description ("manage 10 people")
+  // are not a lead count.
+  const fromPrompt = extractRequestedLeadCount(
+    input.inputType === "job_description" ? input.prompt : prompt
+  );
   const clarification = await clarifyWithAi(prompt, criteria, {
     leadContext,
     userId: user.id,

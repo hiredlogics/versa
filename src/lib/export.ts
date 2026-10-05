@@ -194,7 +194,7 @@ export function leadsToAtsCSV(leads: ExportLead[]): string {
       state,
       country,
       httpsUrl(lead.linkedinUrl),
-      "Versa",
+      BRAND.name,
       tags,
       score === "" ? "" : singleLine(`Score ${score}/10${reason ? ` – ${reason}` : ""}`, 300),
     ];

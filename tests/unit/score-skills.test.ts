@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  formatSkillsBreakdown,
-  scoreLeadsWithAi,
-} from "@/lib/services/ai/scoreLead";
+import { scoreLeadsWithAi, skillsFromAi } from "@/lib/services/ai/scoreLead";
+import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
 import type { LeadScoreContext } from "@/lib/types";
 
 vi.mock("@/lib/services/ai/aiRouter", () => ({
@@ -83,7 +81,7 @@ describe("scoreLeadsWithAi with skills breakdown", () => {
     expect(result.provider).toBe("OPENAI");
   });
 
-  it("defaults matchedSkills and missingSkills to empty arrays when omitted by AI", async () => {
+  it("leaves both lists empty when the AI gives no skills at all", async () => {
     vi.mocked(aiChat).mockResolvedValueOnce({
       content: JSON.stringify({
         leads: [
@@ -101,7 +99,7 @@ describe("scoreLeadsWithAi with skills breakdown", () => {
     const result = await scoreLeadsWithAi([sampleLead], mockContext);
     expect(result.scores).toHaveLength(1);
     expect(result.scores[0].matchedSkills).toEqual([]);
-    expect(result.scores[0].missingSkills).toEqual(["Spark", "AWS", "Airflow"]);
+    expect(result.scores[0].missingSkills).toEqual([]);
   });
 
   it("falls back gracefully with empty arrays on malformed JSON or error", async () => {
@@ -112,5 +110,23 @@ describe("scoreLeadsWithAi with skills breakdown", () => {
     expect(result.scores[0].matchedSkills).toEqual([]);
     expect(result.scores[0].missingSkills).toEqual([]);
     expect(result.provider).toBe("HEURISTIC");
+  });
+});
+
+describe("skillsFromAi", () => {
+  const targets = ["Spark", "AWS", "Airflow"];
+
+  it("drops skills the search did not ask for and keeps the search's spelling", () => {
+    expect(skillsFromAi({ matchedSkills: ["spark", "Kafka"], missingSkills: [] }, targets)).toEqual({
+      matchedSkills: ["Spark"],
+      missingSkills: ["AWS", "Airflow"],
+    });
+  });
+
+  it("returns empty lists when the search has no target skills", () => {
+    expect(skillsFromAi({ matchedSkills: ["Spark"] }, [])).toEqual({
+      matchedSkills: [],
+      missingSkills: [],
+    });
   });
 });

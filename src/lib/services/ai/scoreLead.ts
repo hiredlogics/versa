@@ -52,27 +52,28 @@ function toDbPriority(p: LeadScoreOutput["priorityLevel"]): PriorityLevel {
 export { toDbPriority };
 
 /**
- * Formats a clean skill match summary, e.g. "8/10 · Has Spark, AWS · No sign of Airflow".
- * Returns null when both lists are empty.
+ * Matched/missing skills from one AI item, limited to the skills the search asked for
+ * (spelled as the search spelled them). Both stay empty when the AI gave neither list.
  */
-export function formatSkillsBreakdown(
-  leadScore: number,
-  matchedSkills?: string[] | null,
-  missingSkills?: string[] | null
-): string | null {
-  const matched = (matchedSkills ?? []).map((s) => (s ?? "").trim()).filter(Boolean);
-  const missing = (missingSkills ?? []).map((s) => (s ?? "").trim()).filter(Boolean);
-  if (matched.length === 0 && missing.length === 0) {
-    return null;
+export function skillsFromAi(
+  item: { matchedSkills?: unknown; missingSkills?: unknown },
+  targetSkills: string[] = []
+): { matchedSkills: string[]; missingSkills: string[] } {
+  const none = { matchedSkills: [], missingSkills: [] };
+  if (targetSkills.length === 0) return none;
+  if (!Array.isArray(item.matchedSkills) && !Array.isArray(item.missingSkills)) return none;
+
+  const byLower = new Map(targetSkills.map((skill) => [skill.toLowerCase(), skill]));
+  const matched = new Set<string>();
+  for (const value of Array.isArray(item.matchedSkills) ? item.matchedSkills : []) {
+    const skill = byLower.get(String(value).trim().toLowerCase());
+    if (skill) matched.add(skill);
   }
-  const parts: string[] = [`${leadScore}/10`];
-  if (matched.length > 0) {
-    parts.push(`Has ${matched.join(", ")}`);
-  }
-  if (missing.length > 0) {
-    parts.push(`No sign of ${missing.join(", ")}`);
-  }
-  return parts.join(" · ");
+  // A target skill without evidence is "no sign of", even if the AI left it out of both lists.
+  return {
+    matchedSkills: [...matched],
+    missingSkills: targetSkills.filter((skill) => !matched.has(skill)),
+  };
 }
 
 function buildScoringSystem(context: LeadScoreContext): string {
@@ -94,14 +95,13 @@ Saved business context:
 
   const skillsBlock = context.targetSkills?.length
     ? `
-Target/Required Skills for this search:
+Skills this search asks for:
 ${context.targetSkills.map((s) => `- ${s}`).join("\n")}
 
-Skills Breakdown Instructions:
-- For each lead, judge matchedSkills and missingSkills ONLY from evidence in their current title, headline, and past jobHistory text.
-- matchedSkills: target skills that have clear evidence in the text.
-- missingSkills: target skills with no sign or mention in the text.
-- Instruct: a skill is "matched" ONLY with evidence in that text; otherwise it goes to missingSkills. Never invent skills.
+For each lead, judge these skills ONLY from its title, headline and jobHistory text:
+- matchedSkills: skills from the list above with clear evidence in that text.
+- missingSkills: skills from the list above with no evidence in that text.
+Use the skill names exactly as listed. Never add other skills.
 `
     : "";
 
@@ -145,8 +145,6 @@ function applyCaps(
       leadScore: capped,
       priorityLevel: toPriority(capped),
       reasoning: `${output.reasoning}. Capped due to exclusion rules.`,
-      matchedSkills: output.matchedSkills ?? [],
-      missingSkills: output.missingSkills ?? [],
     };
   }
   return output;
@@ -232,12 +230,7 @@ async function scoreChunkWithAi(
           reasoning: item.reasoning || "AI scored",
           recommendedApproach:
             item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
-          matchedSkills: Array.isArray(item.matchedSkills)
-            ? item.matchedSkills.map(String).filter(Boolean)
-            : [],
-          missingSkills: Array.isArray(item.missingSkills)
-            ? item.missingSkills.map(String).filter(Boolean)
-            : (context.targetSkills ?? []),
+          ...skillsFromAi(item, context.targetSkills),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
       }

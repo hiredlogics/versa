@@ -23,7 +23,8 @@ import { Button } from "@/components/ui/Button";
 import { ExportButtons } from "@/components/app/ExportButtons";
 import { emailConfidence, emailConfidenceLabel } from "@/lib/email-confidence";
 import type { LeadRecord } from "@/lib/types/lead-finder";
-import { formatSkillsBreakdown } from "@/lib/services/ai/scoreLead";
+import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
+import { OPEN_TO_WORK_NOTE, OpenToWorkBadge, openToWorkRank } from "@/components/app/OpenToWorkBadge";
 
 export const LEADS_PAGE_SIZE = 200;
 
@@ -75,12 +76,9 @@ export function LeadResultsTable({
   const filteredLeads = useMemo(() => {
     let list = leads.filter((l) => l.leadScore >= minScoreFilter);
     if (sortBy === "open_to_work") {
-      const rank = (level?: string | null) => {
-        if (level === "likely") return 3;
-        if (level === "maybe") return 2;
-        return 1;
-      };
-      list = [...list].sort((a, b) => rank(b.openToWorkLevel) - rank(a.openToWorkLevel));
+      list = [...list].sort(
+        (a, b) => openToWorkRank(b.openToWorkLevel) - openToWorkRank(a.openToWorkLevel)
+      );
     }
     return list;
   }, [leads, minScoreFilter, sortBy]);
@@ -100,29 +98,12 @@ export function LeadResultsTable({
       columnHelper.accessor("name", {
         header: "Name",
         cell: (info) => {
-          const otwLevel = info.row.original.openToWorkLevel;
-          const otwReasons = info.row.original.openToWorkReasons ?? [];
-          const tooltip = [
-            ...otwReasons,
-            "Estimate from public signals. Not LinkedIn's Open to Work badge.",
-          ].join(" · ");
-
+          const { openToWorkLevel, openToWorkReasons } = info.row.original;
+          const tooltip = [...(openToWorkReasons ?? []), OPEN_TO_WORK_NOTE].join("\n");
           return (
             <div className="flex flex-col gap-1">
               <span className="font-medium text-lp-white">{info.getValue()}</span>
-              {otwLevel && otwLevel !== "unlikely" && (
-                <span
-                  className={
-                    otwLevel === "likely"
-                      ? "inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
-                      : "inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300"
-                  }
-                  title={tooltip}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-                  {otwLevel === "likely" ? "Likely looking" : "Maybe"}
-                </span>
-              )}
+              <OpenToWorkBadge level={openToWorkLevel} title={tooltip} />
             </div>
           );
         },
@@ -130,21 +111,14 @@ export function LeadResultsTable({
       columnHelper.accessor("reasoning", {
         header: "Why",
         cell: (info) => {
-          const breakdown = formatSkillsBreakdown(
-            info.row.original.leadScore,
-            info.row.original.matchedSkills,
-            info.row.original.missingSkills
-          );
+          const { leadScore, matchedSkills, missingSkills } = info.row.original;
+          const breakdown = formatSkillsBreakdown(leadScore, matchedSkills, missingSkills);
           return (
             <div className="flex max-w-[360px] flex-col gap-1">
-              {breakdown && (
-                <span className="text-xs font-medium text-lp-white">
-                  {breakdown}
-                </span>
-              )}
-          <span className="line-clamp-3 max-w-[360px] text-xs leading-relaxed text-lp-muted">
-            {info.getValue() || "Personalized fit note pending"}
-          </span>
+              {breakdown && <span className="text-xs font-medium text-lp-white">{breakdown}</span>}
+              <span className="line-clamp-3 text-xs leading-relaxed text-lp-muted">
+                {info.getValue() || "Personalized fit note pending"}
+              </span>
             </div>
           );
         },

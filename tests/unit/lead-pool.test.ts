@@ -88,6 +88,22 @@ describe("mergePoolPerson", () => {
     const merged = mergePoolPerson(first, { ...base, profile: newProfile });
     expect(merged.profile).toEqual(newProfile);
   });
+
+  it("keeps saved job history when a newer profile has none", () => {
+    const enriched = {
+      headline: "Old",
+      employment_history: [{ title: "SWE", current: true }],
+      github_url: null,
+    };
+    const fromSearch = { headline: "New", employment_history: [], github_url: "https://github.com/x" };
+    const first = mergePoolPerson(null, { ...base, profile: enriched });
+    const merged = mergePoolPerson(first, { ...base, profile: fromSearch });
+    expect(merged.profile).toEqual({
+      headline: "New",
+      employment_history: [{ title: "SWE", current: true }],
+      github_url: "https://github.com/x",
+    });
+  });
 });
 
 describe("toStoredApolloProfile — github_url", () => {

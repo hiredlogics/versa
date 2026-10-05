@@ -16,7 +16,7 @@ import { normalizeTitle } from "@/lib/role-policy";
 import { requireVerifiedEmail } from "@/lib/services/leads/fetchProgress";
 import { logLeadFetch } from "@/lib/services/leads/fetchLog";
 import type { ApolloPerson, SearchCriteria } from "@/lib/types";
-import { scoreOpenToWork } from "@/lib/open-to-work-score";
+import { scoreOpenToWorkForLeads } from "@/lib/services/leads/openToWorkSignals";
 
 /** Do not pay Apollo again for a person whose email lookup came back empty this recently. */
 const EMAIL_RECHECK_AFTER_MS = 90 * 24 * 60 * 60 * 1000;
@@ -312,25 +312,8 @@ export async function serveFromPool(input: {
     return { ...empty, unlockAttempts, creditsExhausted };
   }
 
-  const otwScores = await Promise.all(
-    selected.map((row, idx) => {
-      const profile = row.profile as
-        | {
-            headline?: string | null;
-            employment_history?: import("@/lib/lead-profile").ApolloEmploymentEntry[];
-            github_url?: string | null;
-          }
-        | undefined;
-      const allowGithub = idx < 50;
-      return scoreOpenToWork({
-        title: row.title,
-        headline: profile?.headline ?? null,
-        company: row.company,
-        employmentHistory: profile?.employment_history ?? null,
-        githubUrl: allowGithub ? profile?.github_url ?? null : null,
-        rawApolloData: profile,
-      });
-    })
+  const otwScores = await scoreOpenToWorkForLeads(
+    selected.map((row) => ({ title: row.title, company: row.company, profile: row.profile }))
   );
 
   await prisma.lead.createMany({
@@ -358,8 +341,8 @@ export async function serveFromPool(input: {
         recommendedApproach: "",
         matchedSkills: [],
         missingSkills: [],
-        openToWorkLevel: otwScores[i]?.level ?? null,
-        openToWorkReasons: otwScores[i]?.reasons ?? [],
+        openToWorkLevel: otwScores[i].level,
+        openToWorkReasons: otwScores[i].reasons,
         hasEmail: withEmail,
         // Copy the cached profile snapshot into rawApolloData so downstream
         // features (scoring, open-to-work) have access to job history.

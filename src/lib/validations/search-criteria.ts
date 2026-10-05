@@ -69,6 +69,20 @@ export const aiParsePromptOutputSchema = z
 
 export type AiParsePromptOutput = z.infer<typeof aiParsePromptOutputSchema>;
 
+/** What Versa reads from a pasted job description. */
+export const parsedJobDescriptionSchema = z.object({
+  title: z.string().min(1),
+  alternativeTitles: z.array(z.string()).default([]),
+  seniority: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  remote: z.boolean().nullable().optional(),
+  minYearsExperience: z.number().nullable().optional(),
+  mustHaveSkills: z.array(z.string()).default([]),
+  niceToHaveSkills: z.array(z.string()).default([]),
+});
+
+export type ParsedJobDescription = z.infer<typeof parsedJobDescriptionSchema>;
+
 export const findLeadsInputSchema = z
   .object({
     prompt: z.string().optional(),
@@ -79,6 +93,8 @@ export const findLeadsInputSchema = z
       .string()
       .max(20_000, "Job description must be 20,000 characters or fewer")
       .optional(),
+    /** Requirements already read from this conversation's job description (follow-ups). */
+    jobRequirements: parsedJobDescriptionSchema.optional(),
     inputType: z
       .enum(["prompt", "linkedin", "company_url", "company_name", "persona", "job_description"])
       .default("prompt"),
@@ -88,21 +104,13 @@ export const findLeadsInputSchema = z
     /** When true, skip clarification and start the job (user already answered). */
     skipClarification: z.boolean().optional(),
   })
-  .superRefine((data, ctx) => {
-    if (data.inputType === "job_description") {
-      const text = data.jobDescription ?? data.prompt ?? "";
-      if (text.length > 20_000) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.too_big,
-          maximum: 20_000,
-          type: "string",
-          inclusive: true,
-          message: "Job description must be 20,000 characters or fewer",
-          path: ["jobDescription"],
-        });
-      }
-    }
-  });
+  .refine(
+    (data) =>
+      data.inputType !== "job_description" ||
+      Boolean(data.jobDescription?.trim()) ||
+      Boolean(data.jobRequirements),
+    { message: "Paste a job description to search with.", path: ["jobDescription"] }
+  );
 
 export const leadScoreResultSchema = z.object({
   leadScore: z.number().min(1).max(10),

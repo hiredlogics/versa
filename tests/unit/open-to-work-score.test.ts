@@ -1,257 +1,195 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  scoreOpenToWork,
+  findRecentLayoff,
   normalizeCompanyName,
-  extractGithubUsername,
-  hadRecentLayoff,
-  getGithubRecentEvents,
+  scoreOpenToWork,
   type LayoffRecord,
 } from "@/lib/open-to-work-score";
+import { getGithubRecentEvents, githubUsernameFromUrl } from "@/lib/services/leads/githubActivity";
+import { layoffsFromCsv } from "../../scripts/import-layoffs";
 import { prisma } from "@/lib/db/prisma";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     githubActivityCache: {
-      findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
     },
   },
 }));
 
-describe("normalizeCompanyName", () => {
-  it("strips common corporate suffixes and punctuation", () => {
+const NOW = new Date("2026-10-05T00:00:00Z");
+
+// Clearly fake companies: test fixture only, never in data/layoffs.json.
+const FAKE_LAYOFFS: LayoffRecord[] = [
+  { company: "Example Widgets Inc.", date: "2026-08-14", source: "test" },
+  { company: "Old Layoff Example LLC", date: "2025-01-10", source: "test" },
+];
+
+describe("scoreOpenToWork signals", () => {
+  it("open-to-work words in the headline give +5 and 'likely'", () => {
+    const result = scoreOpenToWork({ title: "Engineer", headline: "#OpenToWork", now: NOW });
+    expect(result).toEqual({ level: "likely", points: 5, reasons: ["Says they are open to work"] });
+  });
+
+  it("no current job with the last one ending recently gives +4", () => {
+    const result = scoreOpenToWork({
+      title: "Engineer",
+      employmentHistory: [{ current: false, start_date: "2022-01-01", end_date: "2026-07-01" }],
+      now: NOW,
+    });
+    expect(result.points).toBe(4);
+    expect(result.level).toBe("maybe");
+    expect(result.reasons).toEqual(["Last job ended July 2026"]);
+  });
+
+  it("a job that ended years ago does not count", () => {
+    const result = scoreOpenToWork({
+      employmentHistory: [{ current: false, end_date: "2019-03-01" }],
+      now: NOW,
+    });
+    expect(result.points).toBe(0);
+    expect(result.level).toBe("unlikely");
+  });
+
+  it("no current job and no end date says 'No current job listed'", () => {
+    const result = scoreOpenToWork({ employmentHistory: [{ current: false }], now: NOW });
+    expect(result.reasons).toEqual(["No current job listed"]);
+    expect(result.points).toBe(4);
+  });
+
+  it("a layoff at their company in the last 6 months gives +3", () => {
+    const result = scoreOpenToWork({
+      company: "Example Widgets",
+      layoffs: FAKE_LAYOFFS,
+      now: NOW,
+    });
+    expect(result.points).toBe(3);
+    expect(result.reasons).toEqual(["Example Widgets had layoffs in August 2026"]);
+  });
+
+  it("just starting a job gives -3 with no reason text", () => {
+    const result = scoreOpenToWork({
+      headline: "open to work",
+      employmentHistory: [{ current: true, start_date: "2026-08-01" }],
+      now: NOW,
+    });
+    expect(result.points).toBe(2);
+    expect(result.level).toBe("maybe");
+    expect(result.reasons).toEqual(["Says they are open to work"]);
+  });
+
+  it("freelance, contract or consultant titles give +1", () => {
+    for (const title of ["Freelance Developer", "Contract Data Engineer", "IT Consultant"]) {
+      expect(scoreOpenToWork({ title, now: NOW }).points).toBe(1);
+    }
+  });
+
+  it("a consultant alone stays 'unlikely' (not 'likely looking')", () => {
+    expect(scoreOpenToWork({ title: "Senior Consultant", now: NOW }).level).toBe("unlikely");
+  });
+
+  it("recent GitHub activity gives +1 only at 5+ events", () => {
+    expect(scoreOpenToWork({ githubRecentEvents: 5, now: NOW }).reasons).toEqual([
+      "Active on GitHub recently",
+    ]);
+    expect(scoreOpenToWork({ githubRecentEvents: 4, now: NOW }).points).toBe(0);
+  });
+});
+
+describe("scoreOpenToWork thresholds", () => {
+  it("uses 5+ likely, 2-4 maybe, under 2 unlikely", () => {
+    const layoff = { company: "Example Widgets", layoffs: FAKE_LAYOFFS, now: NOW };
+    expect(scoreOpenToWork({ ...layoff, title: "Consultant", githubRecentEvents: 9 }).level).toBe("likely");
+    expect(scoreOpenToWork({ ...layoff, title: "Consultant" }).level).toBe("maybe");
+    expect(scoreOpenToWork({ title: "Consultant", githubRecentEvents: 9, now: NOW }).level).toBe("maybe");
+    expect(scoreOpenToWork({ title: "Engineer", now: NOW }).level).toBe("unlikely");
+  });
+});
+
+describe("layoff company matching", () => {
+  it("ignores case, punctuation and Inc/LLC/Ltd endings", () => {
     expect(normalizeCompanyName("Stripe, Inc.")).toBe("stripe");
-    expect(normalizeCompanyName("Google LLC")).toBe("google");
-    expect(normalizeCompanyName("Meta Platforms Technologies")).toBe("meta platforms");
-    expect(normalizeCompanyName("Acme Corp.")).toBe("acme");
-    expect(normalizeCompanyName("OpenAI, Co.")).toBe("openai");
-    expect(normalizeCompanyName("Vercel Labs")).toBe("vercel");
+    expect(normalizeCompanyName("Acme Ltd")).toBe("acme");
+    expect(normalizeCompanyName("ACME LLC")).toBe("acme");
   });
 
-  it("handles null or empty input", () => {
-    expect(normalizeCompanyName(null)).toBe("");
-    expect(normalizeCompanyName("")).toBe("");
+  it("does not match a different company that only shares a word", () => {
+    expect(findRecentLayoff("Example", FAKE_LAYOFFS, NOW)).toBeNull();
+    expect(findRecentLayoff("Example Widgets Labs", FAKE_LAYOFFS, NOW)).toBeNull();
   });
-});
 
-describe("extractGithubUsername", () => {
-  it("extracts username from various URL shapes and handles", () => {
-    expect(extractGithubUsername("https://github.com/octocat")).toBe("octocat");
-    expect(extractGithubUsername("http://www.github.com/octocat/")).toBe("octocat");
-    expect(extractGithubUsername("@octocat")).toBe("octocat");
-    expect(extractGithubUsername("octocat")).toBe("octocat");
-    expect(extractGithubUsername("https://github.com/octocat?tab=repositories")).toBe("octocat");
-    expect(extractGithubUsername("https://linkedin.com/in/octocat")).toBeNull();
-    expect(extractGithubUsername(null)).toBeNull();
+  it("ignores layoffs older than 6 months", () => {
+    expect(findRecentLayoff("Old Layoff Example", FAKE_LAYOFFS, NOW)).toBeNull();
   });
 });
 
-describe("hadRecentLayoff", () => {
-  const referenceDate = new Date("2026-10-01T00:00:00Z");
-  const layoffs: LayoffRecord[] = [
-    { company: "Acme Corp", date: "2026-05-15" },
-    { company: "Old Corp", date: "2024-01-01" }, // > 12 months ago
-  ];
-
-  it("matches company with normalized name and recent layoff", () => {
-    expect(hadRecentLayoff("Acme Technologies Inc.", layoffs, referenceDate)).toBe(true);
-    expect(hadRecentLayoff("Acme", layoffs, referenceDate)).toBe(true);
+describe("layoffsFromCsv", () => {
+  it("reads company,date,source rows and skips bad ones", () => {
+    const csv = 'company,date,source\n"Example Widgets, Inc.",2026-08-14,news\nNo Date Co,,x\n';
+    expect(layoffsFromCsv(csv)).toEqual({
+      records: [{ company: "Example Widgets, Inc.", date: "2026-08-14", source: "news" }],
+      skipped: 1,
+    });
   });
 
-  it("does not match when layoff was more than 12 months ago", () => {
-    expect(hadRecentLayoff("Old Corp LLC", layoffs, referenceDate)).toBe(false);
-  });
-
-  it("returns false for non-matching companies", () => {
-    expect(hadRecentLayoff("Stripe", layoffs, referenceDate)).toBe(false);
+  it("needs company and date columns", () => {
+    expect(() => layoffsFromCsv("name,when\nA,2026-01-01")).toThrow(/company/);
   });
 });
 
-describe("getGithubRecentEvents", () => {
+describe("GitHub activity", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(prisma.githubActivityCache.findMany).mockReset();
+    vi.mocked(prisma.githubActivityCache.upsert).mockReset();
+    vi.unstubAllGlobals();
   });
 
-  it("uses cached database entry if within 7 days", async () => {
-    const now = new Date("2026-10-05T00:00:00Z");
-    vi.mocked(prisma.githubActivityCache.findUnique).mockResolvedValueOnce({
-      id: "cache-1",
-      username: "octocat",
-      recentEvents: 12,
-      checkedAt: new Date("2026-10-03T00:00:00Z"), // 2 days ago
-      updatedAt: new Date("2026-10-03T00:00:00Z"),
-    });
-
-    const events = await getGithubRecentEvents("octocat", now);
-    expect(events).toBe(12);
+  it("reads usernames from profile URLs only", () => {
+    expect(githubUsernameFromUrl("https://github.com/Octocat")).toBe("octocat");
+    expect(githubUsernameFromUrl("http://www.github.com/octocat/repo")).toBe("octocat");
+    expect(githubUsernameFromUrl("https://gitlab.com/octocat")).toBeNull();
+    expect(githubUsernameFromUrl(null)).toBeNull();
   });
 
-  it("fetches from GitHub API and caches when cache is stale or missing", async () => {
-    const now = new Date("2026-10-05T00:00:00Z");
-    vi.mocked(prisma.githubActivityCache.findUnique).mockResolvedValueOnce(null);
+  it("uses the cache and does not call GitHub on a hit", async () => {
+    vi.mocked(prisma.githubActivityCache.findMany).mockResolvedValue([
+      { username: "octocat", recentEvents: 7 },
+    ] as never);
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
 
-    const mockFetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => [
-        { created_at: "2026-10-02T00:00:00Z" },
-        { created_at: "2026-09-25T00:00:00Z" },
-        { created_at: "2026-08-01T00:00:00Z" }, // > 30 days ago
-      ],
-    });
-    vi.stubGlobal("fetch", mockFetch);
+    const result = await getGithubRecentEvents(["octocat"], NOW);
+    expect(result.get("octocat")).toBe(7);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
-    const events = await getGithubRecentEvents("octocat", now);
-    expect(events).toBe(2);
-    expect(prisma.githubActivityCache.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { username: "octocat" },
-        create: expect.objectContaining({ recentEvents: 2 }),
+  it("counts events from the last 30 days on a miss and saves them", async () => {
+    vi.mocked(prisma.githubActivityCache.findMany).mockResolvedValue([]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [
+          { created_at: "2026-10-01T00:00:00Z" },
+          { created_at: "2026-09-20T00:00:00Z" },
+          { created_at: "2026-07-01T00:00:00Z" },
+        ],
       })
     );
 
-    vi.unstubAllGlobals();
+    const result = await getGithubRecentEvents(["octocat"], NOW);
+    expect(result.get("octocat")).toBe(2);
+    expect(prisma.githubActivityCache.upsert).toHaveBeenCalledOnce();
   });
 
-  it("returns 0 gracefully on network error or timeout without throwing", async () => {
-    const now = new Date("2026-10-05T00:00:00Z");
-    vi.mocked(prisma.githubActivityCache.findUnique).mockResolvedValueOnce(null);
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("Timeout")));
+  it("gives no signal (and saves nothing) when GitHub fails", async () => {
+    vi.mocked(prisma.githubActivityCache.findMany).mockResolvedValue([]);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("timeout")));
 
-    const events = await getGithubRecentEvents("octocat", now);
-    expect(events).toBe(0);
-
-    vi.unstubAllGlobals();
-  });
-});
-
-describe("scoreOpenToWork", () => {
-  const referenceDate = new Date("2026-10-05T00:00:00Z");
-
-  it("awards +3 points and likely level for open to work headline phrases", async () => {
-    const result = await scoreOpenToWork({
-      title: "Software Engineer",
-      headline: "Senior Software Engineer #OpenToWork | Looking for new opportunities",
-      now: referenceDate,
-      githubRecentEvents: 0,
-      layoffsData: [],
-    });
-
-    expect(result.points).toBe(3);
-    expect(result.level).toBe("likely");
-    expect(result.reasons).toContain("Public headline indicates availability");
-  });
-
-  it("awards +2 points when most recent position has ended", async () => {
-    const result = await scoreOpenToWork({
-      title: "Senior Developer",
-      employmentHistory: [
-        {
-          title: "Senior Developer",
-          organization_name: "Tech Corp",
-          start_date: "2022-01-01",
-          end_date: "2026-08-01",
-          current: false,
-        },
-      ],
-      now: referenceDate,
-      githubRecentEvents: 0,
-      layoffsData: [],
-    });
-
-    expect(result.points).toBe(2);
-    expect(result.level).toBe("maybe");
-    expect(result.reasons).toContain("Most recent position ended");
-  });
-
-  it("awards +1 point for tenure over 2 years in current role", async () => {
-    const result = await scoreOpenToWork({
-      title: "Lead Engineer",
-      employmentHistory: [
-        {
-          title: "Lead Engineer",
-          organization_name: "Stable Co",
-          start_date: "2023-01-01",
-          current: true,
-        },
-      ],
-      now: referenceDate,
-      githubRecentEvents: 0,
-      layoffsData: [],
-    });
-
-    expect(result.points).toBe(1);
-    expect(result.level).toBe("maybe");
-    expect(result.reasons).toContain("In current role for over 2 years");
-  });
-
-  it("deducts -1 point for recently started position (< 6 months)", async () => {
-    const result = await scoreOpenToWork({
-      title: "Junior Engineer",
-      employmentHistory: [
-        {
-          title: "Junior Engineer",
-          organization_name: "New Co",
-          start_date: "2026-08-01", // ~2 months ago
-          current: true,
-        },
-      ],
-      now: referenceDate,
-      githubRecentEvents: 0,
-      layoffsData: [],
-    });
-
-    expect(result.points).toBe(-1);
-    expect(result.level).toBe("unlikely");
-    expect(result.reasons).toContain("Recently started a new position (< 6 months)");
-  });
-
-  it("awards +2 points when employer had recent layoffs", async () => {
-    const result = await scoreOpenToWork({
-      title: "Backend Engineer",
-      company: "Downsizing Corp Inc",
-      layoffsData: [{ company: "Downsizing Corp", date: "2026-04-01" }],
-      now: referenceDate,
-      githubRecentEvents: 0,
-    });
-
-    expect(result.points).toBe(2);
-    expect(result.level).toBe("maybe");
-    expect(result.reasons).toContain("Employer had public layoffs in the past 12 months");
-  });
-
-  it("awards +1 point when user has active GitHub contributions", async () => {
-    const result = await scoreOpenToWork({
-      title: "Full Stack Engineer",
-      githubRecentEvents: 8,
-      now: referenceDate,
-      layoffsData: [],
-    });
-
-    expect(result.points).toBe(1);
-    expect(result.level).toBe("maybe");
-    expect(result.reasons).toContain("Active public GitHub contributions in last 30 days");
-  });
-
-  it("combines multiple signals to reach likely level (>= 3 points)", async () => {
-    const result = await scoreOpenToWork({
-      title: "Staff Engineer",
-      company: "Acme Corp",
-      layoffsData: [{ company: "Acme", date: "2026-06-01" }], // +2
-      employmentHistory: [
-        {
-          title: "Staff Engineer",
-          organization_name: "Acme Corp",
-          start_date: "2022-01-01", // > 2 years (+1)
-          current: true,
-        },
-      ],
-      githubRecentEvents: 10, // +1
-      now: referenceDate,
-    });
-
-    // 2 (layoffs) + 1 (tenure) + 1 (github) = 4 points -> likely
-    expect(result.points).toBe(4);
-    expect(result.level).toBe("likely");
-    expect(result.reasons).toHaveLength(3);
+    const result = await getGithubRecentEvents(["octocat"], NOW);
+    expect(result.has("octocat")).toBe(false);
+    expect(prisma.githubActivityCache.upsert).not.toHaveBeenCalled();
   });
 });
