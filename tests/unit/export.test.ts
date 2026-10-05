@@ -125,7 +125,7 @@ describe("ATS export", () => {
       "Texas",
       "United States",
       "https://www.linkedin.com/in/maria",
-      "VARSA",
+      "Versa",
       "varsa;data-engineer-austin",
       "Score 8/10 – Strong match for the role.",
     ]);
@@ -189,13 +189,13 @@ describe("database lead mapping", () => {
         parsedCriteria: { jobTitles: ["AI Engineer", "ML Engineer"], city: "Lahore", country: "Pakistan" },
       },
     });
-    expect(mapped).toMatchObject({ city: "Lahore", state: "Punjab", country: "Pakistan", searchTag: "ai-engineer-lahore" });
+    expect(mapped).toMatchObject({ city: "Lahore", state: "Punjab", country: "Pakistan", searchTag: "lead-search-request-combine-al" });
     expect(mapped.industry).toBe("");
     expect(mapped.location).toBe("");
   });
 
-  it("has no search tag when the search has no job title", () => {
-    expect(searchTagFor({ prompt: "x", parsedCriteria: {} })).toBeNull();
+  it("uses the prompt for the search tag", () => {
+    expect(searchTagFor({ prompt: "x", parsedCriteria: {} })).toBe("x");
     expect(searchTagFor(null)).toBeNull();
   });
 });

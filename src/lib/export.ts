@@ -38,7 +38,7 @@ function toCsv(headers: string[], rows: Array<Array<string | number | null | und
 /** Empty instead of placeholder values, so an import doesn't store "N/A" or 0 as data. */
 function blank(value: string | null | undefined): string {
   const trimmed = value?.trim() ?? "";
-  return trimmed === "N/A" ? "" : trimmed;
+  return /^(n\/a|null|undefined)$/i.test(trimmed) ? "" : trimmed;
 }
 
 function blankNumber(value: number | null | undefined): number | string {
@@ -116,7 +116,7 @@ export const ATS_HEADERS = [
 
 /** The last word is the last name; everything before it is the first name. */
 export function splitName(fullName: string): { first: string; last: string } {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const parts = blank(fullName).split(/\s+/).filter(Boolean);
   if (parts.length <= 1) return { first: parts[0] ?? "", last: "" };
   return { first: parts.slice(0, -1).join(" "), last: parts[parts.length - 1] };
 }
@@ -155,7 +155,14 @@ export function slugify(value: string, maxLength: number): string {
 
 function httpsUrl(url: string | null | undefined): string {
   const trimmed = url?.trim() ?? "";
-  return trimmed.replace(/^http:\/\//i, "https://");
+  if (!trimmed) return "";
+
+  try {
+    const parsed = new URL(trimmed.replace(/^http:\/\//i, "https://"));
+    return parsed.protocol === "https:" ? parsed.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function singleLine(value: string, maxLength: number): string {
@@ -173,12 +180,13 @@ export function leadsToAtsCSV(leads: ExportLead[]): string {
     // Only verified emails: an ATS treats every imported address as real.
     const verified = emailConfidence(lead.email, lead.emailStatus) === "verified";
     const tags = [BRAND.slug, lead.searchTag].filter(Boolean).join(";");
-    const reason = lead.reasoning?.trim();
+    const reason = blank(lead.reasoning);
+    const score = lead.score > 0 ? lead.score : "";
 
     return [
       first,
       last,
-      verified ? lead.email : "",
+      verified ? blank(lead.email) : "",
       "",
       blank(lead.title),
       blank(lead.company),
@@ -186,9 +194,9 @@ export function leadsToAtsCSV(leads: ExportLead[]): string {
       state,
       country,
       httpsUrl(lead.linkedinUrl),
-      BRAND.name,
+      "Versa",
       tags,
-      singleLine(`Score ${lead.score}/10${reason ? ` – ${reason}` : ""}`, 300),
+      score === "" ? "" : singleLine(`Score ${score}/10${reason ? ` – ${reason}` : ""}`, 300),
     ];
   });
 

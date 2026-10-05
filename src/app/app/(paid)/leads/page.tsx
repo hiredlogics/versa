@@ -35,9 +35,9 @@ export default function AllLeadsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">All saved leads</h1>
         <div className="flex items-center gap-4">
-          <a href="/api/export/csv" className="text-sm text-electric hover:underline">Export all CSV</a>
+          <a href="/api/export/csv" className="text-sm text-electric hover:underline">CSV</a>
           <a href="/api/export/csv?format=ats" className="text-sm text-electric hover:underline">
-            Export all for ATS
+            CSV for ATS import
           </a>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileSpreadsheet, Users } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 export function ExportButtons({ searchId }: { searchId: string }) {
@@ -17,7 +17,7 @@ export function ExportButtons({ searchId }: { searchId: string }) {
         }}
       >
         <Download className="h-3.5 w-3.5" aria-hidden />
-        Export CSV
+        CSV
       </Button>
       <Button
         variant="secondary"
@@ -34,13 +34,12 @@ export function ExportButtons({ searchId }: { searchId: string }) {
         variant="secondary"
         size="sm"
         className="gap-1.5"
-        title="CSV ready to import into Greenhouse, Lever, Workable and other hiring tools"
         onClick={() => {
           window.location.href = `/api/export/csv?searchId=${id}&format=ats`;
         }}
       >
-        <Users className="h-3.5 w-3.5" aria-hidden />
-        Export for ATS
+        <Download className="h-3.5 w-3.5" aria-hidden />
+        CSV for ATS import
       </Button>
     </div>
   );

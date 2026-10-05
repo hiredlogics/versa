@@ -62,12 +62,20 @@ export function LeadDataTable({ leads, searchId }: { leads: LeadRow[]; searchId?
       <div className="flex items-center justify-between px-4 py-2 border-b border-glass-border bg-charcoal-light">
         <span className="text-sm text-muted">{leads.length} leads</span>
         {searchId && (
-          <a
-            href={`/api/export/csv?searchId=${searchId}`}
-            className="text-xs text-electric flex items-center gap-1 hover:underline"
-          >
-            <Download className="w-3 h-3" /> CSV
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/api/export/csv?searchId=${searchId}`}
+              className="text-xs text-electric flex items-center gap-1 hover:underline"
+            >
+              <Download className="w-3 h-3" /> CSV
+            </a>
+            <a
+              href={`/api/export/csv?searchId=${searchId}&format=ats`}
+              className="text-xs text-electric flex items-center gap-1 hover:underline"
+            >
+              <Download className="w-3 h-3" /> CSV for ATS import
+            </a>
+          </div>
         )}
       </div>
       <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
