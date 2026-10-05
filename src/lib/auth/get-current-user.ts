@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { isConfiguredAdminEmail } from "@/lib/admin/credentials";
 import { prisma } from "@/lib/db/prisma";
@@ -8,7 +9,11 @@ function resolveUserRole(email: string, clerkRole?: UserRole): UserRole {
   return clerkRole || "USER";
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+/**
+ * Cached per request: the app layout, the paid layout and the page all ask for the user,
+ * and this way Clerk and the database are asked once per page load, not three times.
+ */
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   const { userId: clerkId } = await auth();
   if (!clerkId) return null;
 
@@ -38,7 +43,7 @@ export async function getCurrentUser(): Promise<User | null> {
       role: resolveUserRole(email, clerkUser.publicMetadata?.role as UserRole),
     },
   });
-}
+});
 
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();

@@ -132,14 +132,20 @@ function buildUsageSnapshotFromRecord(
   };
 }
 
+/** Read-only: showing usage never writes; the usage row is created when a search runs. */
 export async function buildUsageSnapshot(userId: string, subscription: SubscriptionWithPlan | null) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error("User not found");
-
   try {
-    const plan = (await getEffectivePlan(subscription)) ?? (await getUserPlanLimits(user));
+    let plan = await getEffectivePlan(subscription);
+    if (!plan) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new Error("User not found");
+      plan = await getUserPlanLimits(user);
+    }
     const period = usagePeriodFor(subscription);
-    const usage = await getOrCreateUsageRecord(userId, period.start, period.end);
+    const usage = (await prisma.usageRecord.findUnique({
+      where: { userId_periodStart: { userId, periodStart: period.start } },
+      select: { leadsUsed: true, searchesUsed: true },
+    })) ?? { leadsUsed: 0, searchesUsed: 0 };
     return buildUsageSnapshotFromRecord(usage, plan, period);
   } catch {
     const period = getUsagePeriod(null);

@@ -12,6 +12,7 @@ import {
   getSubscriptionForUser,
   isActiveSubscription,
   isOnFreeTrial,
+  type SubscriptionWithPlan,
 } from "./subscription";
 import { buildUsageSnapshot } from "@/lib/services/billing/usageLimits";
 
@@ -77,8 +78,12 @@ export async function getFullBillingStatus(userId: string): Promise<FullBillingS
 }
 
 /** Legacy shape for /api/billing/usage */
-export async function getLegacyUsageSummary(userId: string) {
-  const subscription = await getSubscriptionForUser(userId);
+export async function getLegacyUsageSummary(
+  userId: string,
+  knownSubscription?: SubscriptionWithPlan | null
+) {
+  const subscription =
+    knownSubscription !== undefined ? knownSubscription : await getSubscriptionForUser(userId);
   const usage = await buildUsageSnapshot(userId, subscription);
   return {
     plan: isOnFreeTrial(subscription)

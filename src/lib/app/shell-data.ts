@@ -37,12 +37,13 @@ export type AppShellData = {
 };
 
 export async function getAppShellData(userId: string, isAdmin: boolean): Promise<AppShellData> {
-  const [usage, subscription, leadContext, readiness] = await Promise.all([
-    getLegacyUsageSummary(userId),
-    getSubscriptionForUser(userId),
+  // Load the subscription once and share it, instead of once here and once for usage.
+  const subscription = await getSubscriptionForUser(userId);
+  const [usage, leadContext] = await Promise.all([
+    getLegacyUsageSummary(userId, subscription),
     getUserLeadContext(userId),
-    Promise.resolve(getPlatformReadiness()),
   ]);
+  const readiness = getPlatformReadiness();
 
   const billingEnforced = isBillingEnforced();
   const onFreeTrial = isOnFreeTrial(subscription);
