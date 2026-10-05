@@ -1,17 +1,44 @@
 import { prisma } from "@/lib/db/prisma";
-import { leadsToCSV, leadsToExcelBuffer } from "@/lib/export";
+import {
+  leadsToAtsCSV,
+  leadsToCSV,
+  leadsToExcelBuffer,
+  slugify,
+  type CsvFormat,
+  type ExportLead,
+} from "@/lib/export";
+import type { ApolloProfileRaw } from "@/lib/lead-profile";
 import type { ScoredLead } from "@/lib/types";
-import type { Lead } from "@prisma/client";
+import type { Lead, LeadSearch } from "@prisma/client";
 
-export function dbLeadToExport(lead: Lead): ScoredLead {
+type LeadWithSearch = Lead & {
+  search?: Pick<LeadSearch, "prompt" | "parsedCriteria"> | null;
+};
+
+/** e.g. "ai-engineer-lahore": first target title plus city (or country). */
+export function searchTagFor(search: LeadWithSearch["search"]): string | null {
+  if (!search) return null;
+  const criteria = (search.parsedCriteria ?? {}) as {
+    jobTitles?: string[];
+    city?: string;
+    country?: string;
+  };
+  const title = criteria.jobTitles?.find((t) => t.trim())?.trim();
+  if (!title) return null;
+  const place = criteria.city?.trim() || criteria.country?.trim() || "";
+  return slugify(`${title} ${place}`, 30) || null;
+}
+
+export function dbLeadToExport(lead: LeadWithSearch): ExportLead {
+  const profile = (lead.rawApolloData ?? null) as ApolloProfileRaw | null;
   return {
     id: lead.id,
     name: lead.name,
     title: lead.title,
     company: lead.company,
-    industry: lead.industry || "N/A",
+    industry: lead.industry || "",
     employees: lead.employees || 0,
-    location: lead.location || "N/A",
+    location: lead.location || "",
     email: lead.email,
     emailStatus: lead.emailStatus,
     linkedinUrl: lead.linkedinUrl,
@@ -21,6 +48,10 @@ export function dbLeadToExport(lead: Lead): ScoredLead {
     priority: mapPriority(lead.priorityLevel),
     hasEmail: lead.hasEmail,
     createdAt: lead.createdAt.toISOString(),
+    city: profile?.city ?? null,
+    state: profile?.state ?? null,
+    country: profile?.country ?? null,
+    searchTag: searchTagFor(lead.search),
   };
 }
 
@@ -34,6 +65,7 @@ export async function exportUserLeads(params: {
   userId: string;
   searchId?: string;
   format: "csv" | "xlsx";
+  csvFormat?: CsvFormat;
 }) {
   const leads = await prisma.lead.findMany({
     where: {
@@ -41,23 +73,28 @@ export async function exportUserLeads(params: {
       deletedAt: null,
       ...(params.searchId ? { searchId: params.searchId } : {}),
     },
+    include: { search: { select: { prompt: true, parsedCriteria: true } } },
     orderBy: { leadScore: "desc" },
   });
 
   if (leads.length === 0) return null;
 
+  const csvFormat = params.csvFormat ?? "standard";
   await prisma.exportLog.create({
     data: {
       userId: params.userId,
       searchId: params.searchId,
-      format: params.format,
+      format: params.format === "csv" && csvFormat === "ats" ? "csv-ats" : params.format,
       leadCount: leads.length,
     },
   });
 
   const exportLeads = leads.map(dbLeadToExport);
+  const fileTag = params.searchId ? searchTagFor(leads[0].search) : null;
+
   if (params.format === "xlsx") {
-    return { buffer: await leadsToExcelBuffer(exportLeads), count: leads.length };
+    return { buffer: await leadsToExcelBuffer(exportLeads), count: leads.length, fileTag };
   }
-  return { csv: leadsToCSV(exportLeads), count: leads.length };
+  const csv = csvFormat === "ats" ? leadsToAtsCSV(exportLeads) : leadsToCSV(exportLeads);
+  return { csv, count: leads.length, fileTag };
 }
