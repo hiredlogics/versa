@@ -14,6 +14,8 @@ export interface ApolloProfileRaw {
   state?: string;
   country?: string;
   employment_history?: ApolloEmploymentEntry[];
+  /** GitHub profile URL when the provider includes it. */
+  github_url?: string | null;
 }
 
 export function extractProfileSummary(raw: ApolloProfileRaw | null | undefined): string | null {
@@ -57,6 +59,7 @@ export function toStoredApolloProfile(raw: ApolloProfileRaw | null | undefined):
     city: raw.city ?? null,
     state: raw.state ?? null,
     country: raw.country ?? null,
+    github_url: raw.github_url ?? null,
     employment_history: (raw.employment_history ?? []).slice(0, 6).map((entry) => ({
       title: entry.title ?? null,
       organization_name: entry.organization_name ?? null,

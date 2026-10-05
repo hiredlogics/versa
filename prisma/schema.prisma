@@ -302,6 +302,8 @@ model LeadPoolPerson {
   openToWorkSignal String?
   /// Where this person came from, e.g. "apollo_search", "apollo_enrich", "serper".
   sources          String[]  @default([])
+  /// Trimmed profile snapshot (headline, employment history, github_url, etc.).
+  profile          Json?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

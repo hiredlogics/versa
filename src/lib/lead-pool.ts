@@ -1,6 +1,7 @@
 import { isUsableEmail } from "@/lib/apollo";
 import { emailConfidence } from "@/lib/email-confidence";
 import { normalizeTitle } from "@/lib/role-policy";
+import { toStoredApolloProfile } from "@/lib/lead-profile";
 import type { ApolloPerson } from "@/lib/types";
 
 /**
@@ -28,6 +29,8 @@ export type PoolPersonInput = {
   emailChecked?: boolean;
   openToWorkSignal?: string | null;
   source: string;
+  /** Trimmed profile snapshot for caching job history. */
+  profile?: object | null;
 };
 
 /** The pool columns a merge can write. */
@@ -50,6 +53,8 @@ export type PoolPersonData = {
   emailCheckedAt: Date | null;
   openToWorkSignal: string | null;
   sources: string[];
+  /** Trimmed profile snapshot; non-null beats null (never overwrite with null). */
+  profile: object | null;
 };
 
 const PLACEHOLDER_VALUES = new Set(["", "n/a", "na", "unknown", "none", "null", "not collected"]);
@@ -134,6 +139,9 @@ export function mergePoolPerson(
   const sources = new Set(existing?.sources ?? []);
   sources.add(incoming.source);
 
+  // Merge rule: a newer non-null profile replaces an older one; never overwrite with null.
+  const mergedProfile = incoming.profile ?? existing?.profile ?? null;
+
   return {
     apolloPersonId: clean(incoming.apolloPersonId) ?? existing?.apolloPersonId ?? null,
     linkedinUrl: linkedinUrl ?? existing?.linkedinUrl ?? null,
@@ -160,6 +168,7 @@ export function mergePoolPerson(
     emailCheckedAt: incoming.emailChecked ? now : existing?.emailCheckedAt ?? null,
     openToWorkSignal: clean(incoming.openToWorkSignal) ?? existing?.openToWorkSignal ?? null,
     sources: [...sources].sort(),
+    profile: mergedProfile,
   };
 }
 
@@ -170,6 +179,17 @@ export function poolInputFromApolloPerson(
   options: { emailChecked?: boolean } = {}
 ): PoolPersonInput {
   const org = person.organization;
+  // Build a profile snapshot from the Apollo person data we already have.
+  const rawProfile = {
+    headline: person.headline ?? undefined,
+    city: person.city,
+    state: person.state,
+    country: person.country,
+    github_url: person.github_url ?? undefined,
+    employment_history: person.employment_history,
+    seniority: person.seniority ?? undefined,
+    departments: person.departments,
+  };
   return {
     apolloPersonId: person.id || null,
     linkedinUrl: person.linkedin_url,
@@ -186,6 +206,7 @@ export function poolInputFromApolloPerson(
     emailStatus: person.email_status ?? null,
     emailChecked: options.emailChecked,
     source,
+    profile: toStoredApolloProfile(rawProfile),
   };
 }
 

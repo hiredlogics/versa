@@ -40,6 +40,7 @@ function toData(row: LeadPoolPerson): PoolPersonData {
     emailCheckedAt: row.emailCheckedAt,
     openToWorkSignal: row.openToWorkSignal,
     sources: row.sources,
+    profile: (row.profile as object | null) ?? null,
   };
 }
 
@@ -116,9 +117,14 @@ export async function upsertPoolPeople(
       }
 
       try {
+        // Prisma's nullable JSON field rejects plain null; use Prisma.JsonNull instead.
+        const prismaData = {
+          ...data,
+          profile: data.profile ?? Prisma.JsonNull,
+        };
         const row = existing
-          ? await prisma.leadPoolPerson.update({ where: { id: existing.id }, data })
-          : await prisma.leadPoolPerson.create({ data });
+          ? await prisma.leadPoolPerson.update({ where: { id: existing.id }, data: prismaData })
+          : await prisma.leadPoolPerson.create({ data: prismaData });
         if (existing) updated += 1;
         else created += 1;
         for (const key of poolPersonKeys(row)) byKey.set(key, row);
@@ -329,6 +335,9 @@ export async function serveFromPool(input: {
           : `${row.title}${location ? ` in ${location}` : ""}, matching the requested role and location.`,
         recommendedApproach: "",
         hasEmail: withEmail,
+        // Copy the cached profile snapshot into rawApolloData so downstream
+        // features (scoring, open-to-work) have access to job history.
+        rawApolloData: row.profile ?? undefined,
       };
     }),
   });

@@ -5,8 +5,10 @@ import {
   poolInputFromCsvRow,
   poolLocationTerms,
   promptAsksForEmail,
+  poolInputFromApolloPerson,
   type PoolPersonInput,
 } from "@/lib/lead-pool";
+import { toStoredApolloProfile } from "@/lib/lead-profile";
 
 const base: PoolPersonInput = {
   apolloPersonId: "a1",
@@ -63,6 +65,69 @@ describe("mergePoolPerson", () => {
     const merged = mergePoolPerson(first, { ...base, source: "apollo_enrich", emailChecked: true }, now);
     expect(merged.emailCheckedAt).toEqual(now);
     expect(merged.sources).toEqual(["apollo_enrich", "apollo_search"]);
+  });
+
+  it("saves a profile when provided", () => {
+    const profile = { headline: "Data Engineer", employment_history: [] };
+    const merged = mergePoolPerson(null, { ...base, profile });
+    expect(merged.profile).toEqual(profile);
+  });
+
+  it("never overwrites an existing profile with null", () => {
+    const profile = { headline: "Data Engineer", employment_history: [] };
+    const first = mergePoolPerson(null, { ...base, profile });
+    // Second merge has no profile — existing should survive.
+    const merged = mergePoolPerson(first, { ...base, profile: null });
+    expect(merged.profile).toEqual(profile);
+  });
+
+  it("newer non-null profile replaces an older one", () => {
+    const oldProfile = { headline: "Old" };
+    const newProfile = { headline: "New", employment_history: [{ title: "SWE", current: true }] };
+    const first = mergePoolPerson(null, { ...base, profile: oldProfile });
+    const merged = mergePoolPerson(first, { ...base, profile: newProfile });
+    expect(merged.profile).toEqual(newProfile);
+  });
+});
+
+describe("toStoredApolloProfile — github_url", () => {
+  it("preserves github_url in the stored profile", () => {
+    const raw = {
+      headline: "Engineer",
+      github_url: "https://github.com/janedoe",
+      employment_history: [],
+    };
+    const stored = toStoredApolloProfile(raw) as Record<string, unknown>;
+    expect(stored.github_url).toBe("https://github.com/janedoe");
+  });
+
+  it("stores null when github_url is absent", () => {
+    const raw = { headline: "Engineer" };
+    const stored = toStoredApolloProfile(raw) as Record<string, unknown>;
+    expect(stored.github_url).toBeNull();
+  });
+});
+
+describe("poolInputFromApolloPerson — profile", () => {
+  it("builds a profile snapshot from an Apollo person object", () => {
+    const person = {
+      id: "p1",
+      first_name: "Jane",
+      last_name: "Doe",
+      title: "Data Engineer",
+      headline: "Building data things",
+      email: null,
+      linkedin_url: "https://linkedin.com/in/janedoe",
+      github_url: "https://github.com/janedoe",
+      employment_history: [{ title: "SWE", organization_name: "Acme", current: true }],
+    } as unknown as import("@/lib/types").ApolloPerson;
+
+    const input = poolInputFromApolloPerson(person, "apollo_search");
+    expect(input.profile).toBeTruthy();
+    const p = input.profile as Record<string, unknown>;
+    expect(p.headline).toBe("Building data things");
+    expect(p.github_url).toBe("https://github.com/janedoe");
+    expect(Array.isArray(p.employment_history)).toBe(true);
   });
 });
 

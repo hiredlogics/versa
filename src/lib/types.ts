@@ -54,6 +54,12 @@ export interface ApolloPerson {
   city?: string;
   state?: string;
   country?: string;
+  /** GitHub profile URL when Apollo includes it. */
+  github_url?: string | null;
+  /** Employment history from the enriched Apollo profile. */
+  employment_history?: import("@/lib/lead-profile").ApolloEmploymentEntry[];
+  seniority?: string | null;
+  departments?: string[];
   organization?: {
     name: string;
     industry: string;
