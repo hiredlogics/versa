@@ -24,6 +24,8 @@ export const LEAD_SELECT = {
   priorityLevel: true,
   reasoning: true,
   whySource: true,
+  scorePros: true,
+  scoreCons: true,
   createdAt: true,
 } as const;
 
@@ -42,6 +44,8 @@ export interface LeadDTO {
   priority: string;
   why: string | null;
   whySource: string;
+  pros: string[];
+  cons: string[];
   createdAt: string;
 }
 
@@ -63,6 +67,8 @@ export function toLeadDTO(lead: LeadRow): LeadDTO {
     priority: lead.priorityLevel,
     why: lead.reasoning,
     whySource: lead.whySource,
+    pros: lead.scorePros,
+    cons: lead.scoreCons,
     createdAt: lead.createdAt.toISOString(),
   };
 }

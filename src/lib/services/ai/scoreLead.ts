@@ -24,7 +24,19 @@ export type LeadScoreOutput = {
   recommendedApproach: string;
   matchedSkills?: string[];
   missingSkills?: string[];
+  /** Short points that raised / lowered the score, shown when hovering the score. */
+  pros?: string[];
+  cons?: string[];
 };
+
+/** Up to 3 short, non-empty strings from whatever the AI sent. */
+function shortList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 3);
+}
 
 /** Keep each OpenAI score call small enough to finish under AI_TIMEOUT_MS. */
 export const SCORE_BATCH_SIZE = Math.min(
@@ -122,8 +134,12 @@ Rules:
   - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
   - Explicit seeking/available/freelance title signals can go to 8–10.
 - Include ALL leads in response (use the provided index values).
+- Use the full 1-10 range: different profiles should get different scores.
+- pros: up to 3 short facts from this lead's data that raised the score.
+- cons: up to 3 short facts that lowered it, or what is missing or unclear.
+  Each under 12 words, plain English, about THIS lead (not generic).
 
-Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
+Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "pros": ["..."], "cons": ["..."], "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
 priorityLevel: Low|Medium|High|Very High`;
 }
 
@@ -145,6 +161,7 @@ function applyCaps(
       leadScore: capped,
       priorityLevel: toPriority(capped),
       reasoning: `${output.reasoning}. Capped due to exclusion rules.`,
+      cons: [...(output.cons ?? []), "Title or industry is on your excluded list (capped at 5)"],
     };
   }
   return output;
@@ -160,6 +177,8 @@ function heuristicScores(leads: ScoredLeadInput[], context: LeadScoreContext): L
       recommendedApproach: "Personalize outreach based on their role and company context.",
       matchedSkills: [],
       missingSkills: [],
+      pros: h.pros ?? [],
+      cons: h.cons ?? [],
     };
     return applyCaps(base, lead, context);
   });
@@ -231,6 +250,8 @@ async function scoreChunkWithAi(
           recommendedApproach:
             item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
           ...skillsFromAi(item, context.targetSkills),
+          pros: shortList(item.pros),
+          cons: shortList(item.cons),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
       }

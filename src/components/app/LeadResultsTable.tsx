@@ -24,6 +24,7 @@ import { ExportButtons } from "@/components/app/ExportButtons";
 import { emailConfidence, emailConfidenceLabel } from "@/lib/email-confidence";
 import type { LeadRecord } from "@/lib/types/lead-finder";
 import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
+import { ScoreWhy } from "@/components/app/ScoreWhy";
 import { OPEN_TO_WORK_NOTE, OpenToWorkBadge, openToWorkRank } from "@/components/app/OpenToWorkBadge";
 
 export const LEADS_PAGE_SIZE = 200;
@@ -68,7 +69,7 @@ export function LeadResultsTable({
   resuming,
   loadingMore,
 }: LeadResultsTableProps) {
-  // No default sort: the server already returns leads best-score-first, and Score is not a column.
+  // No default sort: the server already returns leads best-score-first.
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [sortBy, setSortBy] = useState<"default" | "open_to_work">("default");
@@ -107,6 +108,17 @@ export function LeadResultsTable({
             </div>
           );
         },
+      }),
+      columnHelper.accessor("leadScore", {
+        header: "Score",
+        cell: ({ row }) => (
+          <ScoreWhy
+            score={row.original.leadScore}
+            pros={row.original.scorePros}
+            cons={row.original.scoreCons}
+            reasoning={row.original.reasoning}
+          />
+        ),
       }),
       columnHelper.accessor("reasoning", {
         header: "Why",

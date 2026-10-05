@@ -207,10 +207,30 @@ async function runSearchStep(args: {
   totalAvailable?: number | null;
   maxLeadsThisRun: number;
 }): Promise<SearchStepResult> {
-  await prisma.leadSearch.update({
+  const searchRow = await prisma.leadSearch.update({
     where: { id: args.searchId },
     data: { relaxNote: "Checking the saved lead database…" },
+    select: { jobRequirements: true },
   });
+
+  // One scoring setup for every way a lead can be saved (pool, email search, profiles),
+  // so no lead is saved with a fixed placeholder score.
+  const scoreContext = buildScoringContextFromLeadContext(
+    args.leadContext,
+    {
+      searchIntent: args.criteria.searchIntent,
+      keywords: args.criteria.keywords,
+      excludedTitles: args.criteria.excludedTitles,
+      excludedIndustries: args.criteria.excludedIndustries,
+      targetSkills: targetSkillsForSearch(
+        searchRow.jobRequirements as JobSkillLists | null,
+        args.criteria.keywords
+      ),
+    },
+    args.prompt
+  );
+  scoreContext.openToWork = args.criteria.openToWork;
+  scoreContext.requireEmail = args.wantsEmail;
 
   const pool = await serveFromPool({
     userId: args.userId,
@@ -220,6 +240,7 @@ async function runSearchStep(args: {
     limit: args.maxLeadsThisRun,
     wantsEmail: args.wantsEmail,
     seenIds: args.seenIds,
+    scoreContext,
   });
 
   const remaining = args.maxLeadsThisRun - pool.saved;
@@ -270,36 +291,12 @@ async function runSearchStep(args: {
     peoplePulled: args.peoplePulled,
     maxLeadsThisRun: remaining,
     wasStopped: () => wasStoppedByUser(args.searchId),
+    scoreContext,
   };
 
-  let result: SequentialBatchResult;
-  if (args.wantsEmail) {
-    const searchRow = await prisma.leadSearch.findUnique({
-      where: { id: args.searchId },
-      select: { jobRequirements: true },
-    });
-    const targetSkills = targetSkillsForSearch(
-      searchRow?.jobRequirements as JobSkillLists | null,
-      args.criteria.keywords
-    );
-
-    const scoreContext = buildScoringContextFromLeadContext(
-      args.leadContext,
-      {
-        searchIntent: args.criteria.searchIntent,
-        keywords: args.criteria.keywords,
-        excludedTitles: args.criteria.excludedTitles,
-        excludedIndustries: args.criteria.excludedIndustries,
-        targetSkills,
-      },
-      args.prompt
-    );
-    scoreContext.openToWork = args.criteria.openToWork;
-    scoreContext.requireEmail = true;
-    result = await runSequentialLeadBatches({ ...common, scoreContext });
-  } else {
-    result = await runProfileDiscovery(common);
-  }
+  const result: SequentialBatchResult = args.wantsEmail
+    ? await runSequentialLeadBatches(common)
+    : await runProfileDiscovery(common);
 
   return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
 }

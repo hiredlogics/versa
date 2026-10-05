@@ -15,7 +15,8 @@ import {
 import { normalizeTitle } from "@/lib/role-policy";
 import { requireVerifiedEmail } from "@/lib/services/leads/fetchProgress";
 import { logLeadFetch } from "@/lib/services/leads/fetchLog";
-import type { ApolloPerson, SearchCriteria } from "@/lib/types";
+import type { ApolloPerson, LeadScoreContext, SearchCriteria } from "@/lib/types";
+import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
 import { scoreOpenToWorkForLeads } from "@/lib/services/leads/openToWorkSignals";
 
 /** Do not pay Apollo again for a person whose email lookup came back empty this recently. */
@@ -238,6 +239,7 @@ export async function serveFromPool(input: {
   wantsEmail: boolean;
   /** Keys (Apollo ids and LinkedIn URLs) already delivered in this search. Updated in place. */
   seenIds: Set<string>;
+  scoreContext: LeadScoreContext;
 }): Promise<PoolServeResult> {
   const empty: PoolServeResult = { saved: 0, unlockedSaved: 0, unlockAttempts: 0, creditsExhausted: false };
   if (input.limit <= 0) return empty;
@@ -316,10 +318,34 @@ export async function serveFromPool(input: {
     selected.map((row) => ({ title: row.title, company: row.company, profile: row.profile }))
   );
 
+  const locationOf = (row: LeadPoolPerson) =>
+    [row.city, row.state, row.country].filter(Boolean).join(", ") || null;
+  const withEmailOf = (row: LeadPoolPerson) =>
+    isUsableEmail(row.email) && (input.wantsEmail || hasDeliverableEmail(row));
+
+  // Pool leads are scored like fresh ones (no more fixed 7 / 5), with pros and cons.
+  const scored = await scoreLeadsWithAi(
+    selected.map((row) => ({
+      name: row.name,
+      title: row.title,
+      company: row.company || "Unknown",
+      industry: row.industry ?? "",
+      employees: row.employees ?? 0,
+      location: locationOf(row) ?? "",
+      hasEmail: withEmailOf(row),
+      headline: (row.profile as { headline?: string | null } | null)?.headline ?? null,
+      rawApolloData: row.profile,
+    })),
+    input.scoreContext,
+    { userId: input.userId, searchId: input.searchId }
+  );
+  const aiScored = scored.provider !== "HEURISTIC";
+
   await prisma.lead.createMany({
     data: selected.map((row, i) => {
-      const location = [row.city, row.state, row.country].filter(Boolean).join(", ") || null;
-      const withEmail = isUsableEmail(row.email) && (input.wantsEmail || hasDeliverableEmail(row));
+      const location = locationOf(row);
+      const withEmail = withEmailOf(row);
+      const score = scored.scores[i];
       return {
         userId: input.userId,
         searchId: input.searchId,
@@ -333,14 +359,19 @@ export async function serveFromPool(input: {
         email: withEmail ? row.email : null,
         emailStatus: withEmail ? row.emailStatus : null,
         linkedinUrl: row.linkedinUrl,
-        leadScore: withEmail ? 7 : 5,
-        priorityLevel: "MEDIUM" as const,
-        reasoning: row.openToWorkSignal
-          ? `${row.title}${location ? ` in ${location}` : ""}. Public open-to-work signal: "${row.openToWorkSignal}".`
-          : `${row.title}${location ? ` in ${location}` : ""}, matching the requested role and location.`,
+        leadScore: score.leadScore,
+        priorityLevel: toDbPriority(score.priorityLevel),
+        reasoning: aiScored
+          ? score.reasoning
+          : row.openToWorkSignal
+            ? `${row.title}${location ? ` in ${location}` : ""}. Public open-to-work signal: "${row.openToWorkSignal}".`
+            : `${row.title}${location ? ` in ${location}` : ""}, matching the requested role and location.`,
+        whySource: aiScored ? ("AI" as const) : ("TEMPLATE" as const),
         recommendedApproach: "",
-        matchedSkills: [],
-        missingSkills: [],
+        matchedSkills: score.matchedSkills ?? [],
+        missingSkills: score.missingSkills ?? [],
+        scorePros: score.pros ?? [],
+        scoreCons: score.cons ?? [],
         openToWorkLevel: otwScores[i].level,
         openToWorkReasons: otwScores[i].reasons,
         hasEmail: withEmail,

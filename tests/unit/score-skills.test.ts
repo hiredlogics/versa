@@ -130,3 +130,47 @@ describe("skillsFromAi", () => {
     });
   });
 });
+
+describe("score pros and cons", () => {
+  const context: LeadScoreContext = { searchIntent: "CTO fintech" };
+  const lead = {
+    name: "Sam Lee",
+    title: "Marketing Intern",
+    company: "Tiny Co",
+    industry: "Retail",
+    employees: 3,
+    location: "Austin, TX",
+    hasEmail: false,
+  };
+
+  it("keeps up to 3 short pros and cons from the AI", async () => {
+    vi.mocked(aiChat).mockResolvedValueOnce({
+      content: JSON.stringify({
+        leads: [
+          {
+            index: 0,
+            leadScore: 4,
+            priorityLevel: "Low",
+            reasoning: "Weak fit.",
+            pros: ["Based in Austin"],
+            cons: ["Intern, not a buyer", "Retail, not fintech", "No email", "Tiny company", ""],
+          },
+        ],
+      }),
+      provider: "OPENAI",
+    });
+    const result = await scoreLeadsWithAi([lead], context);
+    expect(result.scores[0].pros).toEqual(["Based in Austin"]);
+    expect(result.scores[0].cons).toEqual(["Intern, not a buyer", "Retail, not fintech", "No email"]);
+  });
+
+  it("backup rules list what passed and what failed", async () => {
+    vi.mocked(aiChat).mockRejectedValueOnce(new Error("AI down"));
+    const result = await scoreLeadsWithAi([lead], context);
+    expect(result.provider).toBe("HEURISTIC");
+    expect(result.scores[0].cons).toEqual(
+      expect.arrayContaining(["Not a decision-maker title", "No email found"])
+    );
+  });
+});
+

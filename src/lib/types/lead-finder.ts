@@ -23,6 +23,9 @@ export interface LeadRecord {
   hasEmail: boolean;
   matchedSkills?: string[];
   missingSkills?: string[];
+  /** Points for / against the score, shown when hovering it. */
+  scorePros?: string[];
+  scoreCons?: string[];
   openToWorkLevel?: string | null;
   openToWorkReasons?: string[];
 }

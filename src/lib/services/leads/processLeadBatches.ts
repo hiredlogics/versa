@@ -409,6 +409,8 @@ export async function runSequentialLeadBatches(input: {
         reasoning: scored.scores[i].reasoning,
         matchedSkills: scored.scores[i].matchedSkills ?? [],
         missingSkills: scored.scores[i].missingSkills ?? [],
+        scorePros: scored.scores[i].pros ?? [],
+        scoreCons: scored.scores[i].cons ?? [],
         recommendedApproach: "",
       }))
     );
@@ -582,6 +584,8 @@ export async function runSequentialLeadBatches(input: {
       reasoning: lead.reasoning,
       matchedSkills: lead.matchedSkills ?? [],
       missingSkills: lead.missingSkills ?? [],
+      scorePros: lead.scorePros ?? [],
+      scoreCons: lead.scoreCons ?? [],
       openToWorkLevel: otwScores[i].level,
       openToWorkReasons: otwScores[i].reasons,
       whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",

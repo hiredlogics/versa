@@ -6,20 +6,12 @@ import {
   flexRender,
   createColumnHelper,
 } from "@tanstack/react-table";
-import { ScoreBadge } from "@/components/ui/Badge";
+import { ScoreWhy } from "@/components/app/ScoreWhy";
+import type { LeadDTO } from "@/lib/pipeline/dto";
 import { Mail, ExternalLink, Download } from "lucide-react";
 
-type LeadRow = {
-  id: string;
-  name: string;
-  title: string;
-  company: string;
-  email: string | null;
-  linkedinUrl: string | null;
-  leadScore: number;
-  reasoning: string | null;
-  hasEmail: boolean;
-};
+/** One row from GET /api/leads (score is `score`, reason is `why`). */
+type LeadRow = LeadDTO;
 
 const columnHelper = createColumnHelper<LeadRow>();
 
@@ -31,9 +23,16 @@ const columns = [
     header: "Email",
     cell: (info) => info.getValue() || <span className="text-muted">—</span>,
   }),
-  columnHelper.accessor("leadScore", {
+  columnHelper.accessor("score", {
     header: "Score",
-    cell: (info) => <ScoreBadge score={info.getValue()} />,
+    cell: ({ row }) => (
+      <ScoreWhy
+        score={row.original.score}
+        pros={row.original.pros}
+        cons={row.original.cons}
+        reasoning={row.original.why}
+      />
+    ),
   }),
   columnHelper.display({
     id: "links",

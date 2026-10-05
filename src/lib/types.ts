@@ -157,6 +157,9 @@ export interface LeadScoreResult {
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";
+  /** What raised the score / what held it back, in short plain words. */
+  pros?: string[];
+  cons?: string[];
 }
 
 export interface LeadScoreContext {

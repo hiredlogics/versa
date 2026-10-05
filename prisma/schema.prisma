@@ -263,6 +263,9 @@ model Lead {
   rawApolloData       Json?
   matchedSkills       String[]      @default([])
   missingSkills       String[]      @default([])
+  /// Short points for and against the score, shown when hovering the score.
+  scorePros           String[]      @default([])
+  scoreCons           String[]      @default([])
   openToWorkLevel     String?
   openToWorkReasons   String[]      @default([])
   createdAt           DateTime      @default(now())

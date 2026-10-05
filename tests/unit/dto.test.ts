@@ -34,6 +34,7 @@ describe("the vendor boundary", () => {
   it("returns exactly these lead keys", () => {
     expect(Object.keys(toLeadDTO(leadRow())).sort()).toEqual([
       "company",
+      "cons",
       "createdAt",
       "email",
       "emailStatus",
@@ -44,6 +45,7 @@ describe("the vendor boundary", () => {
       "location",
       "name",
       "priority",
+      "pros",
       "score",
       "title",
       "whySource",

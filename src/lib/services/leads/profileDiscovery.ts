@@ -14,6 +14,7 @@ import { isVerifiedEmail } from "@/lib/email-confidence";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
 import { scoreOpenToWorkForLeads } from "@/lib/services/leads/openToWorkSignals";
 import { buildLeadWhyReasoning, generateLeadReasoningBatch } from "@/lib/services/ai/leadReasoning";
+import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
 import type { ApolloSearchFilters, LeadScoreContext, SearchCriteria } from "@/lib/types";
 
 /**
@@ -55,6 +56,7 @@ export async function runProfileDiscovery(input: {
   peoplePulled: number;
   maxLeadsThisRun: number;
   wasStopped: () => Promise<boolean>;
+  scoreContext: LeadScoreContext;
 }): Promise<ProfileDiscoveryResult> {
   const batchSize = getProcessBatchSize();
   const maxBatches = getMaxAutoBatches();
@@ -152,25 +154,36 @@ export async function runProfileDiscovery(input: {
       input.seenIds.add(key);
       return true;
     });
-    const scoreContext: LeadScoreContext = {
-      originalPrompt: input.prompt,
-      searchIntent: input.criteria.searchIntent || input.prompt,
-      keywords: Array.isArray(input.criteria.keywords)
-        ? input.criteria.keywords.join(" ")
-        : input.criteria.keywords || "",
-      openToWork: Boolean(input.criteria.openToWork),
-      requireEmail: Boolean(input.criteria.requireEmail),
-    };
-    const whyInputs = profiles.map(({ person, raw }) => ({
+    const storedProfiles = profiles.map(({ raw }) => toStoredApolloProfile(raw));
+    const meta = { userId: input.userId, searchId: input.searchId };
+    // Real scores (with pros and cons) instead of a fixed 5 for every profile.
+    const scored = await scoreLeadsWithAi(
+      profiles.map(({ person, raw }, index) => ({
+        name: person.name,
+        title: person.title,
+        company: person.company,
+        industry: person.industry,
+        employees: person.employees || 0,
+        location: person.location,
+        hasEmail: isVerifiedEmail(person.email, person.emailStatus),
+        headline: raw?.headline ?? null,
+        rawApolloData: storedProfiles[index],
+      })),
+      input.scoreContext,
+      meta
+    );
+    const aiScored = scored.provider !== "HEURISTIC";
+    // The scoring call already writes a reason; only ask the AI again when scoring fell back.
+    const whyInputs = profiles.map(({ person, raw }, index) => ({
       name: person.name, title: person.title, company: person.company, industry: person.industry,
       employees: person.employees, location: person.location,
-      hasEmail: isVerifiedEmail(person.email, person.emailStatus), leadScore: 5,
+      hasEmail: isVerifiedEmail(person.email, person.emailStatus),
+      leadScore: scored.scores[index].leadScore,
       profileSummary: extractProfileSummary(raw),
     }));
-    const reasons = await generateLeadReasoningBatch(whyInputs, scoreContext, {
-      userId: input.userId, searchId: input.searchId,
-    });
-    const storedProfiles = profiles.map(({ raw }) => toStoredApolloProfile(raw));
+    const reasons = aiScored
+      ? scored.scores.map((score) => ({ reasoning: score.reasoning, source: "AI" as const }))
+      : await generateLeadReasoningBatch(whyInputs, input.scoreContext, meta);
     const otwScores = await scoreOpenToWorkForLeads(
       profiles.map(({ person }, index) => ({
         title: person.title,
@@ -180,7 +193,8 @@ export async function runProfileDiscovery(input: {
     );
     const rows = profiles.map(({ person, raw }, index) => {
       const verified = isVerifiedEmail(person.email, person.emailStatus);
-      const reason = reasons[index] ?? buildLeadWhyReasoning(whyInputs[index], scoreContext);
+      const reason = reasons[index] ?? buildLeadWhyReasoning(whyInputs[index], input.scoreContext);
+      const score = scored.scores[index];
       return {
       userId: input.userId,
       searchId: input.searchId,
@@ -194,13 +208,15 @@ export async function runProfileDiscovery(input: {
       email: verified ? person.email : null,
       emailStatus: verified ? person.emailStatus : null,
       linkedinUrl: person.linkedinUrl,
-      leadScore: 5,
-      priorityLevel: "MEDIUM" as const,
+      leadScore: score.leadScore,
+      priorityLevel: toDbPriority(score.priorityLevel),
       reasoning: reason.reasoning,
       whySource: reason.source,
       recommendedApproach: "",
-      matchedSkills: [],
-      missingSkills: [],
+      matchedSkills: score.matchedSkills ?? [],
+      missingSkills: score.missingSkills ?? [],
+      scorePros: score.pros ?? [],
+      scoreCons: score.cons ?? [],
       openToWorkLevel: otwScores[index].level,
       openToWorkReasons: otwScores[index].reasons,
       hasEmail: verified,
