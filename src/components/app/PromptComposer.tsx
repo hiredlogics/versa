@@ -3,7 +3,6 @@
 import { Pencil, Sparkles, Square } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils/cn";
-import { useState } from "react";
 
 export interface ComposerValues {
   prompt: string;
@@ -43,9 +42,8 @@ export function PromptComposer({
   placeholder = "Find SaaS founders in the US with 20-300 employees who may need AI automation...",
   submitLabel = "Find leads",
 }: PromptComposerProps) {
-  const [mode, setMode] = useState<"describe" | "job_description" | "linkedin" | "company">(
-    values.mode ?? "describe"
-  );
+  // The parent owns the mode, so a reset or restored search always shows the right tab.
+  const mode = values.mode ?? "describe";
   const tabs = ["describe", "job_description", "linkedin", "company"] as const;
 
   const currentText = mode === "job_description" ? values.jobDescription ?? values.prompt : values.prompt;
@@ -73,8 +71,7 @@ export function PromptComposer({
     submitSearch();
   }
 
-  function switchMode(newMode: "describe" | "job_description" | "linkedin" | "company") {
-    setMode(newMode);
+  function switchMode(newMode: NonNullable<ComposerValues["mode"]>) {
     onChange({ ...values, mode: newMode });
   }
 
@@ -153,11 +150,13 @@ export function PromptComposer({
 
         {mode === "linkedin" && (
           <input
-            type="url"
+            type="text"
+            inputMode="url"
+            autoComplete="off"
             value={values.linkedinUrl}
             onChange={(e) => onChange({ ...values, linkedinUrl: e.target.value, mode: "linkedin" })}
             disabled={loading || disabled}
-            placeholder="LinkedIn profile URL"
+            placeholder="LinkedIn profile link, e.g. linkedin.com/in/jane-doe"
             className="app-input"
           />
         )}
@@ -165,11 +164,13 @@ export function PromptComposer({
         {mode === "company" && (
           <div className="grid gap-2">
             <input
-              type="url"
+              type="text"
+              inputMode="url"
+              autoComplete="off"
               value={values.companyUrl}
               onChange={(e) => onChange({ ...values, companyUrl: e.target.value, mode: "company" })}
               disabled={loading || disabled}
-              placeholder="Company URL"
+              placeholder="Company website, e.g. stripe.com"
               className="app-input"
             />
             <input

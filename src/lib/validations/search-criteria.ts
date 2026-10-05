@@ -86,7 +86,12 @@ export type ParsedJobDescription = z.infer<typeof parsedJobDescriptionSchema>;
 export const findLeadsInputSchema = z
   .object({
     prompt: z.string().optional(),
-    linkedinUrl: z.string().url().optional(),
+    linkedinUrl: z
+      .preprocess(
+        (v) => (typeof v === "string" && v.trim() && !/^https?:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
+        z.string().url("Enter a full LinkedIn profile link.")
+      )
+      .optional(),
     companyUrl: z.string().optional(),
     companyName: z.string().optional(),
     jobDescription: z

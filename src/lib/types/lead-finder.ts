@@ -79,6 +79,17 @@ export function priorityLabel(level: PriorityLevel): string {
   return map[level] ?? level;
 }
 
+/** "linkedin.com/in/jane" → "https://linkedin.com/in/jane"; empty stays empty. */
+export function withHttps(url: string | undefined): string {
+  const trimmed = (url ?? "").trim();
+  if (!trimmed) return "";
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+export function isLinkedInProfileUrl(url: string): boolean {
+  return /^https?:\/\/([a-z]{2,3}\.)?(www\.)?linkedin\.com\/in\/[^/?#\s]+/i.test(url);
+}
+
 export function buildPromptWithFilters(
   prompt: string,
   filters: AdvancedFilters,

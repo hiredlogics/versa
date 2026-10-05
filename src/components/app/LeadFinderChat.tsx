@@ -22,10 +22,11 @@ import {
 } from "@/components/app/ClarificationCard";
 import { Sparkles } from "lucide-react";
 import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
-import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
-import type { ParsedJobDescription } from "@/lib/validations/search-criteria";
+import type { ParsedJobDescription, ParsedSearchCriteria } from "@/lib/validations/search-criteria";
 import {
   buildPromptWithFilters,
+  isLinkedInProfileUrl,
+  withHttps,
   type AdvancedFilters,
   type FindLeadsResponse,
   type LeadRecord,
@@ -76,6 +77,23 @@ const EMPTY_COMPOSER: ComposerValues = {
   jobDescription: "",
   mode: "describe",
 };
+
+/**
+ * Only the open tab's fields, with links completed ("stripe.com" → "https://stripe.com"),
+ * so text left in another tab never changes the search.
+ */
+function composerForSubmit(values: ComposerValues): ComposerValues {
+  const mode = values.mode ?? "describe";
+  return {
+    ...EMPTY_COMPOSER,
+    mode,
+    prompt: mode === "describe" ? values.prompt : "",
+    jobDescription: mode === "job_description" ? values.jobDescription || values.prompt : "",
+    linkedinUrl: mode === "linkedin" ? withHttps(values.linkedinUrl) : "",
+    companyUrl: mode === "company" ? withHttps(values.companyUrl) : "",
+    companyName: mode === "company" ? values.companyName.trim() : "",
+  };
+}
 
 type UserTurn = {
   id: string;
@@ -672,7 +690,7 @@ export function LeadFinderChat() {
       history = turns.slice(0, assistantIndex - 1);
       assistantTurnId = retryAssistantTurnId;
     } else if (editingUserTurnId) {
-      snapshot = { ...composer };
+      snapshot = composerForSubmit(composer);
       const hasInput =
         snapshot.prompt.trim() ||
         snapshot.linkedinUrl ||
@@ -726,8 +744,16 @@ export function LeadFinderChat() {
       setEditingUserTurnId(null);
       setComposer(EMPTY_COMPOSER);
     } else {
-      snapshot = override ? { ...composer, prompt: override.prompt } : { ...composer };
+      snapshot = override ? { ...EMPTY_COMPOSER, prompt: override.prompt } : composerForSubmit(composer);
       const isJobDesc = snapshot.mode === "job_description";
+
+      if (snapshot.mode === "linkedin" && !isLinkedInProfileUrl(snapshot.linkedinUrl)) {
+        setComposerError({
+          kind: "missing_prompt",
+          message: "Paste a LinkedIn profile link, like linkedin.com/in/jane-doe.",
+        });
+        return;
+      }
       const currentText = isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : snapshot.prompt;
       const hasInput =
         currentText.trim() ||
