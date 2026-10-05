@@ -37,6 +37,8 @@ yarn-error.log*
 # local data
 /data/*
 !/data/layoffs.json
+/output/
+/output-us-tech-max-v6/
 
 # typescript
 *.tsbuildinfo
