@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -77,7 +78,7 @@ const PLANS: Array<{
 ];
 
 const FAQS = [
-  { q: "What does VARSA do?", a: "VARSA turns a description of your buyer into a ranked list of B2B leads, with a clear reason for every match." },
+  { q: "What does VARSA do?", a: "VARSA turns a description of the people you want, or a job description, into a ranked list of leads, with a clear reason for every match." },
   { q: "How do I start?", a: "Describe the people and companies you want to reach, then review the ranked results and decide where to focus." },
   { q: "What does the score mean?", a: "Scores run from 1–10 and help you compare fit. The explanation beside each score gives the useful context." },
   { q: "Are contacts verified?", a: "Results label verified email availability so you can quickly understand what is ready for outreach." },
@@ -85,46 +86,32 @@ const FAQS = [
   { q: "Is there a free trial?", a: "Yes. Every new account gets 25 free leads and 3 searches, once. After that, choose a plan to keep searching." },
 ];
 
-const SAMPLE_LEADS = [
-  { name: "Maya Chen", title: "Founder", company: "Northstar", reason: "Building a sales team", score: "9.6" },
-  { name: "Daniel Brooks", title: "VP Revenue", company: "Crescent", reason: "Hiring for growth", score: "9.2" },
-  { name: "Priya Shah", title: "COO", company: "Fieldwork", reason: "Owns the buying motion", score: "8.9" },
-  { name: "Aaron Miller", title: "CEO", company: "Relay", reason: "Matches company profile", score: "8.6" },
-];
-
-function SampleResultsCard() {
+/** A real screenshot of the results screen (example people), not a mock-up. */
+function ResultsPreview() {
   return (
-    <motion.div
-      className="relative rounded-2xl border border-lp-border bg-lp-panel p-6 card-glow"
+    <motion.figure
+      className="relative overflow-hidden rounded-2xl border border-lp-border bg-lp-panel card-glow"
       initial={{ opacity: 0, x: 32 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.75, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
-      <p className="text-[10px] uppercase tracking-wider text-lp-ice-blue">Sample results</p>
-      <div className="mt-4 rounded-xl border border-lp-border bg-lp-panel-strong p-4">
-        <p className="text-[11px] uppercase tracking-wide text-lp-muted-dark">Buyer description</p>
-        <p className="mt-1 text-sm text-lp-white">
-          Founders and revenue leaders at growing B2B software companies.
-        </p>
+      <div className="border-b border-lp-border px-5 py-3.5">
+        <p className="text-[10px] uppercase tracking-wider text-lp-ice-blue">Search</p>
+        <p className="mt-1 text-sm text-lp-white">Senior data engineers at fintech companies in Texas</p>
       </div>
-      <div className="mt-2 divide-y divide-lp-border">
-        {SAMPLE_LEADS.map((lead) => (
-          <div key={lead.name} className="flex items-center justify-between gap-3 py-3">
-            <div>
-              <p className="text-sm font-semibold text-lp-white">{lead.name}</p>
-              <p className="text-xs text-lp-muted">
-                {lead.title} · {lead.company}
-              </p>
-              <p className="mt-0.5 text-xs text-lp-success">{lead.reason}</p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-[10px] text-lp-success">Verified email</p>
-              <p className="font-mono text-lg font-bold text-lp-white">{lead.score}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </motion.div>
+      <Image
+        src="/images/varsa-results.png"
+        alt="VARSA results: four people scored from 9/10 to 5/10, each with the skills they have, a short reason, and a popup listing why the top lead scored 9/10."
+        width={1494}
+        height={746}
+        priority
+        sizes="(min-width: 1024px) 560px, 100vw"
+        className="block h-auto w-full"
+      />
+      <figcaption className="border-t border-lp-border px-5 py-2.5 text-[11px] text-lp-muted-dark">
+        The real results screen, shown with example people.
+      </figcaption>
+    </motion.figure>
   );
 }
 
@@ -141,7 +128,7 @@ function Hero() {
             transition={{ duration: 0.5 }}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-lp-ice-blue shadow-[0_0_8px_rgba(187,215,255,0.6)]" />
-            B2B lead intelligence
+            AI lead finder
           </motion.p>
 
           <motion.h1
@@ -150,7 +137,7 @@ function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.08 }}
           >
-            Describe your buyer. <span className="text-gradient-premium">Get a ranked list.</span>
+            Describe who you need. <span className="text-gradient-premium">Get a ranked list.</span>
           </motion.h1>
 
           <motion.p
@@ -159,8 +146,8 @@ function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.16 }}
           >
-            Turn a clear point of view into a practical list of people to contact. {BRAND.name} ranks each
-            lead and explains why it belongs there.
+            Describe the people you want to reach, or paste a job description. {BRAND.name} finds them,
+            scores each one from 1 to 10 and explains why.
           </motion.p>
 
           <motion.div
@@ -195,7 +182,7 @@ function Hero() {
         </div>
 
         <div className="relative lg:pl-4">
-          <SampleResultsCard />
+          <ResultsPreview />
         </div>
       </div>
     </section>
