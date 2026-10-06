@@ -91,6 +91,19 @@ async function resolvePromptAndRequirements(
   return { prompt, jobRequirements };
 }
 
+/**
+ * Every person this user already has a lead for, in any search. A new search treats
+ * them as already seen, so asking again (even in other words) brings new people and
+ * never charges twice for the same person.
+ */
+async function userLeadKeys(userId: string): Promise<Set<string>> {
+  const leads = await prisma.lead.findMany({
+    where: { userId, deletedAt: null },
+    select: { apolloPersonId: true, linkedinUrl: true },
+  });
+  return new Set(leads.flatMap((lead) => poolPersonKeys(lead)));
+}
+
 type JobSkillLists = { mustHaveSkills?: string[]; niceToHaveSkills?: string[] };
 
 /**
@@ -502,7 +515,7 @@ export async function runFindLeadsJob(
       wantsEmail,
       leadContext,
       startPage: 1,
-      seenIds: new Set(),
+      seenIds: await userLeadKeys(user.id),
       batchesCompleted: 0,
       leadsFetched: 0,
       leadsWithEmail: 0,
@@ -551,7 +564,9 @@ export async function runFindLeadsJob(
     const outcomeNote =
       result.totalAvailable === 0 && savedTotal === 0
         ? "No people matched this exact role and location. Try a wider location or more job titles."
-        : savedTotal === 0 && !wantsEmail
+        : savedTotal === 0 && result.leadsFetched === 0
+          ? "You already have every person who matches this search. Try a wider location or more job titles to find new people."
+          : savedTotal === 0 && !wantsEmail
           ? `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a public LinkedIn profile. Try a wider search.`
           : countNote;
 
@@ -652,14 +667,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
   try {
-    const existingIds = new Set(
-      (
-        await prisma.lead.findMany({
-          where: { searchId, deletedAt: null },
-          select: { apolloPersonId: true, linkedinUrl: true },
-        })
-      ).flatMap((lead) => poolPersonKeys(lead))
-    );
+    const existingIds = await userLeadKeys(user.id);
 
     const batchSize = getProcessBatchSize();
     const resumeAccess = await requireLeadSearchAccess(user, batchSize);
