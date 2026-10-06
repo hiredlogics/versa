@@ -647,7 +647,7 @@ export async function runSequentialLeadBatches(input: {
           batchIndex,
           batchSize,
           phase: creditsExhausted
-            ? "Provider credits exhausted — saved this batch and paused."
+            ? "Paused: we can't look up more people right now. This batch is saved."
             : hitSaveCap || !underAutoCap || unlockAttempts >= unlockBudget
               ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email — click Get next 100 to check more people.`
               : morePages

@@ -57,7 +57,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       data: {
         status: "RUNNING",
         errorMessage: null,
-        relaxNote: "Resuming Apollo pull…",
+        relaxNote: "Looking for more people…",
       },
     });
 

@@ -693,7 +693,7 @@ export async function fetchPeopleBatch(options: {
     totalPages = Math.min(firstPage.totalPages || 1, pagesCap, APOLLO_HARD_MAX_PAGES);
     apolloRelaxNote =
       firstPage.variant.level > 0
-        ? `(Filters: ${firstPage.variant.label} — interests like "AI chatbots" ranked after fetch)`
+        ? "We widened the search a little to find enough matches."
         : undefined;
 
     for (const person of firstPage.people) {
@@ -838,7 +838,7 @@ export async function searchAllPeople(
     totalAvailable = firstPage.totalEntries;
     apolloRelaxNote =
       firstPage.variant.level > 0
-        ? `(Filters: ${firstPage.variant.label} — interests like "AI chatbots" ranked after fetch)`
+        ? "We widened the search a little to find enough matches."
         : undefined;
 
     console.log(

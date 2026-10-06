@@ -145,7 +145,8 @@ export function criteriaForClient(criteria: SearchCriteria) {
   const where = criteria.country ? ` in ${criteria.country}` : "";
   const intentSummary = criteria.openToWork
     ? `${role}${where} who wrote open-to-work / job-seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
-    : criteria.summary || criteria.searchIntent?.slice(0, 160) || "";
+    : // Only a real summary: the raw search text can hold internal instructions.
+      criteria.summary || "";
 
   return {
     industry: criteria.industry ?? null,
@@ -210,7 +211,7 @@ async function runSearchStep(args: {
 }): Promise<SearchStepResult> {
   const searchRow = await prisma.leadSearch.update({
     where: { id: args.searchId },
-    data: { relaxNote: "Checking the saved lead database…" },
+    data: { relaxNote: "Looking for matching people…" },
     select: { jobRequirements: true },
   });
 
@@ -318,13 +319,9 @@ async function runSearchStep(args: {
   return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
 }
 
-function poolNote(pool: PoolServeResult): string {
-  if (pool.saved === 0) return "";
-  const unlocked = pool.unlockedSaved
-    ? ` (${pool.unlockedSaved.toLocaleString()} needed a new email unlock)`
-    : "";
-  return `${pool.saved.toLocaleString()} came from the saved lead database${unlocked}. `;
-}
+/** Where leads came from (our saved pool or a new lookup) is internal, so users never see it. */
+const OUT_OF_LOOKUPS =
+  " We can't look up more people right now. Please try again later, then click Get next 100.";
 
 /**
  * Parse prompt and decide if we need clarifying questions before spending credits.
@@ -548,7 +545,7 @@ export async function runFindLeadsJob(
 
     const partialNote = result.canResume
       ? result.creditsExhausted
-        ? " Data-provider credits ran out — top up, then click Get next 100."
+        ? OUT_OF_LOOKUPS
         : result.stopReason === "max_auto_batches" || result.stopReason === "credit_cap"
           ? ` Saved this batch. Click Get next 100 when you want more (you asked for more / more matches remain).`
           : result.stopped
@@ -559,27 +556,20 @@ export async function runFindLeadsJob(
     const verifiedEmailCount = await prisma.lead.count({
       where: { searchId, userId: user.id, deletedAt: null, hasEmail: true },
     });
-    const apolloRequestNote = `Apollo: ${result.batchesCompleted} search page${result.batchesCompleted === 1 ? "" : "s"}${result.savedThisRun ? ` + ${result.batchesCompleted} bulk enrichment request${result.batchesCompleted === 1 ? "" : "s"} for ${result.savedThisRun} people` : ""}.`;
+    const savedTotal = result.leadsWithEmail;
     const countNote =
-      result.leadsWithEmail === 0
+      savedTotal === 0
         ? criteria.openToWork
-          ? (result.otwSignalHits ?? 0) > 0
-            ? `Found ${result.otwSignalHits} profile(s) with open-to-work wording after scanning ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} (pool ≈ ${result.totalAvailable.toLocaleString()}), but none had a verified email to save.`
-            : `Scanned ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} profiles (pool ≈ ${result.totalAvailable.toLocaleString()}) for open-to-work title/headline signals — ${result.otwSignalHits ?? 0} matched.`
-          : `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
-        : `Saved ${result.leadsWithEmail.toLocaleString()} leads (${verifiedEmailCount.toLocaleString()} with verified email). ${apolloRequestNote}`;
-
-    const profileCountNote =
-      result.totalAvailable === 0
-        ? `Apollo returned no people matching the exact requested role and location. No profile lookup credits were spent.`
-        : result.leadsWithEmail === 0 && !wantsEmail
-        ? `Apollo checked ${result.leadsFetched.toLocaleString()} matching people but did not return a LinkedIn profile URL for any of them. No email or workplace enrichment was requested.`
-        : countNote;
+          ? `Checked ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} matching people for open-to-work wording; ${result.otwSignalHits ?? 0} had it, but none had a verified email to save.`
+          : `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a verified email. We only save checked emails.`
+        : `Saved ${savedTotal.toLocaleString()} lead${savedTotal === 1 ? "" : "s"} (${verifiedEmailCount.toLocaleString()} with a verified email).`;
 
     const outcomeNote =
-      pool.saved > 0 && result.savedThisRun === 0 && result.leadsFetched === 0
-        ? `All ${pool.saved.toLocaleString()} leads came from the saved lead database${pool.unlockedSaved ? ` (${pool.unlockedSaved.toLocaleString()} needed a new email unlock)` : ""}, so no new Apollo search was needed.`
-        : `${poolNote(pool)}${profileCountNote}`;
+      result.totalAvailable === 0 && savedTotal === 0
+        ? "No people matched this exact role and location. Try a wider location or more job titles."
+        : savedTotal === 0 && !wantsEmail
+          ? `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a public LinkedIn profile. Try a wider search.`
+          : countNote;
 
     await prisma.leadSearch.update({
       where: { id: searchId },
@@ -714,7 +704,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     const totalSaved = result.leadsWithEmail;
     const partialNote = result.canResume
       ? result.creditsExhausted
-        ? " Provider credits ran out — top up, then click Get next 100."
+        ? OUT_OF_LOOKUPS
         : " Click Get next 100 for more."
       : "";
 
@@ -741,8 +731,8 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
           totalToUnlock: result.totalAvailable,
         }) as object,
         relaxNote: result.canResume
-          ? `${poolNote(pool)}Resume added ${(result.savedThisRun + pool.saved).toLocaleString()} leads (total ${totalSaved.toLocaleString()} after ${result.leadsFetched.toLocaleString()} checked).${partialNote}`
-          : `${poolNote(pool)}Resume finished — ${totalSaved.toLocaleString()} leads saved for this prompt.`,
+          ? `Added ${(result.savedThisRun + pool.saved).toLocaleString()} more leads (${totalSaved.toLocaleString()} in total).${partialNote}`
+          : `Done: ${totalSaved.toLocaleString()} leads saved for this search.`,
       },
     });
   } catch (error) {

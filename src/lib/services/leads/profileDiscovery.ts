@@ -236,7 +236,7 @@ export async function runProfileDiscovery(input: {
       data: {
         totalAvailable,
         leadsReturned: savedProfiles,
-        relaxNote: `Saved ${savedProfiles.toLocaleString()} LinkedIn profile${savedProfiles === 1 ? "" : "s"} after checking ${leadsFetched.toLocaleString()} Apollo matches.`,
+        relaxNote: `Saved ${savedProfiles.toLocaleString()} LinkedIn profile${savedProfiles === 1 ? "" : "s"} after checking ${leadsFetched.toLocaleString()} matching people.`,
       },
     });
 
