@@ -29,12 +29,16 @@ export type LeadScoreOutput = {
   cons?: string[];
 };
 
-/** Up to 3 short, non-empty strings from whatever the AI sent. */
-function shortList(value: unknown): string[] {
+/** Points that say nothing about why one lead beat another, or mention hidden ids. */
+const VAGUE_POINT =
+  /\b(limited (information|details)|diverse (job history|experience|background)|relevant experience|lead #?\d+|no (indication|sign) of job.?seeking)\b/i;
+
+/** Up to 3 short, specific points from whatever the AI sent. */
+export function shortList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => String(item ?? "").trim().slice(0, 120))
-    .filter(Boolean)
+    .filter((item) => item && !VAGUE_POINT.test(item))
     .slice(0, 3);
 }
 
@@ -138,14 +142,29 @@ Rules:
       ? `
 - These leads were all returned for the SAME search. Compare them with each other before scoring:
   the best fit gets the highest score and the weakest fit the lowest. Two leads share a score
-  only when they are truly equally good.`
+  only when they are truly equally good.
+- The pros and cons must EXPLAIN THE RANKING, so a reader sees why one lead scored higher:
+  - Use facts that differ between the leads. Never give two leads the same pro or con.
+  - A higher-scored lead gets at least one pro saying what sets it apart from the others
+    (e.g. "Senior title; most others are mid-level").
+  - A lower-scored lead gets at least one con saying what the higher-scored leads have
+    and it lacks (e.g. "Junior title, while top leads are senior").`
       : ""
   }
 - Use the full 1-10 range: different profiles should get different scores.
 - pros: up to 3 short facts from this lead's data that raised the score.
 - cons: up to 3 short facts that lowered it, or what is missing or unclear.
   Each under 12 words, plain English, about THIS lead (not generic).
-  Mention job-seeking status only when the search is about job seekers or open-to-work.
+  Every point names a concrete fact: a title or seniority, company, company size,
+  industry, location, a past job, a skill, or whether there is an email.
+  Never write vague points like "Relevant experience", "Current role as X",
+  "Limited information", "Diverse experience" or "Diverse job history".
+  Never refer to another lead by number or index (no "lead 2"); name the difference instead.
+  ${
+    context.openToWork
+      ? "This search is about job seekers: job-seeking signals matter."
+      : "This search is NOT about job seekers: never mention job-seeking or open-to-work status."
+  }
 
 Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "pros": ["..."], "cons": ["..."], "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
 priorityLevel: Low|Medium|High|Very High`;

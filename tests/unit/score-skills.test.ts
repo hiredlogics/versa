@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { scoreLeadsWithAi, skillsFromAi } from "@/lib/services/ai/scoreLead";
+import { scoreLeadsWithAi, shortList, skillsFromAi } from "@/lib/services/ai/scoreLead";
 import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
 import type { LeadScoreContext } from "@/lib/types";
 
@@ -197,6 +197,21 @@ describe("comparing leads in one search", () => {
     });
     const result = await scoreLeadsWithAi([a, b], { searchIntent: "CTO" });
     expect(result.fromAi).toEqual([true, false]);
+  });
+});
+
+describe("shortList", () => {
+  it("drops vague points and hidden lead numbers", () => {
+    expect(
+      shortList([
+        "Senior title; most others are mid-level",
+        "Diverse job history across companies",
+        "Limited information on recent achievements",
+        "Lower than lead 2",
+        "No indication of job-seeking status",
+        "Works at a 15,000-person telecom",
+      ])
+    ).toEqual(["Senior title; most others are mid-level", "Works at a 15,000-person telecom"]);
   });
 });
 
