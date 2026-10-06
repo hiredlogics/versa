@@ -6,11 +6,8 @@ import { cn } from "@/lib/utils/cn";
 
 export interface ComposerValues {
   prompt: string;
-  linkedinUrl: string;
-  companyUrl: string;
-  companyName: string;
   jobDescription?: string;
-  mode?: "describe" | "job_description" | "linkedin" | "company";
+  mode?: "describe" | "job_description";
 }
 
 interface PromptComposerProps {
@@ -44,13 +41,13 @@ export function PromptComposer({
 }: PromptComposerProps) {
   // The parent owns the mode, so a reset or restored search always shows the right tab.
   const mode = values.mode ?? "describe";
-  const tabs = ["describe", "job_description", "linkedin", "company"] as const;
+  const tabs = ["describe", "job_description"] as const;
 
   const currentText = mode === "job_description" ? values.jobDescription ?? values.prompt : values.prompt;
   const canSubmit =
     !loading &&
     !disabled &&
-    (currentText.trim() || values.linkedinUrl || values.companyUrl || values.companyName);
+    Boolean(currentText.trim());
 
   function submitSearch() {
     if (!canSubmit) return;
@@ -90,8 +87,6 @@ export function PromptComposer({
             [
               ["describe", "Describe buyers"],
               ["job_description", "Paste job description"],
-              ["linkedin", "LinkedIn profile"],
-              ["company", "Company"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -145,41 +140,6 @@ export function PromptComposer({
               <span>Extracts role, seniority, location, and must-have/nice-to-have skills</span>
               <span>{((values.jobDescription ?? values.prompt)?.length ?? 0).toLocaleString()} / 20,000 chars</span>
             </div>
-          </div>
-        )}
-
-        {mode === "linkedin" && (
-          <input
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            value={values.linkedinUrl}
-            onChange={(e) => onChange({ ...values, linkedinUrl: e.target.value, mode: "linkedin" })}
-            disabled={loading || disabled}
-            placeholder="LinkedIn profile link, e.g. linkedin.com/in/jane-doe"
-            className="app-input"
-          />
-        )}
-
-        {mode === "company" && (
-          <div className="grid gap-2">
-            <input
-              type="text"
-              inputMode="url"
-              autoComplete="off"
-              value={values.companyUrl}
-              onChange={(e) => onChange({ ...values, companyUrl: e.target.value, mode: "company" })}
-              disabled={loading || disabled}
-              placeholder="Company website, e.g. stripe.com"
-              className="app-input"
-            />
-            <input
-              value={values.companyName}
-              onChange={(e) => onChange({ ...values, companyName: e.target.value, mode: "company" })}
-              disabled={loading || disabled}
-              placeholder="Company name"
-              className="app-input"
-            />
           </div>
         )}
 

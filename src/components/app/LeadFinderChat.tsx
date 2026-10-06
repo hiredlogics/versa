@@ -25,8 +25,6 @@ import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 import type { ParsedJobDescription, ParsedSearchCriteria } from "@/lib/validations/search-criteria";
 import {
   buildPromptWithFilters,
-  isLinkedInProfileUrl,
-  withHttps,
   type AdvancedFilters,
   type FindLeadsResponse,
   type LeadRecord,
@@ -71,17 +69,11 @@ const EMPTY_CRITERIA: ParsedSearchCriteria = {
 
 const EMPTY_COMPOSER: ComposerValues = {
   prompt: "",
-  linkedinUrl: "",
-  companyUrl: "",
-  companyName: "",
   jobDescription: "",
   mode: "describe",
 };
 
-/**
- * Only the open tab's fields, with links completed ("stripe.com" → "https://stripe.com"),
- * so text left in another tab never changes the search.
- */
+/** Only the open tab's text, so text left in the other tab never changes the search. */
 function composerForSubmit(values: ComposerValues): ComposerValues {
   const mode = values.mode ?? "describe";
   return {
@@ -89,9 +81,6 @@ function composerForSubmit(values: ComposerValues): ComposerValues {
     mode,
     prompt: mode === "describe" ? values.prompt : "",
     jobDescription: mode === "job_description" ? values.jobDescription || values.prompt : "",
-    linkedinUrl: mode === "linkedin" ? withHttps(values.linkedinUrl) : "",
-    companyUrl: mode === "company" ? withHttps(values.companyUrl) : "",
-    companyName: mode === "company" ? values.companyName.trim() : "",
   };
 }
 
@@ -158,8 +147,7 @@ function classifyError(status: number, message: string, code?: string): SearchEr
 function buildConversationPrompt(
   priorUserTexts: string[],
   nextText: string,
-  filters: AdvancedFilters,
-  composer: ComposerValues
+  filters: AdvancedFilters
 ): string {
   const trimmed = nextText.trim();
   const prior = priorUserTexts.map((line) => line.trim()).filter(Boolean);
@@ -177,11 +165,7 @@ function buildConversationPrompt(
     base = prior.join(". ");
   }
 
-  return buildPromptWithFilters(base, filters, {
-    linkedinUrl: composer.linkedinUrl || undefined,
-    companyUrl: composer.companyUrl || undefined,
-    companyName: composer.companyName || undefined,
-  });
+  return buildPromptWithFilters(base, filters);
 }
 
 export function LeadFinderChat() {
@@ -691,25 +675,17 @@ export function LeadFinderChat() {
       assistantTurnId = retryAssistantTurnId;
     } else if (editingUserTurnId) {
       snapshot = composerForSubmit(composer);
-      const hasInput =
-        snapshot.prompt.trim() ||
-        snapshot.linkedinUrl ||
-        snapshot.companyUrl ||
-        snapshot.companyName;
+      const hasInput = snapshot.prompt.trim();
 
       if (!hasInput) {
         setComposerError({
           kind: "missing_prompt",
-          message: "Describe who you want to find or add a URL.",
+          message: "Describe who you want to find.",
         });
         return;
       }
 
-      displayText =
-        snapshot.prompt.trim() ||
-        snapshot.linkedinUrl ||
-        snapshot.companyUrl ||
-        snapshot.companyName;
+      displayText = snapshot.prompt.trim();
 
       const editId = editingUserTurnId;
       const editIndex = turns.findIndex((turn) => turn.id === editId);
@@ -747,34 +723,19 @@ export function LeadFinderChat() {
       snapshot = override ? { ...EMPTY_COMPOSER, prompt: override.prompt } : composerForSubmit(composer);
       const isJobDesc = snapshot.mode === "job_description";
 
-      if (snapshot.mode === "linkedin" && !isLinkedInProfileUrl(snapshot.linkedinUrl)) {
-        setComposerError({
-          kind: "missing_prompt",
-          message: "Paste a LinkedIn profile link, like linkedin.com/in/jane-doe.",
-        });
-        return;
-      }
       const currentText = isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : snapshot.prompt;
-      const hasInput =
-        currentText.trim() ||
-        snapshot.linkedinUrl ||
-        snapshot.companyUrl ||
-        snapshot.companyName;
+      const hasInput = currentText.trim();
 
       if (!hasInput) {
         setComposerError({
           kind: "missing_prompt",
-          message: "Describe who you want to find or add a URL.",
+          message: "Describe who you want to find.",
         });
         return;
       }
 
       history = turns;
-      displayText =
-        (isJobDesc ? (snapshot.jobDescription || snapshot.prompt).trim() : snapshot.prompt.trim()) ||
-        snapshot.linkedinUrl ||
-        snapshot.companyUrl ||
-        snapshot.companyName;
+      displayText = currentText.trim();
 
       const userTurnId = newId();
       assistantTurnId = newId();
@@ -796,7 +757,7 @@ export function LeadFinderChat() {
       setComposer(EMPTY_COMPOSER);
     }
 
-    const fullPrompt = buildConversationPrompt(priorUserTextsOf(history), snapshot.prompt, filters, snapshot);
+    const fullPrompt = buildConversationPrompt(priorUserTextsOf(history), snapshot.prompt, filters);
     // A new pasted description is parsed on the server; a follow-up reuses the parsed one.
     const newJobDescription =
       snapshot.mode === "job_description"
@@ -836,11 +797,7 @@ export function LeadFinderChat() {
 
     startStepAnimation();
 
-    let inputType: "prompt" | "linkedin" | "company_url" | "company_name" | "job_description" = "prompt";
-    if (newJobDescription || jobRequirements) inputType = "job_description";
-    else if (snapshot.linkedinUrl) inputType = "linkedin";
-    else if (snapshot.companyUrl) inputType = "company_url";
-    else if (snapshot.companyName) inputType = "company_name";
+    const inputType = newJobDescription || jobRequirements ? "job_description" : "prompt";
 
     try {
       const res = await fetch("/api/leads/find", {
@@ -850,9 +807,6 @@ export function LeadFinderChat() {
           prompt: newJobDescription ? undefined : fullPrompt,
           jobDescription: newJobDescription,
           jobRequirements,
-          linkedinUrl: snapshot.linkedinUrl || undefined,
-          companyUrl: snapshot.companyUrl || undefined,
-          companyName: snapshot.companyName || undefined,
           inputType,
           minScore: filters.minScore ?? 5,
           skipClarification: clarified || undefined,

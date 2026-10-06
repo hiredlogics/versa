@@ -86,14 +86,6 @@ export type ParsedJobDescription = z.infer<typeof parsedJobDescriptionSchema>;
 export const findLeadsInputSchema = z
   .object({
     prompt: z.string().optional(),
-    linkedinUrl: z
-      .preprocess(
-        (v) => (typeof v === "string" && v.trim() && !/^https?:\/\//i.test(v.trim()) ? `https://${v.trim()}` : v),
-        z.string().url("Enter a full LinkedIn profile link.")
-      )
-      .optional(),
-    companyUrl: z.string().optional(),
-    companyName: z.string().optional(),
     jobDescription: z
       .string()
       .max(20_000, "Job description must be 20,000 characters or fewer")
@@ -101,7 +93,7 @@ export const findLeadsInputSchema = z
     /** Requirements already read from this conversation's job description (follow-ups). */
     jobRequirements: parsedJobDescriptionSchema.optional(),
     inputType: z
-      .enum(["prompt", "linkedin", "company_url", "company_name", "persona", "job_description"])
+      .enum(["prompt", "persona", "job_description"])
       .default("prompt"),
     minScore: z.number().min(1).max(10).optional(),
     /** How many leads the user wants this run (clamped to remaining credits + batch size). */

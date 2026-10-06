@@ -42,18 +42,6 @@ export async function POST(request: Request) {
       skipClarification: parsed.skipClarification,
     };
 
-    if (parsed.linkedinUrl) {
-      input.linkedinUrl = parsed.linkedinUrl;
-      input.inputType = "linkedin";
-    }
-    if (parsed.companyUrl) {
-      input.companyUrl = parsed.companyUrl;
-      input.inputType = "company_url";
-    }
-    if (parsed.companyName) {
-      input.companyName = parsed.companyName;
-      input.inputType = "company_name";
-    }
     if (!input.requestedLeadCount && input.prompt) {
       input.requestedLeadCount = extractRequestedLeadCount(input.prompt);
     }

@@ -82,26 +82,8 @@ export function priorityLabel(level: PriorityLevel): string {
   return map[level] ?? level;
 }
 
-/** "linkedin.com/in/jane" → "https://linkedin.com/in/jane"; empty stays empty. */
-export function withHttps(url: string | undefined): string {
-  const trimmed = (url ?? "").trim();
-  if (!trimmed) return "";
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
-
-export function isLinkedInProfileUrl(url: string): boolean {
-  return /^https?:\/\/([a-z]{2,3}\.)?(www\.)?linkedin\.com\/in\/[^/?#\s]+/i.test(url);
-}
-
-export function buildPromptWithFilters(
-  prompt: string,
-  filters: AdvancedFilters,
-  extras: { linkedinUrl?: string; companyUrl?: string; companyName?: string }
-): string {
+export function buildPromptWithFilters(prompt: string, filters: AdvancedFilters): string {
   const parts: string[] = [prompt.trim()];
-  if (extras.linkedinUrl) parts.push(`LinkedIn profile: ${extras.linkedinUrl}`);
-  if (extras.companyUrl) parts.push(`Company URL: ${extras.companyUrl}`);
-  if (extras.companyName) parts.push(`Company name: ${extras.companyName}`);
   if (filters.industry) parts.push(`Industry: ${filters.industry}`);
   if (filters.country) parts.push(`Country: ${filters.country}`);
   if (filters.companySizeMin || filters.companySizeMax) {

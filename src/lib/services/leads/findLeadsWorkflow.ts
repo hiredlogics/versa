@@ -49,9 +49,6 @@ export { USER_STOPPED_MESSAGE, canResumeSearch };
 export interface FindLeadsInput {
   prompt: string;
   inputType?: string;
-  linkedinUrl?: string;
-  companyUrl?: string;
-  companyName?: string;
   jobDescription?: string;
   jobRequirements?: ParsedJobDescription | null;
   minScore?: number;
@@ -69,19 +66,6 @@ export type FindLeadsStartResult = {
   async: true;
 };
 
-function buildPrompt(input: FindLeadsInput): string {
-  if (input.linkedinUrl) {
-    return `Find leads similar to this LinkedIn profile: ${input.linkedinUrl}. ${input.prompt || ""}`.trim();
-  }
-  if (input.companyUrl) {
-    return `Find decision makers at companies like ${input.companyUrl}. ${input.prompt || ""}`.trim();
-  }
-  if (input.companyName) {
-    return `Find decision makers at ${input.companyName}. ${input.prompt || ""}`.trim();
-  }
-  return input.prompt;
-}
-
 /**
  * For job description searches: read the description once (or reuse the requirements a
  * follow-up sends back), then search with a short prompt built from them. `input.prompt`
@@ -92,7 +76,7 @@ async function resolvePromptAndRequirements(
   userId?: string
 ): Promise<{ prompt: string; jobRequirements: ParsedJobDescription | null }> {
   if (input.inputType !== "job_description") {
-    return { prompt: buildPrompt(input), jobRequirements: null };
+    return { prompt: input.prompt, jobRequirements: null };
   }
 
   const jobRequirements =
