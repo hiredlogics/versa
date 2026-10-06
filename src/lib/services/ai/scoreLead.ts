@@ -133,11 +133,19 @@ Rules:
   - Do NOT require CEO/founder authority.
   - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
   - Explicit seeking/available/freelance title signals can go to 8–10.
-- Include ALL leads in response (use the provided index values).
+- Include ALL leads in response (use the provided index values).${
+    context.compareAcrossLeads
+      ? `
+- These leads were all returned for the SAME search. Compare them with each other before scoring:
+  the best fit gets the highest score and the weakest fit the lowest. Two leads share a score
+  only when they are truly equally good.`
+      : ""
+  }
 - Use the full 1-10 range: different profiles should get different scores.
 - pros: up to 3 short facts from this lead's data that raised the score.
 - cons: up to 3 short facts that lowered it, or what is missing or unclear.
   Each under 12 words, plain English, about THIS lead (not generic).
+  Mention job-seeking status only when the search is about job seekers or open-to-work.
 
 Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "pros": ["..."], "cons": ["..."], "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
 priorityLevel: Low|Medium|High|Very High`;
@@ -199,7 +207,7 @@ async function scoreChunkWithAi(
   context: LeadScoreContext,
   heuristicChunk: LeadScoreOutput[],
   meta?: { userId?: string; searchId?: string }
-): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
+): Promise<{ scores: LeadScoreOutput[]; provider: string; fromAi: boolean[] }> {
   const payload = chunk.map((l, i) => {
     const raw = l.rawApolloData as {
       headline?: string;
@@ -241,6 +249,7 @@ async function scoreChunkWithAi(
     };
 
     const scores = [...heuristicChunk];
+    const fromAi = chunk.map(() => false);
     for (const item of parsed.leads || []) {
       if (item.index >= 0 && item.index < chunk.length) {
         const base: LeadScoreOutput = {
@@ -254,45 +263,52 @@ async function scoreChunkWithAi(
           cons: shortList(item.cons),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
+        fromAi[item.index] = true;
       }
     }
-    return { scores, provider };
+    return { scores, provider, fromAi };
   } catch (error) {
     console.warn(
       `[scoreLead] AI score chunk offset=${absoluteOffset} size=${chunk.length} failed:`,
       error instanceof Error ? error.message : error
     );
-    return { scores: heuristicChunk, provider: "HEURISTIC" };
+    return { scores: heuristicChunk, provider: "HEURISTIC", fromAi: chunk.map(() => false) };
   }
 }
 
 export async function scoreLeadsWithAi(
   leads: ScoredLeadInput[],
   context: LeadScoreContext,
-  meta?: { userId?: string; searchId?: string }
-): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
+  meta?: { userId?: string; searchId?: string },
+  /** batchSize: leads per AI call; ignoreCap: allow more than AI_MAX_SCORE_COUNT (re-scoring). */
+  options: { batchSize?: number; ignoreCap?: boolean } = {}
+): Promise<{ scores: LeadScoreOutput[]; provider: string; fromAi: boolean[] }> {
   const heuristicFixed = heuristicScores(leads, context);
+  const batchSize = options.batchSize ?? SCORE_BATCH_SIZE;
 
   // Very large pulls can't afford per-batch AI scoring — keep them heuristic-ranked.
-  const aiScoreCap = Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
+  const aiScoreCap = options.ignoreCap
+    ? 0
+    : Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
   if (leads.length === 0 || (aiScoreCap > 0 && leads.length > aiScoreCap)) {
-    if (leads.length > aiScoreCap) {
+    if (aiScoreCap > 0 && leads.length > aiScoreCap) {
       console.log(
         `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap} — using heuristic scores`
       );
     }
-    return { scores: heuristicFixed, provider: "HEURISTIC" };
+    return { scores: heuristicFixed, provider: "HEURISTIC", fromAi: leads.map(() => false) };
   }
 
-  const chunks = chunkLeadsForScoring(leads, SCORE_BATCH_SIZE);
+  const chunks = chunkLeadsForScoring(leads, batchSize);
   const scores = [...heuristicFixed];
+  const fromAi = leads.map(() => false);
   const providers = new Set<string>();
 
   for (let c = 0; c < chunks.length; c++) {
     const chunk = chunks[c];
-    const offset = c * SCORE_BATCH_SIZE;
+    const offset = c * batchSize;
     const heuristicChunk = heuristicFixed.slice(offset, offset + chunk.length);
-    const { scores: chunkScores, provider } = await scoreChunkWithAi(
+    const { scores: chunkScores, provider, fromAi: chunkFromAi } = await scoreChunkWithAi(
       chunk,
       offset,
       context,
@@ -302,6 +318,7 @@ export async function scoreLeadsWithAi(
     providers.add(provider);
     for (let i = 0; i < chunkScores.length; i++) {
       scores[offset + i] = chunkScores[i];
+      fromAi[offset + i] = chunkFromAi[i];
     }
   }
 
@@ -309,5 +326,5 @@ export async function scoreLeadsWithAi(
   const provider =
     aiProviders.length > 0 ? aiProviders[0] : providers.has("HEURISTIC") ? "HEURISTIC" : "OPENAI";
 
-  return { scores, provider };
+  return { scores, provider, fromAi };
 }

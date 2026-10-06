@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, X } from "lucide-react";
 import { ScoreBadge } from "@/components/ui/Badge";
 
@@ -8,7 +9,8 @@ const PANEL_WIDTH = 288;
 
 /**
  * The score badge; hover (or tap) shows the points for and against that score.
- * The panel is fixed-positioned so scrolling tables never clip it.
+ * The panel is drawn on document.body (a portal): inside the results panel, blur
+ * effects, transforms and overflow-hidden would otherwise hide or misplace it.
  */
 export function ScoreWhy({
   score,
@@ -21,7 +23,10 @@ export function ScoreWhy({
   cons?: string[];
   reasoning?: string | null;
 }) {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const pinned = useRef(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -30,7 +35,10 @@ export function ScoreWhy({
   function show() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const left = Math.min(Math.max(8, rect.left), window.innerWidth - PANEL_WIDTH - 8);
+    const left = Math.min(
+      Math.max(8, rect.left),
+      window.innerWidth - PANEL_WIDTH - 8,
+    );
     setPosition({ top: rect.bottom + 6, left });
   }
 
@@ -80,31 +88,44 @@ export function ScoreWhy({
         <ScoreBadge score={score} />
       </button>
 
-      {position && (
-        <div
-          id={panelId}
-          role="tooltip"
-          style={{ top: position.top, left: position.left, width: PANEL_WIDTH }}
-          className="fixed z-50 space-y-2.5 rounded-xl border border-lp-border bg-lp-panel-strong p-3.5 text-left shadow-2xl"
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-lp-muted-dark">
-            Why {score}/10
-          </p>
-          {hasPoints ? (
-            <ScorePoints pros={pros} cons={cons} />
-          ) : (
-            <p className="text-xs leading-relaxed text-lp-muted">
-              {reasoning || "No details were saved for this score. Newer searches show them."}
+      {position &&
+        createPortal(
+          <div
+            id={panelId}
+            role="tooltip"
+            style={{
+              top: position.top,
+              left: position.left,
+              width: PANEL_WIDTH,
+            }}
+            className="fixed z-[60] space-y-2.5 rounded-xl border border-lp-border bg-lp-graphite p-3.5 text-left shadow-2xl"
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-lp-muted-dark">
+              Why {score}/10
             </p>
-          )}
-        </div>
-      )}
+            {hasPoints ? (
+              <ScorePoints pros={pros} cons={cons} />
+            ) : (
+              <p className="text-xs leading-relaxed text-lp-muted">
+                {reasoning ||
+                  "No details were saved for this score. Newer searches show them."}
+              </p>
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
 
 /** Green ticks for what raised the score, red crosses for what held it back. */
-export function ScorePoints({ pros = [], cons = [] }: { pros?: string[]; cons?: string[] }) {
+export function ScorePoints({
+  pros = [],
+  cons = [],
+}: {
+  pros?: string[];
+  cons?: string[];
+}) {
   return (
     <>
       <PointList items={pros} good />
@@ -113,13 +134,22 @@ export function ScorePoints({ pros = [], cons = [] }: { pros?: string[]; cons?: 
   );
 }
 
-function PointList({ items, good = false }: { items: string[]; good?: boolean }) {
+function PointList({
+  items,
+  good = false,
+}: {
+  items: string[];
+  good?: boolean;
+}) {
   if (items.length === 0) return null;
   const Icon = good ? Check : X;
   return (
     <ul className="space-y-1">
       {items.map((item) => (
-        <li key={item} className="flex items-start gap-1.5 text-xs leading-snug text-lp-off-white">
+        <li
+          key={item}
+          className="flex items-start gap-1.5 text-xs leading-snug text-lp-off-white"
+        >
           <Icon
             className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${good ? "text-emerald-300" : "text-rose-300"}`}
             aria-hidden

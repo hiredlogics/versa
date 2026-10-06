@@ -174,3 +174,29 @@ describe("score pros and cons", () => {
   });
 });
 
+describe("comparing leads in one search", () => {
+  const a = { name: "A", title: "CTO", company: "X", industry: "Fintech", employees: 50, location: "NY", hasEmail: true };
+  const b = { ...a, name: "B", title: "Intern" };
+
+  it("tells the AI to compare the leads with each other", async () => {
+    vi.mocked(aiChat).mockResolvedValueOnce({
+      content: JSON.stringify({ leads: [{ index: 0, leadScore: 9 }, { index: 1, leadScore: 3 }] }),
+      provider: "OPENAI",
+    });
+    const result = await scoreLeadsWithAi([a, b], { searchIntent: "CTO", compareAcrossLeads: true });
+    const system = vi.mocked(aiChat).mock.calls.at(-1)![0].system;
+    expect(system).toContain("Compare them with each other");
+    expect(result.scores.map((s) => s.leadScore)).toEqual([9, 3]);
+    expect(result.fromAi).toEqual([true, true]);
+  });
+
+  it("marks leads the AI skipped, so re-scoring keeps their old score", async () => {
+    vi.mocked(aiChat).mockResolvedValueOnce({
+      content: JSON.stringify({ leads: [{ index: 0, leadScore: 8 }] }),
+      provider: "OPENAI",
+    });
+    const result = await scoreLeadsWithAi([a, b], { searchIntent: "CTO" });
+    expect(result.fromAi).toEqual([true, false]);
+  });
+});
+

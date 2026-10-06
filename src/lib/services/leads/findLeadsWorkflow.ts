@@ -36,6 +36,7 @@ import { extractRequestedLeadCount, type ClarificationNeed } from "@/lib/clarify
 import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
 import { resolveSupportedCountry } from "@/lib/location-policy";
 import { Prisma, type User, type AiProvider } from "@prisma/client";
+import { rescoreSearchLeads } from "@/lib/services/leads/rescoreSearch";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
 import {
   parseJobDescription,
@@ -232,6 +233,20 @@ async function runSearchStep(args: {
   scoreContext.openToWork = args.criteria.openToWork;
   scoreContext.requireEmail = args.wantsEmail;
 
+  // After new leads are saved, score the whole search again side by side.
+  const compareLeads = async (savedThisStep: number) => {
+    if (savedThisStep <= 0) return;
+    try {
+      await prisma.leadSearch.update({
+        where: { id: args.searchId },
+        data: { relaxNote: "Comparing the leads with each other to finish their scores…" },
+      });
+      await rescoreSearchLeads({ userId: args.userId, searchId: args.searchId, scoreContext });
+    } catch (error) {
+      console.warn("[findLeads] comparing scores skipped:", error instanceof Error ? error.message : error);
+    }
+  };
+
   const pool = await serveFromPool({
     userId: args.userId,
     searchId: args.searchId,
@@ -250,6 +265,7 @@ async function runSearchStep(args: {
   if (remaining <= 0 || pool.creditsExhausted || stoppedNow) {
     // Nothing left to fetch this step. Apollo pages are untouched, so the
     // next "Get next 100" starts from the same page.
+    await compareLeads(pool.saved);
     return {
       pool,
       charged: pool.unlockedSaved,
@@ -297,6 +313,7 @@ async function runSearchStep(args: {
   const result: SequentialBatchResult = args.wantsEmail
     ? await runSequentialLeadBatches(common)
     : await runProfileDiscovery(common);
+  await compareLeads(pool.saved + result.savedThisRun);
 
   return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
 }

@@ -172,4 +172,6 @@ export interface LeadScoreContext {
   excludedTitles?: string[];
   excludedIndustries?: string[];
   targetSkills?: string[];
+  /** Score the leads relative to each other (all from the same search). */
+  compareAcrossLeads?: boolean;
 }
