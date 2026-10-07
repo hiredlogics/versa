@@ -141,7 +141,7 @@ export function criteriaForClient(criteria: SearchCriteria) {
   const role = titles[0] || "professionals";
   const where = criteria.country ? ` in ${criteria.country}` : "";
   const intentSummary = criteria.openToWork
-    ? `${role}${where} who wrote open-to-work / job-seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
+    ? `${role}${where} who wrote open to work or job seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
     : // Only a real summary: the raw search text can hold internal instructions.
       criteria.summary || "";
 
@@ -462,7 +462,7 @@ export async function startFindLeadsWorkflow(
       rawCriteria: criteria,
       prompt,
       parseProvider,
-      message: `Search started — unlocking up to ${Math.min(batchSize, access.leadsRemaining).toLocaleString()} leads this step (you have ${access.leadsRemaining.toLocaleString()} credits left).`,
+      message: `Search started, unlocking up to ${Math.min(batchSize, access.leadsRemaining).toLocaleString()} leads this step (you have ${access.leadsRemaining.toLocaleString()} credits left).`,
       async: true,
       leadsRemaining: access.leadsRemaining,
       batchSize,
@@ -546,8 +546,8 @@ export async function runFindLeadsJob(
         : result.stopReason === "max_auto_batches" || result.stopReason === "credit_cap"
           ? ` Saved this batch. Click Get next 100 when you want more (you asked for more / more matches remain).`
           : result.stopped
-            ? " Stopped by you — click Get next 100 to continue."
-            : " More matches remain — click Get next 100 to continue."
+            ? " Stopped by you. Click Get next 100 to continue."
+            : " More matches remain. Click Get next 100 to continue."
       : "";
 
     const verifiedEmailCount = await prisma.lead.count({
@@ -557,7 +557,7 @@ export async function runFindLeadsJob(
     const countNote =
       savedTotal === 0
         ? criteria.openToWork
-          ? `Checked ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} matching people for open-to-work wording; ${result.otwSignalHits ?? 0} had it, but none had a verified email to save.`
+          ? `Checked ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} matching people for open to work wording; ${result.otwSignalHits ?? 0} had it, but none had a verified email to save.`
           : `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a verified email. We only save checked emails.`
         : `Saved ${savedTotal.toLocaleString()} lead${savedTotal === 1 ? "" : "s"} (${verifiedEmailCount.toLocaleString()} with a verified email).`;
 
@@ -629,7 +629,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     search.apolloFilters as unknown as ApolloSearchFilters
   );
   if (!resumeFilters?.personTitles?.length && !resumeFilters?.personLocations?.length) {
-    throw new Error("Missing search filters to resume — run a new search.");
+    throw new Error("Missing search filters to resume. Run a new search.");
   }
 
   if (!canResumeSearch(search.apolloFilters, search.leadsReturned, search.totalAvailable, search.relaxNote)) {

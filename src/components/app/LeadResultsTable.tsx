@@ -162,7 +162,7 @@ export function LeadResultsTable({
                     title={
                       confidence === "verified"
                         ? "Confirmed mailbox"
-                        : "Built from the company's email pattern — may bounce"
+                        : "Built from the company's email pattern, so it may bounce"
                     }
                   >
                     {confidence === "verified" ? (
@@ -199,7 +199,7 @@ export function LeadResultsTable({
               Profile
             </a>
           ) : (
-            <span className="text-xs text-lp-muted-dark">—</span>
+            <span className="text-xs text-lp-muted-dark">None</span>
           ),
       }),
     ],
@@ -236,7 +236,7 @@ export function LeadResultsTable({
             {savedCount.toLocaleString()} saved lead{savedCount !== 1 ? "s" : ""}
           </p>
           <p className="text-xs text-lp-muted">
-            Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of{" "}
+            Showing {rangeStart.toLocaleString()} to {rangeEnd.toLocaleString()} of{" "}
             {savedCount.toLocaleString()}
             {savedCount > LEADS_PAGE_SIZE
               ? ` · batch ${currentBatch} of ${totalBatches}`

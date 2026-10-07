@@ -6,7 +6,7 @@ export default function ApiKeysPage() {
       <h1 className="text-2xl font-bold mb-4">API Keys (BYOK)</h1>
       <GlassCard>
         <p className="text-sm text-muted">
-          Bring-your-own-key mode is available on Pro and Agency plans. Platform-managed keys are used by default.
+          Using your own API keys is available on Pro and Agency plans. By default, VARSA manages the keys for you.
           Contact support to enable encrypted key storage for your account.
         </p>
       </GlassCard>

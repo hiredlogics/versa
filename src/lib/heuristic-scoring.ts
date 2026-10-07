@@ -103,9 +103,9 @@ export function heuristicScoreLead(
   if (context?.openToWork) {
     if (OTW_TITLE_SIGNALS.some((s) => title.includes(s))) {
       score += 3;
-      reasons.push("Job-seeking signal in title");
+      reasons.push("Job seeking signal in title");
     } else {
-      cons.push("No job-seeking words in title");
+      cons.push("No job seeking words in title");
     }
     if (ROLE_SIGNALS.some((s) => title.includes(s))) {
       score += 2;
@@ -134,18 +134,18 @@ export function heuristicScoreLead(
       score += 1;
       reasons.push("Known company size");
     } else {
-      cons.push("Company size unknown or outside 11–5,000");
+      cons.push("Company size unknown or outside 11 to 5,000");
     }
   } else {
     if (AUTHORITY_SIGNALS.some((s) => title.includes(s))) {
       score += 2;
-      reasons.push("Decision-making authority");
+      reasons.push("Has decision making authority");
     } else {
-      cons.push("Not a decision-maker title");
+      cons.push("Not a decision maker title");
     }
     if (signals.length > 0 && BUYER_SIGNALS.some((s) => title.includes(s))) {
       score += 1;
-      reasons.push("Decision-maker for this search");
+      reasons.push("Decision maker for this search");
     }
     if (textMatchesSignals(title, signals)) {
       score += 2;
@@ -169,7 +169,7 @@ export function heuristicScoreLead(
       score += 1;
       reasons.push("Ideal company size");
     } else {
-      cons.push("Company size unknown or outside 10–500");
+      cons.push("Company size unknown or outside 10 to 500");
     }
   }
 

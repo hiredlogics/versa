@@ -10,8 +10,7 @@ import type { Brief } from "./types";
 
 /**
  * Response envelopes are built here rather than inline in each route, so the
- * shape a browser receives has one definition and one test. Adding a field —
- * a debug flag, a stray spread — has to happen inside a tested function.
+ * shape a browser receives has one definition and one test. Adding a field,  * a debug flag, a stray spread, has to happen inside a tested function.
  */
 
 export function clarificationEnvelope(input: {

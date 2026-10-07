@@ -240,9 +240,9 @@ def main() -> None:
     print(f"\nSaved {len(records)} unique records. Requests this run: {requests_this_run}.")
     print(f"Profiles scanned since scan counting began: {state['profiles_scanned']}.")
     if state["complete"]:
-        print("STATUS: COMPLETE — all configured role, signal, and page searches have finished.")
+        print("STATUS: COMPLETE, all configured role, signal, and page searches have finished.")
     else:
-        print("STATUS: PAUSED — more searches remain.")
+        print("STATUS: PAUSED, more searches remain.")
         print("Run again with --resume after the Apollo rate-limit window resets.")
     print(f"Inspect: {args.output_dir / 'apollo-tech-candidates.json'}")
 

@@ -76,7 +76,7 @@ describe("mergePoolPerson", () => {
   it("never overwrites an existing profile with null", () => {
     const profile = { headline: "Data Engineer", employment_history: [] };
     const first = mergePoolPerson(null, { ...base, profile });
-    // Second merge has no profile — existing should survive.
+    // Second merge has no profile, existing should survive.
     const merged = mergePoolPerson(first, { ...base, profile: null });
     expect(merged.profile).toEqual(profile);
   });
@@ -106,7 +106,7 @@ describe("mergePoolPerson", () => {
   });
 });
 
-describe("toStoredApolloProfile — github_url", () => {
+describe("toStoredApolloProfile, github_url", () => {
   it("preserves github_url in the stored profile", () => {
     const raw = {
       headline: "Engineer",
@@ -124,7 +124,7 @@ describe("toStoredApolloProfile — github_url", () => {
   });
 });
 
-describe("poolInputFromApolloPerson — profile", () => {
+describe("poolInputFromApolloPerson, profile", () => {
   it("builds a profile snapshot from an Apollo person object", () => {
     const person = {
       id: "p1",

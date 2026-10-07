@@ -163,12 +163,12 @@ export interface EnrichedApolloResult {
   raw: ApolloSearchRawPerson | null;
 }
 
-/** Thrown when Apollo rejects unlock due to insufficient credits — do not retry singles. */
+/** Thrown when Apollo rejects unlock due to insufficient credits, do not retry singles. */
 export class ApolloCreditsExhaustedError extends Error {
   readonly partial: EnrichedApolloResult[];
 
   constructor(partial: EnrichedApolloResult[], detail?: string) {
-    super(detail || "Data provider credits exhausted — email unlock stopped.");
+    super(detail || "Data provider credits exhausted, email unlock stopped.");
     this.name = "ApolloCreditsExhaustedError";
     this.partial = partial;
   }
@@ -383,7 +383,7 @@ async function searchWithSmartFallback(
         best = candidate;
       }
 
-      // Accept once the pool is large enough — or immediately for non-OTW.
+      // Accept once the pool is large enough, or immediately for non-OTW.
       if (!criteria.openToWork || result.totalEntries >= minAcceptPool) {
         if (variant.level > 0) {
           console.log(
@@ -400,7 +400,7 @@ async function searchWithSmartFallback(
       }
 
       console.log(
-        `[apollo] Level ${variant.level} only ${result.totalEntries} hits (<${minAcceptPool}) — trying wider OTW variant`
+        `[apollo] Level ${variant.level} only ${result.totalEntries} hits (<${minAcceptPool}), trying wider OTW variant`
       );
     }
 
@@ -477,7 +477,7 @@ export async function revealEmailsForPeople(
 
 /**
  * Unlock emails via Apollo bulk match (up to 10/request) with reveal_personal_emails.
- * Falls back to single match when bulk fails — except Apollo credit exhaustion (stops immediately).
+ * Falls back to single match when bulk fails, except Apollo credit exhaustion (stops immediately).
  *
  * Callers: enrichWhyBatch.ts (enrichAndWhyInMemory, prepareLeadPage), lead-search.ts (legacy).
  * Optional 2nd arg may be a progress callback (legacy) or EnrichBatchOptions.
@@ -505,7 +505,7 @@ export async function enrichPeopleBatch(
   for (let i = 0; i < people.length; i += bulkSize) {
     if (deadlineAt && Date.now() >= deadlineAt) {
       console.warn(
-        `[apollo] unlock deadline reached after ${done}/${people.length} — returning partial`
+        `[apollo] unlock deadline reached after ${done}/${people.length}, returning partial`
       );
       stoppedEarly = true;
       break;
@@ -546,7 +546,7 @@ export async function enrichPeopleBatch(
       );
 
       if (isApolloCreditsError(error)) {
-        // Do not amplify with 10× single enrich calls — credits are gone.
+        // Do not amplify with 10× single enrich calls, credits are gone.
         for (const person of chunk) {
           enriched.push({ person, raw: null });
         }
@@ -620,7 +620,7 @@ export async function enrichPeopleBatch(
 
 /**
  * Fetch the next ~targetCount unique people from Apollo (sequential pages).
- * Does not unlock emails — used by the 1,000-lead process batch loop.
+ * Does not unlock emails, used by the 1,000-lead process batch loop.
  *
  * Callers: findLeadsWorkflow.ts (sequential batch jobs). searchAllPeople remains for legacy.
  */
@@ -673,7 +673,7 @@ export async function fetchPeopleBatch(options: {
     totalAvailable = probe.totalEntries;
     totalPages = Math.min(probe.totalPages || 1, pagesCap, APOLLO_HARD_MAX_PAGES);
   } else if (options.resumeFilters && startPage === 1) {
-    // First batch after filters already chosen (e.g. same job continuing) — rare
+    // First batch after filters already chosen (e.g. same job continuing), rare
     activeFilters = options.resumeFilters;
     const page1 = await searchPeopleWithFilters(activeFilters, options.criteria, 1, perPage);
     totalAvailable = page1.totalEntries;
@@ -758,7 +758,7 @@ export async function fetchPeopleBatch(options: {
   });
 
   return {
-    // May be slightly over targetCount when the last page overshoots (e.g. 1000–1099)
+    // May be slightly over targetCount when the last page overshoots (e.g. 1000 to 1099)
     people: batch,
     activeFilters,
     lastPage: Math.max(lastPage, 0),
@@ -828,7 +828,7 @@ export async function searchAllPeople(
     const apolloReportedPages = probe.totalPages || 1;
     totalPages = Math.min(apolloReportedPages, pagesCap, APOLLO_HARD_MAX_PAGES);
     console.log(
-      `[apollo] RESUME from page ${startPage}/${totalPages} — pool ≈ ${totalAvailable}`
+      `[apollo] RESUME from page ${startPage}/${totalPages}, pool ≈ ${totalAvailable}`
     );
   } else {
     const firstPage = await searchWithSmartFallback(criteria, 1, perPage);
@@ -842,7 +842,7 @@ export async function searchAllPeople(
         : undefined;
 
     console.log(
-      `[apollo] Total available: ${totalAvailable} — fetching ${totalPages} page(s) × ${perPage}` +
+      `[apollo] Total available: ${totalAvailable}, fetching ${totalPages} page(s) × ${perPage}` +
         ` = up to ${Math.min(totalAvailable, totalPages * perPage)} people`
     );
 
@@ -888,7 +888,7 @@ export async function searchAllPeople(
 
     if (Date.now() - startedAt > deadlineMs) {
       console.warn(
-        `[apollo] Deadline reached after page ${lastPage}/${totalPages} — saved progress (${allPeople.length} people)`
+        `[apollo] Deadline reached after page ${lastPage}/${totalPages}, saved progress (${allPeople.length} people)`
       );
       partial = true;
       break;
@@ -898,7 +898,7 @@ export async function searchAllPeople(
 
     const result = await searchPeopleWithFilters(activeFilters, criteria, page, perPage);
     if (!result.people.length) {
-      console.warn(`[apollo] Empty page ${page} — stopping pagination early (${allPeople.length} collected)`);
+      console.warn(`[apollo] Empty page ${page}, stopping pagination early (${allPeople.length} collected)`);
       break;
     }
     for (const person of result.people) {
@@ -911,7 +911,7 @@ export async function searchAllPeople(
     await onProgress?.(page, totalPages, allPeople.length, totalAvailable);
 
     if (page % 25 === 0 || page === totalPages) {
-      console.log(`[apollo] progress page ${page}/${totalPages} — ${allPeople.length} people so far`);
+      console.log(`[apollo] progress page ${page}/${totalPages}, ${allPeople.length} people so far`);
     }
   }
 

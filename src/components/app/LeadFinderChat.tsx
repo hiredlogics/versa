@@ -152,7 +152,7 @@ function buildConversationPrompt(
   const trimmed = nextText.trim();
   const prior = priorUserTexts.map((line) => line.trim()).filter(Boolean);
 
-  // Merge follow-ups into one clear search brief — never dump "Conversation context" raw into the parser
+  // Merge follow-ups into one clear search brief, never dump "Conversation context" raw into the parser
   let base = trimmed;
   if (prior.length > 0 && trimmed) {
     base = [
@@ -177,7 +177,7 @@ export function LeadFinderChat() {
 
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [composer, setComposer] = useState<ComposerValues>(EMPTY_COMPOSER);
-  // Default 5 — open-to-work / role searches rarely clear an 8+ buyer score
+  // Default 5: open-to-work / role searches rarely clear an 8+ buyer score
   const [filters, setFilters] = useState<AdvancedFilters>({ minScore: 5 });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -196,7 +196,7 @@ export function LeadFinderChat() {
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
   const [resumingSearchId, setResumingSearchId] = useState<string | null>(null);
   const [loadingMoreSearchId, setLoadingMoreSearchId] = useState<string | null>(null);
-  // Set once the user has answered clarifying questions — the next run skips the gate.
+  // Set once the user has answered clarifying questions, the next run skips the gate.
   const [clarified, setClarified] = useState(false);
   const shellData = useAppShellData();
 
@@ -393,7 +393,7 @@ export function LeadFinderChat() {
       error: {
         kind: "still_running",
         message:
-          "Still finding leads in the background. Open Searches in a few minutes — new leads appear as they are saved.",
+          "Still finding leads in the background. Open Searches in a few minutes. New leads appear as they are saved.",
       },
     });
   }
@@ -1031,7 +1031,7 @@ export function LeadFinderChat() {
                     {turn.jobRequirements.mustHaveSkills?.length > 0 && (
                       <div className="space-y-1.5">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
-                          Must-have skills
+                          Required skills
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {turn.jobRequirements.mustHaveSkills.map((skill) => (
@@ -1049,7 +1049,7 @@ export function LeadFinderChat() {
                     {turn.jobRequirements.niceToHaveSkills?.length > 0 && (
                       <div className="space-y-1.5">
                         <p className="text-[11px] font-medium uppercase tracking-wider text-lp-muted-dark">
-                          Nice-to-have skills
+                          Preferred skills
                         </p>
                         <div className="flex flex-wrap gap-1.5">
                           {turn.jobRequirements.niceToHaveSkills.map((skill) => (
@@ -1153,7 +1153,7 @@ export function LeadFinderChat() {
               editingUserTurnId
                 ? "Edit your prompt, then run again…"
                 : inConversation
-                  ? "Continue in this chat — e.g. “Only founders in Canada” or “Add healthcare companies”"
+                  ? "Continue in this chat, e.g. “Only founders in Canada” or “Add healthcare companies”"
                   : undefined
             }
             submitLabel={

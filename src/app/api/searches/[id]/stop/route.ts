@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { scopedLeadSearchWhere } from "@/lib/services/searches/access";
 import { USER_STOPPED_MESSAGE } from "@/lib/services/leads/searchControl";
 
-/** POST — request stop; background job exits pagination and may save a partial result. */
+/** POST: request stop; background job exits pagination and may save a partial result. */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
@@ -42,7 +42,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       data: {
         // Keep RUNNING so the job can finish scoring/saving a partial pull
         errorMessage: USER_STOPPED_MESSAGE,
-        relaxNote: "Stopping — keeping whatever was already pulled for this prompt…",
+        relaxNote: "Stopping. Leads already found for this prompt are kept…",
       },
     });
 

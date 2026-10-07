@@ -1,4 +1,4 @@
-/** Central plan limits — keep in sync with prisma/seed.ts Plan rows */
+/** Central plan limits: keep in sync with prisma/seed.ts Plan rows */
 export const PLAN_LIMITS = {
   freeTrial: {
     slug: "free-trial",

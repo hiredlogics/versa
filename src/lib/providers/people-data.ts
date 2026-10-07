@@ -15,7 +15,7 @@ import type { ApolloPerson, SearchCriteria } from "@/lib/types";
  * The seam between the pipeline and the people-data vendor. This file lives
  * OUTSIDE src/lib/pipeline/ on purpose: it is the only place that imports the
  * vendor client and the only place its error types are translated, so the rule
- * for the pipeline directory stays absolute — nothing in it names the vendor.
+ * for the pipeline directory stays absolute, nothing in it names the vendor.
  */
 
 const PER_PAGE = 100;

@@ -95,7 +95,7 @@ export function ClarificationCard({
     const parts: string[] = [];
     if (answers.roles?.length) parts.push(answers.roles.join(", "));
     if (answers.location?.length) parts.push(`in ${answers.location.join(", ")}`);
-    if (requestedLeadCount) parts.push(`— ${requestedLeadCount} leads`);
+    if (requestedLeadCount) parts.push(`(${requestedLeadCount} leads)`);
 
     const text = parts.join(" ").trim();
     onSubmit({ text: text || "Use my answers above", requestedLeadCount });

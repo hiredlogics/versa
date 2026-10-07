@@ -3,9 +3,9 @@ import { FadeIn } from "./AnimatedAurora";
 const TRUST_ITEMS = [
   "Encrypted workspace data",
   "Verified contact data",
-  "Secure sign-in",
+  "Secure login",
   "Secure payments",
-  "Enterprise-grade reliability",
+  "Enterprise level reliability",
 ];
 
 export function SecurityTrustStrip() {
@@ -14,7 +14,7 @@ export function SecurityTrustStrip() {
       <div className="mx-auto max-w-6xl">
         <FadeIn>
           <p className="text-center text-xs uppercase tracking-[0.2em] text-lp-muted-dark mb-8">
-            Enterprise-grade security and reliability
+            Enterprise level security and reliability
           </p>
           <div className="flex flex-wrap justify-center gap-3 md:gap-6">
             {TRUST_ITEMS.map((item) => (

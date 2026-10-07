@@ -127,7 +127,7 @@ describe("ATS export", () => {
       "https://www.linkedin.com/in/maria",
       "VARSA",
       "varsa;data-engineer-austin",
-      "Score 8/10 – Strong match for the role.",
+      "Score 8/10: Strong match for the role.",
     ]);
   });
 

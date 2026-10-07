@@ -364,7 +364,7 @@ export async function serveFromPool(input: {
         reasoning: aiScored
           ? score.reasoning
           : row.openToWorkSignal
-            ? `${row.title}${location ? ` in ${location}` : ""}. Public open-to-work signal: "${row.openToWorkSignal}".`
+            ? `${row.title}${location ? ` in ${location}` : ""}. Public open to work signal: "${row.openToWorkSignal}".`
             : `${row.title}${location ? ` in ${location}` : ""}, matching the requested role and location.`,
         whySource: aiScored ? ("AI" as const) : ("TEMPLATE" as const),
         recommendedApproach: "",

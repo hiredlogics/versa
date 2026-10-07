@@ -107,7 +107,7 @@ export function AdvancedFiltersDrawer({
               placeholder="Executive, VP, Director"
             />
           </Field>
-          <Field label="Minimum score (1–10)">
+          <Field label="Minimum score (1 to 10)">
             <input
               type="number"
               min={1}

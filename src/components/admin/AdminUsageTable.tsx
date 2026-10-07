@@ -65,7 +65,7 @@ export function AdminUsageTable({ rows }: { rows: AdminUsageRow[] }) {
                 <UsageBar used={row.searchesUsed} limit={row.searchesLimit} />
               </AdminTableCell>
               <AdminTableCell className="text-muted">
-                {new Date(row.periodStart).toLocaleDateString()} –{" "}
+                {new Date(row.periodStart).toLocaleDateString()} to{" "}
                 {new Date(row.periodEnd).toLocaleDateString()}
               </AdminTableCell>
               <AdminTableCell>

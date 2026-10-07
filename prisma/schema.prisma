@@ -223,7 +223,7 @@ model CreditHold {
   amount         Int
   charged        Int?
   status         HoldStatus @default(HELD)
-  /// "{searchId}:{batchNo}" — the unique constraint is what stops a
+  /// "{searchId}:{batchNo}", the unique constraint is what stops a
   /// double-clicked button reserving twice.
   idempotencyKey String     @unique
   /// A refund must return to the UsageRecord it came from, even if the billing

@@ -47,7 +47,7 @@ export function SearchPreviewPanel({ search }: { search: SearchHistoryItem | nul
             <SearchMetric label="Qualified" value={String(search.totalQualified)} />
             <SearchMetric
               label="Avg score"
-              value={search.averageScore != null ? String(search.averageScore) : "—"}
+              value={search.averageScore != null ? String(search.averageScore) : "None"}
             />
             <SearchMetric label="Date" value={formatDate(search.createdAt)} />
           </div>

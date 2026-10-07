@@ -21,7 +21,7 @@ const columns = [
   columnHelper.accessor("company", { header: "Company" }),
   columnHelper.accessor("email", {
     header: "Email",
-    cell: (info) => info.getValue() || <span className="text-muted">—</span>,
+    cell: (info) => info.getValue() || <span className="text-muted">None</span>,
   }),
   columnHelper.accessor("score", {
     header: "Score",

@@ -64,7 +64,7 @@ export function SearchHistoryCard({
         <SearchMetric label="Qualified" value={search.totalQualified.toLocaleString()} />
         <SearchMetric
           label="Avg score"
-          value={search.averageScore != null ? String(search.averageScore) : "—"}
+          value={search.averageScore != null ? String(search.averageScore) : "None"}
         />
         <SearchMetric label="Date" value={formatDate(search.createdAt)} className="sm:col-span-1 col-span-2" />
       </div>

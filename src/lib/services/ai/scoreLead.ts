@@ -131,12 +131,12 @@ ${skillsBlock}
 Rules:
 - Match saved ICP when prompt is vague.
 - Cap relevance low if title is excluded unless prompt explicitly requests that role.
-- Prefer decision-makers in target titles — UNLESS this is an open-to-work / hiring search.
+- Prefer decision-makers in target titles, UNLESS this is an open-to-work / hiring search.
 - For open-to-work / job-seeking / "looking for a job" intent:
-  - Score software engineers, developers, and matching titles at least 6–8 when location/role fit.
+  - Score software engineers, developers, and matching titles at least 6 to 8 when location/role fit.
   - Do NOT require CEO/founder authority.
   - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
-  - Explicit seeking/available/freelance title signals can go to 8–10.
+  - Explicit seeking/available/freelance title signals can go to 8 to 10.
 - Include ALL leads in response (use the provided index values).${
     context.compareAcrossLeads
       ? `
@@ -305,14 +305,14 @@ export async function scoreLeadsWithAi(
   const heuristicFixed = heuristicScores(leads, context);
   const batchSize = options.batchSize ?? SCORE_BATCH_SIZE;
 
-  // Very large pulls can't afford per-batch AI scoring — keep them heuristic-ranked.
+  // Very large pulls can't afford per-batch AI scoring, keep them heuristic-ranked.
   const aiScoreCap = options.ignoreCap
     ? 0
     : Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
   if (leads.length === 0 || (aiScoreCap > 0 && leads.length > aiScoreCap)) {
     if (aiScoreCap > 0 && leads.length > aiScoreCap) {
       console.log(
-        `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap} — using heuristic scores`
+        `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap}, using heuristic scores`
       );
     }
     return { scores: heuristicFixed, provider: "HEURISTIC", fromAi: leads.map(() => false) };

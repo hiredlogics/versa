@@ -21,7 +21,7 @@ const SECTIONS = [
   "Contact",
 ];
 
-// TODO: legal review — every section below is placeholder copy.
+// TODO: legal review: every section below is placeholder copy.
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24 pt-28 text-lp-muted">

@@ -16,7 +16,7 @@ export function ContactHero() {
         </h1>
         <p className="mt-5 text-base md:text-lg text-lp-muted max-w-2xl leading-relaxed">
           Tell us what market you are targeting. We&apos;ll help you understand how {BRAND.name} can find,
-          enrich, score, and save your best-fit B2B leads.
+          enrich, score, and save the B2B leads that fit you best.
         </p>
       </FadeIn>
     </section>

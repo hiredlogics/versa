@@ -27,7 +27,7 @@ export interface CreditBalance {
   limit: number;
   used: number;
   remaining: number;
-  /** Reserved but not yet settled — in-flight, not spent. */
+  /** Reserved but not yet settled, in-flight, not spent. */
   pending: number;
   periodStart: Date;
   periodEnd: Date;
@@ -138,8 +138,7 @@ export async function reserve(input: {
 
       // Lock by primary key, never by (userId, periodStart). periodStart is
       // `timestamp without time zone`; a JS Date binds as timestamptz and gets
-      // shifted by the session offset, so that predicate matches zero rows —
-      // locking nothing and reading leadsUsed as 0, which lets every concurrent
+      // shifted by the session offset, so that predicate matches zero rows,       // locking nothing and reading leadsUsed as 0, which lets every concurrent
       // reserve believe the balance is full.
       const rows = await tx.$queryRaw<Array<{ leadsUsed: number }>>(
         Prisma.sql`SELECT "leadsUsed" FROM "UsageRecord" WHERE id = ${usage.id} FOR UPDATE`

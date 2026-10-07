@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 const cases = [
-  { title: "SaaS sales teams", desc: "Find CTOs and founders at mid-market software companies." },
+  { title: "SaaS sales teams", desc: "Find CTOs and founders at midsize software companies." },
   { title: "AI consultancies", desc: "Target ops leaders interested in automation and AI solutions." },
   { title: "Agencies", desc: "Build prospect lists for outbound campaigns at scale." },
   { title: "Recruiters", desc: "Find professionals by role, location, and company size." },

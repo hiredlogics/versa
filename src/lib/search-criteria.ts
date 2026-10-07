@@ -55,7 +55,7 @@ const REAL_ESTATE_TITLES = [
   "CEO",
 ];
 
-/** HR / People Ops titles — "HR" alone is too vague for Apollo and balloons the pool. */
+/** HR / People Ops titles, "HR" alone is too vague for Apollo and balloons the pool. */
 export const HR_TITLES = [
   "HR Manager",
   "Human Resources Manager",
@@ -462,13 +462,13 @@ export function resolveApolloKeywords(input: {
     return { apolloKeywords: known, searchIntent };
   }
 
-  // Fallback: strip need words, keep 1–2 domain tokens
+  // Fallback: strip need words, keep 1 to 2 domain tokens
   const tokens = lower
     .split(/[^a-z0-9+-]+/)
     .filter((w) => w.length > 1 && !NEED_WORDS.has(w));
 
   if (tokens.length === 0) {
-    // Everything was a "need" — keep as intent, no q_keywords
+    // Everything was a "need", keep as intent, no q_keywords
     if (!searchIntent.toLowerCase().includes(lower)) {
       searchIntent = `${searchIntent} ${raw}`.trim();
     }
@@ -481,7 +481,7 @@ export function resolveApolloKeywords(input: {
   return { apolloKeywords, searchIntent };
 }
 
-/** @deprecated use resolveApolloKeywords — kept for existing tests */
+/** @deprecated use resolveApolloKeywords: kept for existing tests */
 export function splitKeywordsForApollo(
   qKeywords: string,
   searchIntent: string
@@ -512,7 +512,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   const seen = new Set<string>();
 
   // When the user named an employer, that is the search. Relaxing may widen
-  // titles or size, but never the company — otherwise "people at Apple" comes
+  // titles or size, but never the company, otherwise "people at Apple" comes
   // back as people at any tech company.
   const organizationDomains = normalizeDomains(base.organizationDomains);
   const pinned: Partial<ApolloSearchFilters> =
@@ -537,7 +537,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
 
   // Open-to-work: prioritize keyword/title variants that surface self-stated
-  // seekers. Tiny pools (e.g. 1 hit) must not stop relax — unlock often fails.
+  // seekers. Tiny pools (e.g. 1 hit) must not stop relax, unlock often fails.
   if (criteria.openToWork && organizationDomains.length === 0) {
     const otwKeywords = [
       industryKeyword || OPEN_TO_WORK_APOLLO_KEYWORDS,
@@ -589,7 +589,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
       includeSimilarTitles: true,
     });
 
-    // Do NOT fall back to titles+location without OTW bias here — that returns
+    // Do NOT fall back to titles+location without OTW bias here, that returns
     // tens of thousands of employed people with ~0 title signals.
 
     return variants;
@@ -603,22 +603,22 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     includeSimilarTitles: base.includeSimilarTitles !== false,
   };
 
-  // 0 — exact AI filters (industry keyword kept)
+  // 0: exact AI filters (industry keyword kept)
   add(0, "exact AI filters", exact);
 
-  // 1 — broaden company-size buckets, KEEP industry keyword
+  // 1: broaden company-size buckets, KEEP industry keyword
   add(1, "industry + titles + wider company size", {
     ...exact,
     employeeRanges: ["11,50", "51,200", "201,500"],
   });
 
-  // 2 — drop company size only, KEEP industry keyword
+  // 2: drop company size only, KEEP industry keyword
   add(2, "industry + titles + location (no size filter)", {
     ...exact,
     employeeRanges: undefined,
   });
 
-  // 3 — fewer titles, KEEP industry keyword
+  // 3: fewer titles, KEEP industry keyword
   if (titles.length > 2) {
     add(3, "industry + top titles + location", {
       ...exact,
@@ -627,7 +627,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     });
   }
 
-  // 4 — shorten keyword to primary industry token only if multi-word
+  // 4: shorten keyword to primary industry token only if multi-word
   if (industryKeyword && industryKeyword.includes(" ")) {
     add(4, `primary industry keyword: "${industryKeyword.split(/\s+/)[0]}"`, {
       ...exact,
@@ -636,7 +636,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     });
   }
 
-  // 5 — LAST resort: drop keyword (score by searchIntent after fetch)
+  // 5: LAST resort: drop keyword (score by searchIntent after fetch)
   add(5, "titles + location only (industry ranked after fetch)", {
     personTitles: titles.slice(0, 3),
     personLocations: primaryLocation,
@@ -748,7 +748,7 @@ export function normalizeSearchCriteria(
     finalTitles = ["Director", "Manager", "Specialist"];
   }
 
-  // Tighter matching for OTW / short role abbreviations — similar titles explode the pool
+  // Tighter matching for OTW / short role abbreviations, similar titles explode the pool
   const includeSimilar =
     openToWork || finalTitles.some((t) => /^(hr|manager|director|specialist)$/i.test(t.trim()))
       ? false
@@ -761,14 +761,14 @@ export function normalizeSearchCriteria(
   const apollo: ApolloSearchFilters = {
     personTitles: finalTitles.slice(0, 5),
     personLocations,
-    // Keep keywords for OTW — dropping them was a major cause of multi-million pools
+    // Keep keywords for OTW, dropping them was a major cause of multi-million pools
     qKeywords: apolloKeywords || undefined,
     employeeRanges: employeeRanges.length ? employeeRanges : undefined,
     includeSimilarTitles: includeSimilar,
   };
 
   // Bias Apollo text search toward profiles that mention job-seeking. Still not
-  // LinkedIn's private Open to Work flag — only improves odds of title/headline hits.
+  // LinkedIn's private Open to Work flag, only improves odds of title/headline hits.
   if (openToWork && !apollo.organizationDomains?.length) {
     const existing = (apollo.qKeywords || "").trim();
     if (!/open\s*to\s*work/i.test(existing)) {
@@ -779,7 +779,7 @@ export function normalizeSearchCriteria(
   }
 
   // "People at Apple" is answered by the employer, so size and industry guesses
-  // only shrink it — Apple alone fails an "1001,5000" bucket.
+  // only shrink it: Apple alone fails an "1001,5000" bucket.
   if (organizationDomains.length > 0) {
     apollo.organizationDomains = organizationDomains;
     apollo.employeeRanges = undefined;
@@ -787,7 +787,7 @@ export function normalizeSearchCriteria(
   }
 
   const otwIntentSuffix = openToWork
-    ? " Only people with open-to-work / job-seeking wording in title or headline are unlocked and saved."
+    ? " Only people with open to work or job seeking wording in title or headline are unlocked and saved."
     : "";
 
   return {

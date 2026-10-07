@@ -33,7 +33,7 @@ function BillingSuccessContent() {
       }
 
       if (attempts >= 12) {
-        setMessage("Payment received. Your workspace is still setting up — this can take a moment.");
+        setMessage("Payment received. Your workspace is still being set up. This can take a moment.");
         return;
       }
 

@@ -30,7 +30,7 @@ function formatDate(iso: string) {
 }
 
 function formatDuration(ms: number | null) {
-  if (ms == null) return "—";
+  if (ms == null) return "None";
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
@@ -139,7 +139,7 @@ export function SearchDetailPage() {
         <SearchMetric label="Saved leads" value={search.totalQualified.toLocaleString()} />
         <SearchMetric
           label="Avg score"
-          value={search.averageScore != null ? String(search.averageScore) : "—"}
+          value={search.averageScore != null ? String(search.averageScore) : "None"}
         />
         <SearchMetric label="Duration" value={formatDuration(search.durationMs)} />
       </div>

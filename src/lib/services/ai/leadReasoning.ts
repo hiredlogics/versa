@@ -16,9 +16,9 @@ export interface LeadReasoningInput {
 }
 
 export interface LeadOutreachOutput {
-  /** Personalized "Why Reach Out" — specific to this person, not score bullets */
+  /** Personalized "Why Reach Out", specific to this person, not score bullets */
   reasoning: string;
-  /** Kept for schema compatibility — email drafting disabled */
+  /** Kept for schema compatibility, email drafting disabled */
   emailDraft: string;
   source: "AI" | "TEMPLATE";
 }
@@ -83,8 +83,8 @@ export function buildLeadWhyReasoning(
   let fit: string;
   if (context.openToWork) {
     fit = intent
-      ? `is a strong hire / job-search fit for “${intent}” — Open to Work can’t be verified from public data, but role + company context still warrant outreach.`
-      : `is a strong hire / job-search fit — Open to Work can’t be verified from public data, but role + company context still warrant outreach.`;
+      ? `is a strong hire / job-search fit for “${intent}”, Open to Work can’t be verified from public data, but role + company context still warrant outreach.`
+      : `is a strong hire / job-search fit, Open to Work can’t be verified from public data, but role + company context still warrant outreach.`;
   } else if (intent) {
     fit = `is a strong ICP match for “${intent}”.`;
   } else {
@@ -134,14 +134,14 @@ Original prompt: "${(context.originalPrompt || "").slice(0, 240)}"
 ${ctxBlock}
 ${mode}
 
-STYLE — match this reference quality (1–2 dense sentences, specific):
+STYLE: match this reference quality (1 to 2 dense sentences, specific):
 "Java full-stack developer at Morgan Stanley with H1B transfer eligibility and willingness to relocate is a strong visa-driven job-search fit. Even without explicit layoff confirmation, 'transfer eligible' typically indicates active movement and time sensitivity where an AI job search assistant is valuable."
 
 HARD RULES:
 - One unique paragraph per lead. Cite THIS person's title, company, and any concrete signals in the title/profileSummary.
 - Never use generic score phrases: "Matching role", "Matches your search intent", "Matches saved target industry", "Good company size".
 - No email draft, greeting, subject line, or bullet lists.
-- If a detail is unknown, skip it — do not invent layoffs or Open to Work badges.
+- If a detail is unknown, skip it, do not invent layoffs or Open to Work badges.
 
 Return JSON only: { "leads": [{ "index": 0, "reasoning": "..." }] }`;
 }
@@ -199,7 +199,7 @@ async function generateWhyChunk(
   return results;
 }
 
-/** Personalized "Why Reach Out" for each lead — AI when possible, rich template otherwise. */
+/** Personalized "Why Reach Out" for each lead, AI when possible, rich template otherwise. */
 export async function generateLeadReasoningBatch(
   leads: LeadReasoningInput[],
   context: LeadScoreContext,
@@ -209,7 +209,7 @@ export async function generateLeadReasoningBatch(
 
   const heuristic = leads.map((lead) => buildLeadWhyReasoning(lead, context));
   if (!hasAiProvidersConfigured()) {
-    console.warn("[leadReasoning] No AI providers — using dynamic template why-text.");
+    console.warn("[leadReasoning] No AI providers, using dynamic template why-text.");
     return heuristic;
   }
 

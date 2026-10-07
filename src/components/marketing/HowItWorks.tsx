@@ -6,7 +6,7 @@ const STEPS = [
   {
     num: "01",
     title: "Describe your ideal buyer",
-    desc: "Write a plain-language prompt — role, industry, company size, geography, and intent.",
+    desc: "Write what you need in plain words: role, industry, company size, location and intent.",
   },
   {
     num: "02",
@@ -16,7 +16,7 @@ const STEPS = [
   {
     num: "03",
     title: "Score every lead",
-    desc: "Each lead is ranked 1–10, with the reasons it fits and a suggested outreach angle.",
+    desc: "Each lead is ranked 1 to 10, with the reasons it fits and a suggested outreach angle.",
   },
   {
     num: "04",
@@ -31,7 +31,7 @@ export function HowItWorks() {
       <SectionHeader
         badge="Workflow"
         title="How it works"
-        subtitle="From prompt to pipeline in four steps — no manual list building required."
+        subtitle="From prompt to pipeline in four steps. No manual list building needed."
       />
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
         {STEPS.map((step, i) => (

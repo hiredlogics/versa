@@ -169,7 +169,7 @@ describe("score pros and cons", () => {
     const result = await scoreLeadsWithAi([lead], context);
     expect(result.provider).toBe("HEURISTIC");
     expect(result.scores[0].cons).toEqual(
-      expect.arrayContaining(["Not a decision-maker title", "No email found"])
+      expect.arrayContaining(["Not a decision maker title", "No email found"])
     );
   });
 });

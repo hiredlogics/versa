@@ -37,7 +37,7 @@ describe("employer targeting", () => {
 
   it("sends the employer to Apollo instead of dropping it", () => {
     // Real failure: "people who work at Apple" returned staff at Raya, FORTNA,
-    // RAYUS Radiology — the employer was parsed and then discarded.
+    // RAYUS Radiology: the employer was parsed and then discarded.
     expect(parseAtApple().apollo?.organizationDomains).toEqual(["apple.com"]);
   });
 

@@ -3,9 +3,9 @@
 import { BRAND } from "@/config/brand";
 
 const EXAMPLES = [
-  ["Founders likely to need automation", "SaaS founders in the US, 20-300 employees"],
+  ["Founders likely to need automation", "SaaS founders in the US, 20 to 300 employees"],
   ["Recently funded teams hiring sales", "VP of Sales at fintech companies that raised funding"],
-  ["Agency owners in the UK", "Marketing agency founders in the UK, 10-50 employees"],
+  ["Agency owners in the UK", "Marketing agency founders in the UK, 10 to 50 employees"],
   ["People open to new roles", "Backend engineers in Germany open to work"],
 ] as const;
 

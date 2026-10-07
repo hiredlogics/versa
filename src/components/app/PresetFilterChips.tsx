@@ -9,7 +9,7 @@ const PRESETS = [
   "Agency owners",
   "VP Engineering",
   "US companies",
-  "10-500 employees",
+  "10 to 500 employees",
   "Need automation",
 ];
 

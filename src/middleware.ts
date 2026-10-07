@@ -42,7 +42,7 @@ export default clerkMiddleware(
     await auth.protect();
   },
   {
-    // Dev machines often drift behind Clerk's token iat (seen ~15–30s locally).
+    // Dev machines often drift behind Clerk's token iat (seen ~15 to 30s locally).
     // Default 5s / prior 12s is too tight and causes session_expired + refresh loops.
     clockSkewInMs: 60_000,
   }

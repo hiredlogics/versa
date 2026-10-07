@@ -22,7 +22,7 @@ export function getEnrichBatchSize(): number {
   );
 }
 
-/** Max enrich calls for one page prepare request — default full page (200). */
+/** Max enrich calls for one page prepare request, default full page (200). */
 export function getEnrichPageCap(): number {
   return Math.min(
     200,
@@ -114,7 +114,7 @@ export async function enrichAndWhyInMemory(
     userId: string;
     searchId: string;
     maxEnrich: number;
-    /** When true, only unlock emails/profiles — skip AI/template Why (caller filters then writes Why). */
+    /** When true, only unlock emails/profiles, skip AI/template Why (caller filters then writes Why). */
     skipWhy?: boolean;
     onProgress?: (note: string) => void | Promise<void>;
   }
@@ -279,7 +279,7 @@ export function filterLeadsWithUsableEmail<T extends { email: string | null | un
 
 /**
  * Enrich + Why for one page of already-saved leads (Next/Previous 200).
- * Never drops leads — only fills email / Why where missing.
+ * Never drops leads: only fills email / Why where missing.
  */
 export async function prepareLeadPage(input: {
   userId: string;

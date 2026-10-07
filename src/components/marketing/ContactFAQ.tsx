@@ -13,10 +13,10 @@ const FAQS = [
   },
   {
     q: "Can I see a product demo?",
-    a: "Yes — describe your ideal customer in the form and we'll tailor a walkthrough to it.",
+    a: "Yes, describe your ideal customer in the form and we'll tailor a walkthrough to it.",
   },
   {
-    q: "Do you support agencies and multi-client workflows?",
+    q: "Do you support agencies that work for many clients?",
     a: `${BRAND.name} supports agency plans with team workspaces, saved lists, and advanced exports.`,
   },
   {

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 const SECTIONS = ["Data we collect", "How we use it", "Retention", "Your rights", "Contact"];
 
-// TODO: legal review — every section below is placeholder copy.
+// TODO: legal review: every section below is placeholder copy.
 export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24 pt-28 text-lp-muted">

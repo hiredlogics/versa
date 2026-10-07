@@ -21,16 +21,16 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { title: "Ranked 1–10", desc: "See the strongest matches first, with a clear score for every lead." },
+  { title: "Ranked 1 to 10", desc: "See the strongest matches first, with a clear score for every lead." },
   { title: "Explained, not a black box", desc: "Every recommendation includes a concise reason it fits your buyer." },
   { title: "Verified contacts", desc: "Start with contact details you can use with confidence." },
   { title: "Saved context", desc: "Keep your buyer definition close so each new search starts smarter." },
 ];
 
 const USE_CASES = [
-  { tag: "Founders", title: "Founder-led sales", desc: "Build an early, focused list of buyers without losing time to research." },
+  { tag: "Founders", title: "Sales led by founders", desc: "Build an early, focused list of buyers without losing time to research." },
   { tag: "Revenue teams", title: "Outbound teams", desc: "Give reps a ranked starting point for thoughtful outreach." },
-  { tag: "Agencies", title: "Agencies", desc: "Find the right decision-makers for each client engagement." },
+  { tag: "Agencies", title: "Agencies", desc: "Find the right decision makers for each client engagement." },
   { tag: "Growth", title: "Market research", desc: "Explore new audiences and see who matches a new point of view." },
 ];
 
@@ -80,7 +80,7 @@ const PLANS: Array<{
 const FAQS = [
   { q: "What does VARSA do?", a: "VARSA turns a description of the people you want, or a job description, into a ranked list of leads, with a clear reason for every match." },
   { q: "How do I start?", a: "Describe the people and companies you want to reach, then review the ranked results and decide where to focus." },
-  { q: "What does the score mean?", a: "Scores run from 1–10 and help you compare fit. The explanation beside each score gives the useful context." },
+  { q: "What does the score mean?", a: "Scores run from 1 to 10 and help you compare fit. The explanation beside each score gives the useful context." },
   { q: "Are contacts verified?", a: "Results label verified email availability so you can quickly understand what is ready for outreach." },
   { q: "Can I save my buyer context?", a: "Yes. VARSA keeps your buyer context available for your next search." },
   { q: "Is there a free trial?", a: "Yes. Every new account gets 25 free leads and 3 searches, once. After that, choose a plan to keep searching." },
@@ -244,7 +244,7 @@ function UseCasesSection() {
       <SectionHeader
         badge="Use cases"
         title="For teams with a clear next customer"
-        subtitle={`Whether you're a founder, agency, or growth lead — ${BRAND.name} adapts to how you prospect.`}
+        subtitle={`Whether you're a founder, agency, or growth lead, ${BRAND.name} adapts to how you prospect.`}
       />
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {USE_CASES.map((uc, i) => (

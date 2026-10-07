@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: `${BRAND.fullName} — ${BRAND.tagline}`,
+  title: `${BRAND.fullName}: ${BRAND.tagline}`,
   description: BRAND.longTagline,
   metadataBase: process.env.NEXT_PUBLIC_APP_URL
     ? new URL(process.env.NEXT_PUBLIC_APP_URL)

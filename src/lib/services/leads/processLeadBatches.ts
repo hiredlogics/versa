@@ -218,7 +218,7 @@ export async function runSequentialLeadBatches(input: {
           batchIndex,
           batchSize,
           phase: openToWorkMode
-            ? "Fetching matches to scan for open-to-work title/headline signals…"
+            ? "Fetching matches to scan for open to work signals in titles and headlines…"
             : "Fetching matches…",
         }),
       },
@@ -291,7 +291,7 @@ export async function runSequentialLeadBatches(input: {
       otwSignalHits += otw.signalCount;
       people = otw.people;
       openToWorkNote = otw.note;
-      if (!apolloRelaxNote?.includes("open to work") && !apolloRelaxNote?.includes("Open-to-work")) {
+      if (!apolloRelaxNote?.includes("open to work") && !apolloRelaxNote?.includes("Open to work")) {
         apolloRelaxNote = OPEN_TO_WORK_APOLLO_DISCLAIMER;
       }
       logLeadFetch("open_to_work_pre_unlock", {
@@ -330,8 +330,8 @@ export async function runSequentialLeadBatches(input: {
               batchSize,
               phase:
                 otwSignalHits > 0
-                  ? openToWorkNote || "Checking more pages for open-to-work signals…"
-                  : `Scanned ${otwScanned.toLocaleString()} profiles — ${otwSignalHits} with open-to-work wording so far. Checking more pages…`,
+                  ? openToWorkNote || "Checking more pages for open to work signals…"
+                  : `Scanned ${otwScanned.toLocaleString()} profiles, ${otwSignalHits} with open to work wording so far. Checking more pages…`,
             }),
           },
         });
@@ -552,7 +552,7 @@ export async function runSequentialLeadBatches(input: {
         email: lead.email!.trim(),
         hasEmail: true,
         reasoning: openToWorkMode
-          ? `Open-to-work signal in title/headline. ${baseWhy}`
+          ? `Open to work signal in title or headline. ${baseWhy}`
           : baseWhy,
         recommendedApproach: "",
       };
@@ -649,7 +649,7 @@ export async function runSequentialLeadBatches(input: {
           phase: creditsExhausted
             ? "Paused: we can't look up more people right now. This batch is saved."
             : hitSaveCap || !underAutoCap || unlockAttempts >= unlockBudget
-              ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email — click Get next 100 to check more people.`
+              ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email. Click Get next 100 to check more people.`
               : morePages
                 ? "Checking more people for verified emails…"
                 : "All available pages processed.",
@@ -674,7 +674,7 @@ export async function runSequentialLeadBatches(input: {
       break;
     }
     // Verified emails are a minority, so a run keeps checking more people until
-    // it fills the batch or spends its unlock budget — whichever comes first.
+    // it fills the batch or spends its unlock budget, whichever comes first.
     if (unlockAttempts >= unlockBudget) {
       stopReason = "unlock_budget";
       break;
@@ -696,7 +696,7 @@ export async function runSequentialLeadBatches(input: {
   }
 
   if (openToWorkMode && savedThisRun === 0 && otwScanned > 0) {
-    apolloRelaxNote = `${OPEN_TO_WORK_NONE_FOUND} Scanned ${otwScanned.toLocaleString()} profiles; ${otwSignalHits} had open-to-work wording.`;
+    apolloRelaxNote = `${OPEN_TO_WORK_NONE_FOUND} Scanned ${otwScanned.toLocaleString()} profiles; ${otwSignalHits} had open to work wording.`;
   } else if (openToWorkMode && savedThisRun > 0) {
     apolloRelaxNote = `${OPEN_TO_WORK_APOLLO_DISCLAIMER} Saved ${savedThisRun} after scanning ${otwScanned.toLocaleString()} profiles (${otwSignalHits} with signals).`;
   }

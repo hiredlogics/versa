@@ -51,7 +51,7 @@ const PLANS: Array<{
   {
     name: "Agency",
     price: "$399",
-    desc: "For agencies and multi-client workflows",
+    desc: "For agencies that work for many clients",
     features: [
       "10,000 leads/month",
       "Team workspace",

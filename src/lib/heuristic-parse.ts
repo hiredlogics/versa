@@ -172,7 +172,7 @@ export function heuristicParsePrompt(
     apollo: {
       personTitles,
       personLocations: [location],
-      // Keep keywords even for OTW — Apollo has no open-to-work filter
+      // Keep keywords even for OTW, Apollo has no open-to-work filter
       qKeywords: hrPrompt ? "human resources" : keywords,
     },
   };

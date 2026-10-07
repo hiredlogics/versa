@@ -24,7 +24,7 @@ export function buildCriteriaSummary(criteria: ParsedSearchCriteria | null): str
   if (criteria.country) parts.push(criteria.country);
   if (criteria.companySizeMin != null || criteria.companySizeMax != null) {
     parts.push(
-      `${criteria.companySizeMin ?? "any"}–${criteria.companySizeMax ?? "any"} employees`
+      `${criteria.companySizeMin ?? "any"} to ${criteria.companySizeMax ?? "any"} employees`
     );
   }
   if (criteria.industry) parts.push(criteria.industry);
@@ -163,14 +163,14 @@ export function buildAssistantSummary(
   } else if (openToWork) {
     const role = titles[0] || "professionals";
     const where = location ? ` in ${location}` : "";
-    base = `I interpreted this as ${role}${where} open to work. Only people with job-seeking wording in title/headline are unlocked and saved`;
+    base = `I interpreted this as ${role}${where} open to work. Only people with job seeking wording in title or headline are unlocked and saved`;
   } else {
     const parts: string[] = [];
     if (titles.length) parts.push(titles.join(", "));
     if (location) parts.push(`in ${location}`);
     if (criteria?.companySizeMin != null || criteria?.companySizeMax != null) {
       parts.push(
-        `at companies with ${criteria.companySizeMin ?? "any"}–${criteria.companySizeMax ?? "any"} employees`
+        `at companies with ${criteria.companySizeMin ?? "any"} to ${criteria.companySizeMax ?? "any"} employees`
       );
     }
     if (industry) parts.push(`in ${industry}`);
@@ -189,7 +189,7 @@ export function buildAssistantSummary(
   }
 
   if (totalFound > 0) {
-    return `${base}. ~${totalFound.toLocaleString()} matches available — still pulling / saving for this prompt.`;
+    return `${base}. ~${totalFound.toLocaleString()} matches available, still pulling / saving for this prompt.`;
   }
 
   return `${base}. No qualified leads matched this search.`;

@@ -37,7 +37,7 @@ export function ContactProductPanel() {
       <div className="rounded-xl border border-lp-border bg-lp-graphite/80 p-3 mb-4">
         <p className="text-xs text-lp-muted mb-1">Prompt</p>
         <p className="text-sm text-lp-off-white leading-relaxed">
-          Find B2B SaaS founders in the US with 20–300 employees.
+          Find B2B SaaS founders in the US with 20 to 300 employees.
         </p>
       </div>
 

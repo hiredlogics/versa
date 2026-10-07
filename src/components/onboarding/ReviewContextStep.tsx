@@ -27,7 +27,7 @@ export function ReviewContextStep({ data }: { data: OnboardingFormState }) {
         <Row label="Countries" value={data.targetCountries.join(", ")} />
         <Row
           label="Company size"
-          value={`${data.companySizeMin}–${data.companySizeMax} employees`}
+          value={`${data.companySizeMin} to ${data.companySizeMax} employees`}
         />
         <Row label="Titles" value={data.targetTitles.join(", ")} />
         <Row label="Services" value={data.servicesToSell.join(", ")} />

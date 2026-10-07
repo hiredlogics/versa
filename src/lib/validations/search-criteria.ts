@@ -61,7 +61,7 @@ export const aiParsePromptOutputSchema = z
     if (!hasTitles) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Missing personTitles/jobTitles — filters would fall back to generic defaults",
+        message: "Missing personTitles/jobTitles, filters would fall back to generic defaults",
         path: ["apollo", "personTitles"],
       });
     }

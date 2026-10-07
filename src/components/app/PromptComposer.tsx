@@ -36,7 +36,7 @@ export function PromptComposer({
   loading,
   disabled,
   editing,
-  placeholder = "Find SaaS founders in the US with 20-300 employees who may need AI automation...",
+  placeholder = "Find SaaS founders in the US with 20 to 300 employees who may need AI automation...",
   submitLabel = "Find leads",
 }: PromptComposerProps) {
   // The parent owns the mode, so a reset or restored search always shows the right tab.
@@ -77,7 +77,7 @@ export function PromptComposer({
       {editing && (
         <div className="flex items-center gap-2 border-b border-lp-border bg-lp-panel/50 px-4 py-2">
           <Pencil className="h-3.5 w-3.5 text-lp-ice-blue" />
-          <p className="text-xs text-lp-ice-blue">Editing prompt — submit to run again</p>
+          <p className="text-xs text-lp-ice-blue">Editing prompt. Submit to run again.</p>
         </div>
       )}
 
@@ -137,7 +137,7 @@ export function PromptComposer({
               className="w-full resize-y bg-transparent text-sm leading-relaxed text-lp-white placeholder:text-lp-muted-dark focus:outline-none disabled:opacity-50 min-h-[140px]"
             />
             <div className="flex justify-between text-[11px] text-lp-muted-dark">
-              <span>Extracts role, seniority, location, and must-have/nice-to-have skills</span>
+              <span>Extracts role, seniority, location, and required and preferred skills</span>
               <span>{((values.jobDescription ?? values.prompt)?.length ?? 0).toLocaleString()} / 20,000 chars</span>
             </div>
           </div>
