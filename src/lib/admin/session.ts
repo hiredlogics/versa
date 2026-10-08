@@ -44,7 +44,9 @@ function parseSessionToken(token: string): AdminSession | null {
     .update(payload)
     .digest("base64url");
 
-  if (signature !== expected) return null;
+  const given = Buffer.from(signature);
+  const wanted = Buffer.from(expected);
+  if (given.length !== wanted.length || !crypto.timingSafeEqual(given, wanted)) return null;
 
   try {
     const session = JSON.parse(

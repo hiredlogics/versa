@@ -16,7 +16,7 @@ export function SectionShell({
     <section
       id={id}
       className={cn(
-        "relative py-20 md:py-28 px-4",
+        "relative px-4 py-14 md:py-20",
         soft ? "bg-lp-graphite" : "bg-lp-black",
         className
       )}
@@ -38,7 +38,7 @@ export function SectionHeader({
   align?: "center" | "left";
 }) {
   return (
-    <FadeIn className={cn("mb-14 md:mb-16", align === "center" && "text-center max-w-3xl mx-auto")}>
+    <FadeIn className={cn("mb-10 md:mb-12", align === "center" && "text-center max-w-3xl mx-auto")}>
       {badge && (
         <p className="mb-4 inline-flex items-center rounded-full border border-lp-border bg-lp-panel px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-lp-muted">
           {badge}

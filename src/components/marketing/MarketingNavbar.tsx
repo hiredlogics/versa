@@ -4,10 +4,39 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useAuth } from "@clerk/nextjs";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/marketing/ThemeToggle";
 import { cn } from "@/lib/utils/cn";
+
+/** "Log in / Start free" for visitors, "Open app" for someone already logged in. */
+function AuthLinks({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
+  const { isSignedIn } = useAuth();
+  const ctaClass = mobile ? "lp-btn-cta w-full text-center py-3.5 text-sm" : "lp-btn-cta text-sm";
+
+  if (isSignedIn) {
+    return (
+      <Link href="/app" onClick={onNavigate} className={ctaClass}>
+        Open app
+      </Link>
+    );
+  }
+  return (
+    <>
+      <Link
+        href="/login"
+        onClick={onNavigate}
+        className={mobile ? "lp-nav-login text-center py-3 text-sm" : "lp-nav-login text-sm px-1"}
+      >
+        Log in
+      </Link>
+      <Link href="/register" onClick={onNavigate} className={ctaClass}>
+        Start free
+      </Link>
+    </>
+  );
+}
 
 const NAV_LINKS = [
   { href: "/features", label: "Features" },
@@ -27,12 +56,6 @@ export function MarketingNavbar() {
   return (
     <header className="lp-nav-enter fixed top-0 inset-x-0 z-50">
       <div className="lp-nav-glass absolute inset-0" aria-hidden />
-      <div className="lp-nav-top-line pointer-events-none absolute inset-x-0 top-0 h-px" aria-hidden />
-      <div className="lp-nav-glow-center pointer-events-none absolute inset-x-0 top-0 h-16" aria-hidden />
-      <div
-        className="lp-nav-glow-cta pointer-events-none absolute right-[12%] top-1/2 h-24 w-24 -translate-y-1/2 rounded-full blur-2xl"
-        aria-hidden
-      />
 
       <div className="relative mx-auto flex h-[76px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Logo size="lg" animated variant="nav" className="relative z-10 shrink-0" />
@@ -67,12 +90,7 @@ export function MarketingNavbar() {
 
         <div className="hidden md:flex items-center gap-3 shrink-0">
           <ThemeToggle />
-          <Link href="/login" className="lp-nav-login text-sm px-1">
-            Log in
-          </Link>
-          <Link href="/register" className="lp-btn-cta text-sm">
-            Start free
-          </Link>
+          <AuthLinks />
         </div>
 
         <div className="flex md:hidden items-center gap-2 relative z-10">
@@ -118,20 +136,7 @@ export function MarketingNavbar() {
                 })}
               </nav>
               <div className="mt-4 flex flex-col gap-2.5 border-t lp-nav-mobile-divider pt-4">
-                <Link
-                  href="/login"
-                  onClick={() => setOpen(false)}
-                  className="lp-nav-login text-center py-3 text-sm"
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setOpen(false)}
-                  className="lp-btn-cta w-full text-center py-3.5 text-sm"
-                >
-                  Start free
-                </Link>
+                <AuthLinks mobile onNavigate={() => setOpen(false)} />
               </div>
             </div>
           </motion.div>

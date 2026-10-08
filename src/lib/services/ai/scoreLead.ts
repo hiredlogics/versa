@@ -12,6 +12,9 @@ export type ScoredLeadInput = {
   employees: number;
   location: string;
   hasEmail?: boolean;
+  headline?: string | null;
+  employmentHistory?: Array<{ title?: string; organization_name?: string }> | null;
+  rawApolloData?: unknown;
 };
 
 export type LeadScoreOutput = {
@@ -19,7 +22,25 @@ export type LeadScoreOutput = {
   priorityLevel: "Low" | "Medium" | "High" | "Very High";
   reasoning: string;
   recommendedApproach: string;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  /** Short points that raised / lowered the score, shown when hovering the score. */
+  pros?: string[];
+  cons?: string[];
 };
+
+/** Points that say nothing about why one lead beat another, or mention hidden ids. */
+const VAGUE_POINT =
+  /\b(limited (information|details)|diverse (job history|experience|background)|relevant experience|lead #?\d+|no (indication|sign) of job.?seeking)\b/i;
+
+/** Up to 3 short, specific points from whatever the AI sent. */
+export function shortList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim().slice(0, 120))
+    .filter((item) => item && !VAGUE_POINT.test(item))
+    .slice(0, 3);
+}
 
 /** Keep each OpenAI score call small enough to finish under AI_TIMEOUT_MS. */
 export const SCORE_BATCH_SIZE = Math.min(
@@ -46,6 +67,31 @@ function toDbPriority(p: LeadScoreOutput["priorityLevel"]): PriorityLevel {
 
 export { toDbPriority };
 
+/**
+ * Matched/missing skills from one AI item, limited to the skills the search asked for
+ * (spelled as the search spelled them). Both stay empty when the AI gave neither list.
+ */
+export function skillsFromAi(
+  item: { matchedSkills?: unknown; missingSkills?: unknown },
+  targetSkills: string[] = []
+): { matchedSkills: string[]; missingSkills: string[] } {
+  const none = { matchedSkills: [], missingSkills: [] };
+  if (targetSkills.length === 0) return none;
+  if (!Array.isArray(item.matchedSkills) && !Array.isArray(item.missingSkills)) return none;
+
+  const byLower = new Map(targetSkills.map((skill) => [skill.toLowerCase(), skill]));
+  const matched = new Set<string>();
+  for (const value of Array.isArray(item.matchedSkills) ? item.matchedSkills : []) {
+    const skill = byLower.get(String(value).trim().toLowerCase());
+    if (skill) matched.add(skill);
+  }
+  // A target skill without evidence is "no sign of", even if the AI left it out of both lists.
+  return {
+    matchedSkills: [...matched],
+    missingSkills: targetSkills.filter((skill) => !matched.has(skill)),
+  };
+}
+
 function buildScoringSystem(context: LeadScoreContext): string {
   const ctx = context.leadContext;
   const ctxBlock = ctx
@@ -63,24 +109,64 @@ Saved business context:
 `
     : "";
 
+  const skillsBlock = context.targetSkills?.length
+    ? `
+Skills this search asks for:
+${context.targetSkills.map((s) => `- ${s}`).join("\n")}
+
+For each lead, judge these skills ONLY from its title, headline and jobHistory text:
+- matchedSkills: skills from the list above with clear evidence in that text.
+- missingSkills: skills from the list above with no evidence in that text.
+Use the skill names exactly as listed. Never add other skills.
+`
+    : "";
+
   return `Score B2B leads 1-10 for the user's search.
 
 Search intent: "${context.searchIntent || context.keywords || ""}"
 Current prompt: "${context.originalPrompt || ""}"
 ${ctxBlock}
+${skillsBlock}
 
 Rules:
 - Match saved ICP when prompt is vague.
 - Cap relevance low if title is excluded unless prompt explicitly requests that role.
-- Prefer decision-makers in target titles — UNLESS this is an open-to-work / hiring search.
+- Prefer decision-makers in target titles, UNLESS this is an open-to-work / hiring search.
 - For open-to-work / job-seeking / "looking for a job" intent:
-  - Score software engineers, developers, and matching titles at least 6–8 when location/role fit.
+  - Score software engineers, developers, and matching titles at least 6 to 8 when location/role fit.
   - Do NOT require CEO/founder authority.
   - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
-  - Explicit seeking/available/freelance title signals can go to 8–10.
-- Include ALL leads in response (use the provided index values).
+  - Explicit seeking/available/freelance title signals can go to 8 to 10.
+- Include ALL leads in response (use the provided index values).${
+    context.compareAcrossLeads
+      ? `
+- These leads were all returned for the SAME search. Compare them with each other before scoring:
+  the best fit gets the highest score and the weakest fit the lowest. Two leads share a score
+  only when they are truly equally good.
+- The pros and cons must EXPLAIN THE RANKING, so a reader sees why one lead scored higher:
+  - Use facts that differ between the leads. Never give two leads the same pro or con.
+  - A higher-scored lead gets at least one pro saying what sets it apart from the others
+    (e.g. "Senior title; most others are mid-level").
+  - A lower-scored lead gets at least one con saying what the higher-scored leads have
+    and it lacks (e.g. "Junior title, while top leads are senior").`
+      : ""
+  }
+- Use the full 1-10 range: different profiles should get different scores.
+- pros: up to 3 short facts from this lead's data that raised the score.
+- cons: up to 3 short facts that lowered it, or what is missing or unclear.
+  Each under 12 words, plain English, about THIS lead (not generic).
+  Every point names a concrete fact: a title or seniority, company, company size,
+  industry, location, a past job, a skill, or whether there is an email.
+  Never write vague points like "Relevant experience", "Current role as X",
+  "Limited information", "Diverse experience" or "Diverse job history".
+  Never refer to another lead by number or index (no "lead 2"); name the difference instead.
+  ${
+    context.openToWork
+      ? "This search is about job seekers: job-seeking signals matter."
+      : "This search is NOT about job seekers: never mention job-seeking or open-to-work status."
+  }
 
-Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "..." }] }
+Return JSON: { "leads": [{ "index": 0, "leadScore": 8, "priorityLevel": "High", "reasoning": "...", "recommendedApproach": "...", "pros": ["..."], "cons": ["..."], "matchedSkills": ["Skill1"], "missingSkills": ["Skill2"] }] }
 priorityLevel: Low|Medium|High|Very High`;
 }
 
@@ -102,6 +188,7 @@ function applyCaps(
       leadScore: capped,
       priorityLevel: toPriority(capped),
       reasoning: `${output.reasoning}. Capped due to exclusion rules.`,
+      cons: [...(output.cons ?? []), "Title or industry is on your excluded list (capped at 5)"],
     };
   }
   return output;
@@ -115,6 +202,10 @@ function heuristicScores(leads: ScoredLeadInput[], context: LeadScoreContext): L
       priorityLevel: toPriority(h.score),
       reasoning: h.reasoning,
       recommendedApproach: "Personalize outreach based on their role and company context.",
+      matchedSkills: [],
+      missingSkills: [],
+      pros: h.pros ?? [],
+      cons: h.cons ?? [],
     };
     return applyCaps(base, lead, context);
   });
@@ -135,17 +226,31 @@ async function scoreChunkWithAi(
   context: LeadScoreContext,
   heuristicChunk: LeadScoreOutput[],
   meta?: { userId?: string; searchId?: string }
-): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
-  const payload = chunk.map((l, i) => ({
-    index: i,
-    name: l.name,
-    title: l.title,
-    company: l.company,
-    industry: l.industry,
-    employees: l.employees,
-    location: l.location,
-    hasEmail: l.hasEmail ?? false,
-  }));
+): Promise<{ scores: LeadScoreOutput[]; provider: string; fromAi: boolean[] }> {
+  const payload = chunk.map((l, i) => {
+    const raw = l.rawApolloData as {
+      headline?: string;
+      employment_history?: Array<{ title?: string; organization_name?: string }>;
+    } | undefined;
+    const history = (l.employmentHistory ?? raw?.employment_history ?? [])
+      .slice(0, 5)
+      .map((e) => [e.title, e.organization_name].filter(Boolean).join(" at "))
+      .filter(Boolean)
+      .join("; ");
+
+    return {
+      index: i,
+      name: l.name,
+      title: l.title,
+      headline: l.headline || raw?.headline || undefined,
+      company: l.company,
+      industry: l.industry,
+      employees: l.employees,
+      location: l.location,
+      hasEmail: l.hasEmail ?? false,
+      jobHistory: history || undefined,
+    };
+  });
 
   try {
     const { content, provider } = await aiChat({
@@ -163,55 +268,66 @@ async function scoreChunkWithAi(
     };
 
     const scores = [...heuristicChunk];
+    const fromAi = chunk.map(() => false);
     for (const item of parsed.leads || []) {
       if (item.index >= 0 && item.index < chunk.length) {
-        const base = {
+        const base: LeadScoreOutput = {
           leadScore: Math.min(10, Math.max(1, item.leadScore || 5)),
           priorityLevel: item.priorityLevel || toPriority(item.leadScore),
           reasoning: item.reasoning || "AI scored",
           recommendedApproach:
             item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
+          ...skillsFromAi(item, context.targetSkills),
+          pros: shortList(item.pros),
+          cons: shortList(item.cons),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
+        fromAi[item.index] = true;
       }
     }
-    return { scores, provider };
+    return { scores, provider, fromAi };
   } catch (error) {
     console.warn(
       `[scoreLead] AI score chunk offset=${absoluteOffset} size=${chunk.length} failed:`,
       error instanceof Error ? error.message : error
     );
-    return { scores: heuristicChunk, provider: "HEURISTIC" };
+    return { scores: heuristicChunk, provider: "HEURISTIC", fromAi: chunk.map(() => false) };
   }
 }
 
 export async function scoreLeadsWithAi(
   leads: ScoredLeadInput[],
   context: LeadScoreContext,
-  meta?: { userId?: string; searchId?: string }
-): Promise<{ scores: LeadScoreOutput[]; provider: string }> {
+  meta?: { userId?: string; searchId?: string },
+  /** batchSize: leads per AI call; ignoreCap: allow more than AI_MAX_SCORE_COUNT (re-scoring). */
+  options: { batchSize?: number; ignoreCap?: boolean } = {}
+): Promise<{ scores: LeadScoreOutput[]; provider: string; fromAi: boolean[] }> {
   const heuristicFixed = heuristicScores(leads, context);
+  const batchSize = options.batchSize ?? SCORE_BATCH_SIZE;
 
-  // Very large pulls can't afford per-batch AI scoring — keep them heuristic-ranked.
-  const aiScoreCap = Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
+  // Very large pulls can't afford per-batch AI scoring, keep them heuristic-ranked.
+  const aiScoreCap = options.ignoreCap
+    ? 0
+    : Math.max(0, parseInt(process.env.AI_MAX_SCORE_COUNT || "40", 10));
   if (leads.length === 0 || (aiScoreCap > 0 && leads.length > aiScoreCap)) {
-    if (leads.length > aiScoreCap) {
+    if (aiScoreCap > 0 && leads.length > aiScoreCap) {
       console.log(
-        `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap} — using heuristic scores`
+        `[scoreLead] ${leads.length} leads > AI_MAX_SCORE_COUNT=${aiScoreCap}, using heuristic scores`
       );
     }
-    return { scores: heuristicFixed, provider: "HEURISTIC" };
+    return { scores: heuristicFixed, provider: "HEURISTIC", fromAi: leads.map(() => false) };
   }
 
-  const chunks = chunkLeadsForScoring(leads, SCORE_BATCH_SIZE);
+  const chunks = chunkLeadsForScoring(leads, batchSize);
   const scores = [...heuristicFixed];
+  const fromAi = leads.map(() => false);
   const providers = new Set<string>();
 
   for (let c = 0; c < chunks.length; c++) {
     const chunk = chunks[c];
-    const offset = c * SCORE_BATCH_SIZE;
+    const offset = c * batchSize;
     const heuristicChunk = heuristicFixed.slice(offset, offset + chunk.length);
-    const { scores: chunkScores, provider } = await scoreChunkWithAi(
+    const { scores: chunkScores, provider, fromAi: chunkFromAi } = await scoreChunkWithAi(
       chunk,
       offset,
       context,
@@ -221,6 +337,7 @@ export async function scoreLeadsWithAi(
     providers.add(provider);
     for (let i = 0; i < chunkScores.length; i++) {
       scores[offset + i] = chunkScores[i];
+      fromAi[offset + i] = chunkFromAi[i];
     }
   }
 
@@ -228,5 +345,5 @@ export async function scoreLeadsWithAi(
   const provider =
     aiProviders.length > 0 ? aiProviders[0] : providers.has("HEURISTIC") ? "HEURISTIC" : "OPENAI";
 
-  return { scores, provider };
+  return { scores, provider, fromAi };
 }

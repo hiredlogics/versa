@@ -4,7 +4,7 @@ import type { CreditBalance } from "./credits";
 /**
  * The vendor boundary for anything leaving the server. Every field is listed by
  * hand: spreading a Prisma row ships the stored raw provider payload to a
- * browser, and the provider's person id leaks as a FIELD NAME — which a search
+ * browser, and the provider's person id leaks as a FIELD NAME, which a search
  * for string literals would never catch.
  */
 
@@ -24,6 +24,8 @@ export const LEAD_SELECT = {
   priorityLevel: true,
   reasoning: true,
   whySource: true,
+  scorePros: true,
+  scoreCons: true,
   createdAt: true,
 } as const;
 
@@ -42,6 +44,8 @@ export interface LeadDTO {
   priority: string;
   why: string | null;
   whySource: string;
+  pros: string[];
+  cons: string[];
   createdAt: string;
 }
 
@@ -63,6 +67,8 @@ export function toLeadDTO(lead: LeadRow): LeadDTO {
     priority: lead.priorityLevel,
     why: lead.reasoning,
     whySource: lead.whySource,
+    pros: lead.scorePros,
+    cons: lead.scoreCons,
     createdAt: lead.createdAt.toISOString(),
   };
 }
@@ -76,7 +82,7 @@ export interface SearchDTO {
   requested: number;
   batchesDone: number;
   hasMore: boolean;
-  /** RUNNING with nothing in flight — the UI should offer a retry, not a dead button. */
+  /** RUNNING with nothing in flight, the UI should offer a retry, not a dead button. */
   stale: boolean;
   createdAt: string;
 }

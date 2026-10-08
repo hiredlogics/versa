@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils/cn";
 import type { SearchDisplayStatus } from "@/lib/types/search-history";
 
 const STATUS_CONFIG: Record<
-  SearchDisplayStatus,
+  SearchDisplayStatus | "unknown",
   { label: string; dot: string; bg: string; text: string; border: string }
 > = {
   complete: {
@@ -42,6 +42,13 @@ const STATUS_CONFIG: Record<
     text: "text-lp-muted",
     border: "border-lp-border",
   },
+  unknown: {
+    label: "Unknown",
+    dot: "bg-lp-muted-dark",
+    bg: "bg-lp-panel-strong",
+    text: "text-lp-muted",
+    border: "border-lp-border",
+  },
 };
 
 export function SearchStatusBadge({
@@ -51,13 +58,13 @@ export function SearchStatusBadge({
   status: SearchDisplayStatus | string;
   className?: string;
 }) {
-  const key = (status in STATUS_CONFIG ? status : "complete") as SearchDisplayStatus;
+  const key = (status in STATUS_CONFIG ? status : "unknown") as SearchDisplayStatus | "unknown";
   const config = STATUS_CONFIG[key];
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium tracking-wide",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium tracking-wide",
         config.bg,
         config.text,
         config.border,

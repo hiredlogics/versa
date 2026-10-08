@@ -13,7 +13,7 @@ function CriteriaSummary({ criteria }: { criteria?: ParsedSearchCriteria }) {
     criteria.industry && `Industry: ${criteria.industry}`,
     criteria.country && `Country: ${criteria.country}`,
     (criteria.companySizeMin || criteria.companySizeMax) &&
-      `Employees: ${criteria.companySizeMin ?? "any"}–${criteria.companySizeMax ?? "any"}`,
+      `Employees: ${criteria.companySizeMin ?? "any"} to ${criteria.companySizeMax ?? "any"}`,
     criteria.jobTitles?.length && `Titles: ${criteria.jobTitles.join(", ")}`,
     criteria.intentSummary && criteria.intentSummary,
   ].filter(Boolean);

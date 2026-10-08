@@ -10,7 +10,7 @@ import { toUserFacingSearchError } from "@/lib/services/leads/searchError";
 
 export const maxDuration = 300;
 
-/** POST — resume a partial Apollo pull for this search. */
+/** POST: resume a partial Apollo pull for this search. */
 export async function POST(_req: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireUser();
@@ -57,7 +57,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       data: {
         status: "RUNNING",
         errorMessage: null,
-        relaxNote: "Resuming Apollo pull…",
+        relaxNote: "Looking for more people…",
       },
     });
 
@@ -78,7 +78,7 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
       searchId: search.id,
       status: "RUNNING",
       async: true,
-      message: "Resume started — pulling the next batch of Apollo matches.",
+      message: "Resume started, finding the next batch of matches.",
       leadsReturned: search.leadsReturned,
       totalAvailable: search.totalAvailable,
     });

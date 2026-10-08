@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { ACTIVE_SUBSCRIPTION_STATUSES, isBillingEnforced } from "@/lib/billing/constants";
-import { PLAN_LIMITS } from "@/lib/billing/planLimits";
+import { FREE_TRIAL_PERIOD, PLAN_LIMITS } from "@/lib/billing/planLimits";
 
 /**
  * Credits are deducted before paid work and settled afterwards: charged for what
@@ -22,20 +22,12 @@ export class InsufficientCreditsError extends Error {
   }
 }
 
-/** Distinct from a credits problem: the user has no plan to spend against. */
-export class NoSubscriptionError extends Error {
-  constructor() {
-    super("Active subscription required. Choose a plan to continue.");
-    this.name = "NoSubscriptionError";
-  }
-}
-
 export interface CreditBalance {
   planName: string;
   limit: number;
   used: number;
   remaining: number;
-  /** Reserved but not yet settled — in-flight, not spent. */
+  /** Reserved but not yet settled, in-flight, not spent. */
   pending: number;
   periodStart: Date;
   periodEnd: Date;
@@ -71,11 +63,18 @@ async function resolvePlan(tx: Tx, userId: string, now: Date): Promise<ResolvedP
     Boolean(subscription) &&
     ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription!.status);
 
+  const fallback = calendarPeriod(now);
+
+  // Without an active paid plan the user is on the one-time free trial.
   if (isBillingEnforced() && !active) {
-    throw new NoSubscriptionError();
+    return {
+      start: new Date(FREE_TRIAL_PERIOD.start),
+      end: new Date(FREE_TRIAL_PERIOD.end),
+      limit: PLAN_LIMITS.freeTrial.monthlyLeads,
+      planName: PLAN_LIMITS.freeTrial.name,
+    };
   }
 
-  const fallback = calendarPeriod(now);
   const start = subscription?.currentPeriodStart ?? fallback.start;
   const end = subscription?.currentPeriodEnd ?? fallback.end;
 
@@ -139,8 +138,7 @@ export async function reserve(input: {
 
       // Lock by primary key, never by (userId, periodStart). periodStart is
       // `timestamp without time zone`; a JS Date binds as timestamptz and gets
-      // shifted by the session offset, so that predicate matches zero rows —
-      // locking nothing and reading leadsUsed as 0, which lets every concurrent
+      // shifted by the session offset, so that predicate matches zero rows,       // locking nothing and reading leadsUsed as 0, which lets every concurrent
       // reserve believe the balance is full.
       const rows = await tx.$queryRaw<Array<{ leadsUsed: number }>>(
         Prisma.sql`SELECT "leadsUsed" FROM "UsageRecord" WHERE id = ${usage.id} FOR UPDATE`

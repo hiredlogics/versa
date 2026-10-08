@@ -47,7 +47,7 @@ export default async function AdminSearchesPage() {
 
                 <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
                   <span>{search.leadsReturned} leads returned</span>
-                  <span>{search.durationMs != null ? `${search.durationMs}ms` : "—"}</span>
+                  <span>{search.durationMs != null ? `${search.durationMs}ms` : "None"}</span>
                   <span>{search.aiProviderUsed || "No AI provider"}</span>
                   <Link href={`/app/searches/${search.id}`} className="text-electric hover:underline">
                     Open search

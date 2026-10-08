@@ -10,19 +10,19 @@ export function toUserFacingSearchError(raw: string | null | undefined): string 
   if (message === USER_STOPPED_MESSAGE) return message;
 
   if (/invalid api key|unauthorized|forbidden|\b(401|403)\b/i.test(message)) {
-    return "Lead search is temporarily unavailable — our data provider rejected the request. The team has been notified.";
+    return "Lead search is temporarily unavailable. Our data provider rejected the request. The team has been notified.";
   }
   if (/not configured/i.test(message)) {
     return "Lead search is not configured on this server yet. The team has been notified.";
   }
   if (/credit/i.test(message)) {
-    return "Data provider credits ran out — top up, then click Get next 100.";
+    return "We can't look up more people right now. Please try again later, then click Get next 100.";
   }
   if (/rate limit|\b429\b/i.test(message)) {
     return "We are being rate limited right now. Please try again in a few minutes.";
   }
   if (/timed? ?out|ETIMEDOUT|ECONNRESET|fetch failed|network/i.test(message)) {
-    return "The lead search timed out. Anything already saved is kept — click Get next 100 to continue.";
+    return "The lead search timed out. Anything already saved is kept. Click Get next 100 to continue.";
   }
 
   return message.replace(/apollo(\.io)?/gi, "the data provider");

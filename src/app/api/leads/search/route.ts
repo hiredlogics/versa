@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     console.log("[leads/search] Starting search...");
     const result = await runLeadSearch(prompt.trim(), minScore);
-    console.log(`[leads/search] Done — ${result.session.leads.length} leads`);
+    console.log(`[leads/search] Done, ${result.session.leads.length} leads`);
 
     return NextResponse.json(result);
   } catch (error) {

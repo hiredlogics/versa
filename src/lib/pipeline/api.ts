@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { InsufficientCreditsError, NoSubscriptionError, balance } from "./credits";
+import { InsufficientCreditsError, balance } from "./credits";
 import { toCreditsDTO } from "./dto";
 import { providerDeps } from "@/lib/providers/people-data";
 import { runBatch } from "./run";
@@ -10,8 +10,7 @@ import type { Brief } from "./types";
 
 /**
  * Response envelopes are built here rather than inline in each route, so the
- * shape a browser receives has one definition and one test. Adding a field —
- * a debug flag, a stray spread — has to happen inside a tested function.
+ * shape a browser receives has one definition and one test. Adding a field,  * a debug flag, a stray spread, has to happen inside a tested function.
  */
 
 export function clarificationEnvelope(input: {
@@ -76,9 +75,6 @@ export async function creditsPayload(userId: string) {
 
 /** Maps the errors every route can raise onto the agreed status codes. */
 export async function toErrorResponse(error: unknown, userId?: string) {
-  if (error instanceof NoSubscriptionError) {
-    return fail(402, error.message, userId ? { credits: await creditsPayload(userId) } : undefined);
-  }
   if (error instanceof InsufficientCreditsError) {
     return fail(402, error.message, userId ? { credits: await creditsPayload(userId) } : undefined);
   }

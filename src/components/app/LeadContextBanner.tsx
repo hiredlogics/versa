@@ -12,10 +12,10 @@ export function LeadContextBanner() {
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-lp-border bg-lp-panel/60 px-3 py-2">
       <p className="text-xs text-lp-muted">
-        <span className="text-lp-off-white">Each prompt is searched on its own</span>
+        <span className="text-lp-off-white">Each prompt is searched on its own.</span>
         <span className="text-lp-muted-dark">
           {" "}
-          — {BRAND.name} pulls every match for that prompt (saved ICP is not mixed in).
+          {BRAND.name} pulls every match for that prompt (your saved ideal customer profile is not mixed in).
         </span>
       </p>
       <Link

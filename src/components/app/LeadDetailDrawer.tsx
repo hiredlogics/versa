@@ -1,11 +1,15 @@
 "use client";
 
-import { X, Mail, ExternalLink, Building2, MapPin, Users } from "lucide-react";
+import { X, Mail, ExternalLink, Building2, MapPin, Users, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import { ScoreBadge } from "@/components/ui/Badge";
 import { LeadSignalBadges } from "@/components/app/LeadSignalBadges";
 import type { LeadRecord } from "@/lib/types/lead-finder";
 import { priorityLabel } from "@/lib/types/lead-finder";
+import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
+import { OPEN_TO_WORK_NOTE, OpenToWorkBadge } from "@/components/app/OpenToWorkBadge";
+import { ScorePoints } from "@/components/app/ScoreWhy";
 
 export function LeadDetailDrawer({
   lead,
@@ -14,6 +18,25 @@ export function LeadDetailDrawer({
   lead: LeadRecord | null;
   onClose: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyEmail() {
+    if (!lead?.email) return;
+    try {
+      await navigator.clipboard.writeText(lead.email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const emailStatusLabel =
+    lead?.emailStatus === "verified" ? "Verified" : lead?.emailStatus ? "Unverified" : null;
+  const skillsBreakdown = lead
+    ? formatSkillsBreakdown(lead.leadScore, lead.matchedSkills, lead.missingSkills)
+    : null;
+
   return (
     <AnimatePresence>
       {lead && (
@@ -42,18 +65,25 @@ export function LeadDetailDrawer({
               <button
                 type="button"
                 onClick={onClose}
+                aria-label="Close"
                 className="rounded-lg border border-lp-border p-2 text-lp-muted hover:text-lp-white"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden />
               </button>
             </div>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-5">
-              <section className="flex items-center gap-3">
-                <ScoreBadge score={lead.leadScore} />
-                <span className="rounded-full border border-lp-border bg-lp-panel px-2.5 py-0.5 text-xs text-lp-muted">
-                  {priorityLabel(lead.priorityLevel)} priority
-                </span>
+              <section className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <ScoreBadge score={lead.leadScore} />
+                  <span className="rounded-full border border-lp-border bg-lp-panel px-2.5 py-0.5 text-xs text-lp-muted">
+                    {priorityLabel(lead.priorityLevel)} priority
+                  </span>
+                </div>
+                {skillsBreakdown && (
+                  <p className="text-xs font-medium text-lp-off-white">{skillsBreakdown}</p>
+                )}
+                <ScorePoints pros={lead.scorePros} cons={lead.scoreCons} />
               </section>
 
               <section className="space-y-2">
@@ -63,15 +93,52 @@ export function LeadDetailDrawer({
                 <LeadSignalBadges lead={lead} />
               </section>
 
+              {lead.openToWorkLevel && (
+                <section className="space-y-2 rounded-lg border border-lp-border bg-lp-panel/60 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-lp-muted-dark">
+                      Looking for a job?
+                    </h3>
+                    <OpenToWorkBadge level={lead.openToWorkLevel} />
+                  </div>
+                  {lead.openToWorkReasons && lead.openToWorkReasons.length > 0 && (
+                    <ul className="space-y-1 text-xs text-lp-off-white">
+                      {lead.openToWorkReasons.map((reason) => (
+                        <li key={reason} className="flex items-start gap-1.5">
+                          <span className="text-lp-ice-blue">•</span>
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-[10px] italic text-lp-muted-dark">{OPEN_TO_WORK_NOTE}</p>
+                </section>
+              )}
+
               <section className="space-y-3">
                 <h3 className="text-xs font-medium uppercase tracking-wider text-lp-muted-dark">
                   Contact
                 </h3>
                 <InfoRow icon={Mail} label="Email">
                   {lead.email ? (
-                    <a href={`mailto:${lead.email}`} className="app-link">
-                      {lead.email}
-                    </a>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <a href={`mailto:${lead.email}`} className="app-link">
+                        {lead.email}
+                      </a>
+                      {emailStatusLabel && (
+                        <span className="rounded-full bg-lp-panel px-2 py-0.5 text-xs text-lp-muted">
+                          {emailStatusLabel}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={copyEmail}
+                        className="inline-flex items-center gap-1 text-xs text-lp-ice-blue hover:underline"
+                      >
+                        <Copy className="h-3 w-3" aria-hidden />
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </span>
                   ) : (
                     "Not available"
                   )}
@@ -143,7 +210,7 @@ function InfoRow({
     <div className="flex items-start gap-3 text-sm">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-lp-muted-dark" />
       <div>
-        <p className="text-[11px] text-lp-muted-dark">{label}</p>
+        <p className="text-xs text-lp-muted-dark">{label}</p>
         <p className="text-lp-off-white">{children}</p>
       </div>
     </div>

@@ -241,7 +241,7 @@ describe("search-criteria helpers", () => {
     expect(criteria.apollo?.employeeRanges).not.toContain("501,1000");
     // Client-facing copy must stay provider-neutral while explaining strict OTW keep.
     expect(criteria.searchIntent?.toLowerCase()).toContain(
-      "only people with open-to-work / job-seeking wording"
+      "only people with open to work or job seeking wording"
     );
     expect(criteria.searchIntent?.toLowerCase()).not.toContain("apollo");
   });
@@ -298,7 +298,7 @@ describe("open-to-work title signals", () => {
 
     const hard = filterPeopleForOpenToWork([
       { title: "HR Manager" },
-      { title: "Recruiter — Open to Work" },
+      { title: "Recruiter, Open to Work" },
     ]);
     expect(hard.usedTitleSignals).toBe(true);
     expect(hard.people).toHaveLength(1);

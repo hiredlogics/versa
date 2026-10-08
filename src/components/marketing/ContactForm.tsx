@@ -175,7 +175,7 @@ export function ContactForm() {
         <Field label="What are you trying to find?" error={fieldErrors.intent}>
           <textarea
             rows={3}
-            placeholder="e.g. SaaS founders in the US with 20–300 employees who need AI automation"
+            placeholder="e.g. SaaS founders in the US with 20 to 300 employees who need AI automation"
             value={form.intent}
             onChange={(e) => update("intent", e.target.value)}
             className={`${inputClass} min-h-[88px] resize-y`}

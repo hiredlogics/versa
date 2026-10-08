@@ -22,7 +22,7 @@ export function getEnrichBatchSize(): number {
   );
 }
 
-/** Max enrich calls for one page prepare request — default full page (200). */
+/** Max enrich calls for one page prepare request, default full page (200). */
 export function getEnrichPageCap(): number {
   return Math.min(
     200,
@@ -114,7 +114,7 @@ export async function enrichAndWhyInMemory(
     userId: string;
     searchId: string;
     maxEnrich: number;
-    /** When true, only unlock emails/profiles — skip AI/template Why (caller filters then writes Why). */
+    /** When true, only unlock emails/profiles, skip AI/template Why (caller filters then writes Why). */
     skipWhy?: boolean;
     onProgress?: (note: string) => void | Promise<void>;
   }
@@ -279,7 +279,7 @@ export function filterLeadsWithUsableEmail<T extends { email: string | null | un
 
 /**
  * Enrich + Why for one page of already-saved leads (Next/Previous 200).
- * Never drops leads — only fills email / Why where missing.
+ * Never drops leads: only fills email / Why where missing.
  */
 export async function prepareLeadPage(input: {
   userId: string;
@@ -319,7 +319,10 @@ export async function prepareLeadPage(input: {
     (l) => needsEmailReveal(l) || needsWhyUpgrade(l)
   );
   const pageCap = getEnrichPageCap();
-  const toEnrich = candidates
+  // Search-time bulk matching already stored the complete Apollo payload. Page
+  // preparation only improves Why text; it must never trigger another unlock.
+  const toEnrich: typeof pageLeads = [];
+  /* const toEnrich = candidates
     .filter((l) => l.apolloPersonId && needsEmailReveal(l))
     .sort((a, b) => {
       const aNeed = Number(!isUsableEmail(a.email) && a.hasEmail);
@@ -327,7 +330,7 @@ export async function prepareLeadPage(input: {
       if (bNeed !== aNeed) return bNeed - aNeed;
       return b.leadScore - a.leadScore;
     })
-    .slice(0, pageCap);
+    .slice(0, pageCap); */
 
   let enrichedCount = 0;
   let emailsUnlocked = 0;
@@ -421,7 +424,8 @@ export async function prepareLeadPage(input: {
       hasEmail: lead.hasEmail,
       leadScore: lead.leadScore,
       profileSummary:
-        (lead.apolloPersonId && profileByApolloId.get(lead.apolloPersonId)) || null,
+        (lead.apolloPersonId && profileByApolloId.get(lead.apolloPersonId)) ||
+        extractProfileSummary(lead.rawApolloData as never),
     }));
 
     const aiSlice = inputs.slice(0, whyAiMax);
@@ -439,7 +443,7 @@ export async function prepareLeadPage(input: {
 
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { reasoning, recommendedApproach: "" },
+        data: { reasoning, recommendedApproach: "", whySource: outreach[i]?.source ?? "TEMPLATE" },
       });
       lead.reasoning = reasoning;
       whyUpdated += 1;

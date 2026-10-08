@@ -93,6 +93,7 @@ export function heuristicScoreLead(
 ): LeadScoreResult {
   let score = 5;
   const reasons: string[] = [];
+  const cons: string[] = [];
   const title = lead.title.toLowerCase();
   const industry = lead.industry.toLowerCase();
   const company = lead.company.toLowerCase();
@@ -102,15 +103,21 @@ export function heuristicScoreLead(
   if (context?.openToWork) {
     if (OTW_TITLE_SIGNALS.some((s) => title.includes(s))) {
       score += 3;
-      reasons.push("Job-seeking signal in title");
+      reasons.push("Job seeking signal in title");
+    } else {
+      cons.push("No job seeking words in title");
     }
     if (ROLE_SIGNALS.some((s) => title.includes(s))) {
       score += 2;
       reasons.push("Matching role");
+    } else {
+      cons.push("Title is not a matching role");
     }
     if (textMatchesSignals(title, signals) || textMatchesSignals(combined, signals)) {
       score += 2;
       reasons.push("Matches your search intent");
+    } else if (signals.length > 0) {
+      cons.push("Your search words are not in the profile");
     }
     // Employed professionals in the target role are still valid outreach/hire targets
     if (score < 7 && ROLE_SIGNALS.some((s) => title.includes(s))) {
@@ -120,35 +127,49 @@ export function heuristicScoreLead(
     if (lead.hasEmail) {
       score += 1;
       reasons.push("Email available");
+    } else {
+      cons.push("No email found");
     }
     if (lead.employees >= 11 && lead.employees <= 5000) {
       score += 1;
       reasons.push("Known company size");
+    } else {
+      cons.push("Company size unknown or outside 11 to 5,000");
     }
   } else {
     if (AUTHORITY_SIGNALS.some((s) => title.includes(s))) {
       score += 2;
-      reasons.push("Decision-making authority");
+      reasons.push("Has decision making authority");
+    } else {
+      cons.push("Not a decision maker title");
     }
     if (signals.length > 0 && BUYER_SIGNALS.some((s) => title.includes(s))) {
       score += 1;
-      reasons.push("Decision-maker for this search");
+      reasons.push("Decision maker for this search");
     }
     if (textMatchesSignals(title, signals)) {
       score += 2;
       reasons.push("Intent match in title");
+    } else if (signals.length > 0) {
+      cons.push("Your search words are not in the title");
     }
     if (textMatchesSignals(`${industry} ${company}`, signals)) {
       score += 2;
       reasons.push("Intent match in company/industry");
+    } else if (signals.length > 0) {
+      cons.push("Company or industry does not match your search");
     }
     if (lead.hasEmail) {
       score += 1;
       reasons.push("Email available");
+    } else {
+      cons.push("No email found");
     }
     if (lead.employees >= 10 && lead.employees <= 500) {
       score += 1;
       reasons.push("Ideal company size");
+    } else {
+      cons.push("Company size unknown or outside 10 to 500");
     }
   }
 
@@ -194,6 +215,8 @@ export function heuristicScoreLead(
     score,
     reasoning: reasons.length ? reasons.join(". ") : "Standard profile match",
     priority,
+    pros: reasons,
+    cons,
   };
 }
 

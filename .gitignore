@@ -13,6 +13,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
 
 # production
@@ -35,7 +36,10 @@ yarn-error.log*
 !.env.docker.example
 
 # local data
-/data/
+/data/*
+!/data/layoffs.json
+/output/
+/output-us-tech-max-v6/
 
 # typescript
 *.tsbuildinfo

@@ -11,6 +11,9 @@ export interface ApolloSearchFilters {
 export interface SearchCriteria {
   industry: string;
   country: string;
+  /** LLM-extracted location fields retained for display and auditing. */
+  city?: string;
+  state?: string;
   companySizeMin: number;
   companySizeMax: number;
   jobTitles: string[];
@@ -51,6 +54,12 @@ export interface ApolloPerson {
   city?: string;
   state?: string;
   country?: string;
+  /** GitHub profile URL when Apollo includes it. */
+  github_url?: string | null;
+  /** Employment history from the enriched Apollo profile. */
+  employment_history?: import("@/lib/lead-profile").ApolloEmploymentEntry[];
+  seniority?: string | null;
+  departments?: string[];
   organization?: {
     name: string;
     industry: string;
@@ -79,6 +88,10 @@ export interface ScoredLead {
   recommendedApproach?: string | null;
   openToWork?: boolean;
   hasEmail?: boolean;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  openToWorkLevel?: string | null;
+  openToWorkReasons?: string[];
   searchPrompt?: string;
   searchTitle?: string;
   history?: LeadHistoryEntry[];
@@ -144,6 +157,9 @@ export interface LeadScoreResult {
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";
+  /** What raised the score / what held it back, in short plain words. */
+  pros?: string[];
+  cons?: string[];
 }
 
 export interface LeadScoreContext {
@@ -155,4 +171,7 @@ export interface LeadScoreContext {
   leadContext?: import("@/lib/validations/onboarding-context").UserLeadContextDTO | null;
   excludedTitles?: string[];
   excludedIndustries?: string[];
+  targetSkills?: string[];
+  /** Score the leads relative to each other (all from the same search). */
+  compareAcrossLeads?: boolean;
 }

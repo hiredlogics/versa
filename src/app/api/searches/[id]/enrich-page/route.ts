@@ -7,8 +7,8 @@ import { prepareLeadPage } from "@/lib/services/leads/enrichWhyBatch";
 export const maxDuration = 300;
 
 /**
- * POST — unlock emails + write Why Reach Out for one page (batch) of saved leads.
- * Body: { offset?: number, limit?: number } — defaults to first 200.
+ * POST: unlock emails + write Why Reach Out for one page (batch) of saved leads.
+ * Body: { offset?: number, limit?: number }, defaults to first 200.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   try {

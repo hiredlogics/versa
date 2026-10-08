@@ -5,6 +5,19 @@ import { SalesRoutingCards } from "@/components/marketing/SalesRoutingCards";
 import { SecurityTrustStrip } from "@/components/marketing/SecurityTrustStrip";
 import { ContactFAQ } from "@/components/marketing/ContactFAQ";
 import { AnimatedColdBackground } from "@/components/marketing/AnimatedColdBackground";
+import type { Metadata } from "next";
+import { BRAND } from "@/config/brand";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description: `Talk to the ${BRAND.name} team.`,
+  openGraph: {
+    title: `Contact ${BRAND.name}`,
+    description: `Talk to the ${BRAND.name} team.`,
+    images: ["/og.png"],
+  },
+  twitter: { card: "summary_large_image" },
+};
 
 export default function ContactPage() {
   return (

@@ -160,14 +160,14 @@ model StripeEvent {
 }
 
 model UsageRecord {
-  id     String @id @default(cuid())
-  userId String
+  id           String   @id @default(cuid())
+  userId       String
   /// timestamp WITHOUT time zone. A JS Date binds as timestamptz in raw SQL and
   /// is shifted by the session offset, so `WHERE "periodStart" = ${date}` in
   /// Prisma.sql matches ZERO rows. Query this column through the Prisma client,
   /// or look the row up first and use its `id` in raw SQL.
-  periodStart DateTime
-  periodEnd   DateTime
+  periodStart  DateTime
+  periodEnd    DateTime
   leadsUsed    Int      @default(0)
   searchesUsed Int      @default(0)
   createdAt    DateTime @default(now())
@@ -197,6 +197,7 @@ model LeadSearch {
   brief          Json?
   questions      Json?
   answers        Json?
+  jobRequirements Json?
   nextPage       Int          @default(1)
   batchesDone    Int          @default(0)
   totalPages     Int?
@@ -222,7 +223,7 @@ model CreditHold {
   amount         Int
   charged        Int?
   status         HoldStatus @default(HELD)
-  /// "{searchId}:{batchNo}" — the unique constraint is what stops a
+  /// "{searchId}:{batchNo}", the unique constraint is what stops a
   /// double-clicked button reserving twice.
   idempotencyKey String     @unique
   /// A refund must return to the UsageRecord it came from, even if the billing
@@ -260,6 +261,13 @@ model Lead {
   recommendedApproach String?
   hasEmail            Boolean       @default(false)
   rawApolloData       Json?
+  matchedSkills       String[]      @default([])
+  missingSkills       String[]      @default([])
+  /// Short points for and against the score, shown when hovering the score.
+  scorePros           String[]      @default([])
+  scoreCons           String[]      @default([])
+  openToWorkLevel     String?
+  openToWorkReasons   String[]      @default([])
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   deletedAt           DateTime?
@@ -271,6 +279,44 @@ model Lead {
   @@index([userId, leadScore(sort: Desc)])
   @@index([searchId])
   @@index([email])
+}
+
+/// One row per real person, shared by every search. Searches read from here
+/// first and only go to Apollo for what is missing, so a person found or
+/// unlocked once is never paid for twice.
+model LeadPoolPerson {
+  id               String    @id @default(cuid())
+  apolloPersonId   String?   @unique
+  /// Normalized: https, no "www.", no query string, no trailing slash.
+  linkedinUrl      String?   @unique
+  name             String
+  title            String
+  /// Lowercase, singular, punctuation-free title used for matching.
+  titleNormalized  String
+  headline         String?
+  company          String?
+  industry         String?
+  employees        Int?
+  city             String?
+  state            String?
+  country          String?
+  /// Lowercase "city, state, country" plus any free-text location, for matching.
+  locationText     String    @default("")
+  email            String?
+  /// Provider email confidence: "verified", "guessed", or null when unknown.
+  emailStatus      String?
+  /// Set when Apollo was asked for an email, whether or not it returned one.
+  emailCheckedAt   DateTime?
+  openToWorkSignal String?
+  /// Where this person came from, e.g. "apollo_search", "apollo_enrich", "serper".
+  sources          String[]  @default([])
+  /// Trimmed profile snapshot (headline, employment history, github_url, etc.).
+  profile          Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([titleNormalized])
+  @@index([country])
 }
 
 model SavedLeadList {
@@ -362,4 +408,14 @@ model AdminAuditLog {
   createdAt  DateTime @default(now())
 
   @@index([adminId, createdAt(sort: Desc)])
+}
+
+model GithubActivityCache {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  recentEvents Int
+  checkedAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([username])
 }

@@ -2,6 +2,7 @@
 
 import { ClerkProvider } from "@clerk/nextjs";
 import { AuthSessionSync } from "@/components/auth/AuthSessionSync";
+import { ClerkFirstUserToastDismissal } from "@/components/auth/ClerkFirstUserToastDismissal";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       signUpFallbackRedirectUrl="/auth/continue"
     >
       <AuthSessionSync />
+      <ClerkFirstUserToastDismissal />
       {children}
     </ClerkProvider>
   );

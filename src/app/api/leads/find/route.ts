@@ -11,7 +11,7 @@ import {
   previewFindClarification,
   type FindLeadsInput,
 } from "@/lib/services/leads/findLeadsWorkflow";
-import { SubscriptionRequiredError, requireActiveSubscription } from "@/lib/billing/subscription";
+import { SubscriptionRequiredError, ensureAppAccess } from "@/lib/billing/subscription";
 import {
   LeadSearchAccessError,
   UsageLimitError,
@@ -26,7 +26,7 @@ export const maxDuration = 300;
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
-    await requireActiveSubscription(user.id);
+    await ensureAppAccess(user.id);
     await requireOnboardingComplete(user.id);
 
     const body = await request.json();
@@ -35,23 +35,12 @@ export async function POST(request: Request) {
     const input: FindLeadsInput = {
       prompt: parsed.prompt || "",
       inputType: parsed.inputType,
+      jobDescription: parsed.jobDescription,
+      jobRequirements: parsed.jobRequirements,
       minScore: parsed.minScore,
       requestedLeadCount: parsed.requestedLeadCount,
       skipClarification: parsed.skipClarification,
     };
-
-    if (parsed.linkedinUrl) {
-      input.linkedinUrl = parsed.linkedinUrl;
-      input.inputType = "linkedin";
-    }
-    if (parsed.companyUrl) {
-      input.companyUrl = parsed.companyUrl;
-      input.inputType = "company_url";
-    }
-    if (parsed.companyName) {
-      input.companyName = parsed.companyName;
-      input.inputType = "company_name";
-    }
 
     if (!input.requestedLeadCount && input.prompt) {
       input.requestedLeadCount = extractRequestedLeadCount(input.prompt);
@@ -65,6 +54,7 @@ export async function POST(request: Request) {
           async: false,
           leads: [],
           criteria: preview.clientCriteria,
+          jobRequirements: preview.jobRequirements,
           message: preview.clarification.message,
           questions: preview.clarification.questions,
           requestedLeadCount: preview.clarification.requestedLeadCount,
@@ -101,6 +91,7 @@ export async function POST(request: Request) {
       status: "RUNNING",
       async: true,
       criteria: started.clientCriteria,
+      jobRequirements: started.jobRequirements,
       leads: [],
       message: started.message,
       leadsRemaining: started.leadsRemaining,

@@ -1,3 +1,4 @@
+import type { ParsedJobDescription } from "@/lib/validations/search-criteria";
 import type { ParsedSearchCriteria } from "@/lib/validations/search-criteria";
 import type { ClarificationQuestion } from "@/lib/clarifyPrompt";
 
@@ -20,6 +21,13 @@ export interface LeadRecord {
   reasoning: string | null;
   recommendedApproach: string | null;
   hasEmail: boolean;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  /** Points for / against the score, shown when hovering it. */
+  scorePros?: string[];
+  scoreCons?: string[];
+  openToWorkLevel?: string | null;
+  openToWorkReasons?: string[];
 }
 
 export interface FindLeadsResponse {
@@ -41,6 +49,7 @@ export interface FindLeadsResponse {
   requestedLeadCount?: number;
   leadsRemaining?: number;
   batchSize?: number;
+  jobRequirements?: ParsedJobDescription | null;
 }
 
 export interface AdvancedFilters {
@@ -73,15 +82,8 @@ export function priorityLabel(level: PriorityLevel): string {
   return map[level] ?? level;
 }
 
-export function buildPromptWithFilters(
-  prompt: string,
-  filters: AdvancedFilters,
-  extras: { linkedinUrl?: string; companyUrl?: string; companyName?: string }
-): string {
+export function buildPromptWithFilters(prompt: string, filters: AdvancedFilters): string {
   const parts: string[] = [prompt.trim()];
-  if (extras.linkedinUrl) parts.push(`LinkedIn profile: ${extras.linkedinUrl}`);
-  if (extras.companyUrl) parts.push(`Company URL: ${extras.companyUrl}`);
-  if (extras.companyName) parts.push(`Company name: ${extras.companyName}`);
   if (filters.industry) parts.push(`Industry: ${filters.industry}`);
   if (filters.country) parts.push(`Country: ${filters.country}`);
   if (filters.companySizeMin || filters.companySizeMax) {

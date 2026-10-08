@@ -84,7 +84,7 @@ export function AdminUsersTable({
               <AdminTableRow key={user.id}>
                 <AdminTableCell>
                   <div>
-                    <p className="font-medium">{user.name || "—"}</p>
+                    <p className="font-medium">{user.name || "None"}</p>
                     <p className="text-xs text-muted">{user.email}</p>
                   </div>
                 </AdminTableCell>
@@ -93,7 +93,7 @@ export function AdminUsersTable({
                 </AdminTableCell>
                 <AdminTableCell>
                   <div>
-                    <p>{user.planName || "—"}</p>
+                    <p>{user.planName || "None"}</p>
                     {user.subscriptionStatus && (
                       <p className="text-xs text-muted">{user.subscriptionStatus}</p>
                     )}

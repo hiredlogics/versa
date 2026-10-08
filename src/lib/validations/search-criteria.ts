@@ -3,6 +3,8 @@ import { z } from "zod";
 export const parsedSearchCriteriaSchema = z.object({
   industry: z.string().nullable(),
   country: z.string().nullable(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
   companySizeMin: z.number().nullable(),
   companySizeMax: z.number().nullable(),
   jobTitles: z.array(z.string()),
@@ -26,6 +28,8 @@ export const aiParsePromptOutputSchema = z
     searchIntent: z.string().optional(),
     industry: z.union([z.string(), z.null()]).optional(),
     country: z.union([z.string(), z.null()]).optional(),
+    city: z.union([z.string(), z.null()]).optional(),
+    state: z.union([z.string(), z.null()]).optional(),
     companySizeMin: z.union([z.number(), z.null()]).optional(),
     companySizeMax: z.union([z.number(), z.null()]).optional(),
     openToWork: z.boolean().optional(),
@@ -57,7 +61,7 @@ export const aiParsePromptOutputSchema = z
     if (!hasTitles) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Missing personTitles/jobTitles — filters would fall back to generic defaults",
+        message: "Missing personTitles/jobTitles, filters would fall back to generic defaults",
         path: ["apollo", "personTitles"],
       });
     }
@@ -65,18 +69,45 @@ export const aiParsePromptOutputSchema = z
 
 export type AiParsePromptOutput = z.infer<typeof aiParsePromptOutputSchema>;
 
-export const findLeadsInputSchema = z.object({
-  prompt: z.string().optional(),
-  linkedinUrl: z.string().url().optional(),
-  companyUrl: z.string().optional(),
-  companyName: z.string().optional(),
-  inputType: z.enum(["prompt", "linkedin", "company_url", "company_name", "persona"]).default("prompt"),
-  minScore: z.number().min(1).max(10).optional(),
-  /** How many leads the user wants this run (clamped to remaining credits + batch size). */
-  requestedLeadCount: z.number().int().min(1).max(50_000).optional(),
-  /** When true, skip clarification and start the job (user already answered). */
-  skipClarification: z.boolean().optional(),
+/** What Versa reads from a pasted job description. */
+export const parsedJobDescriptionSchema = z.object({
+  title: z.string().min(1),
+  alternativeTitles: z.array(z.string()).default([]),
+  seniority: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  remote: z.boolean().nullable().optional(),
+  minYearsExperience: z.number().nullable().optional(),
+  mustHaveSkills: z.array(z.string()).default([]),
+  niceToHaveSkills: z.array(z.string()).default([]),
 });
+
+export type ParsedJobDescription = z.infer<typeof parsedJobDescriptionSchema>;
+
+export const findLeadsInputSchema = z
+  .object({
+    prompt: z.string().optional(),
+    jobDescription: z
+      .string()
+      .max(20_000, "Job description must be 20,000 characters or fewer")
+      .optional(),
+    /** Requirements already read from this conversation's job description (follow-ups). */
+    jobRequirements: parsedJobDescriptionSchema.optional(),
+    inputType: z
+      .enum(["prompt", "persona", "job_description"])
+      .default("prompt"),
+    minScore: z.number().min(1).max(10).optional(),
+    /** How many leads the user wants this run (clamped to remaining credits + batch size). */
+    requestedLeadCount: z.number().int().min(1).max(50_000).optional(),
+    /** When true, skip clarification and start the job (user already answered). */
+    skipClarification: z.boolean().optional(),
+  })
+  .refine(
+    (data) =>
+      data.inputType !== "job_description" ||
+      Boolean(data.jobDescription?.trim()) ||
+      Boolean(data.jobRequirements),
+    { message: "Paste a job description to search with.", path: ["jobDescription"] }
+  );
 
 export const leadScoreResultSchema = z.object({
   leadScore: z.number().min(1).max(10),

@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils/cn";
 
-const STEPS = ["Business", "ICP", "Qualification", "Review"];
+const STEPS = ["Business", "Ideal customer", "Qualification", "Review"];
 
 export function OnboardingProgress({ step }: { step: number }) {
   return (
@@ -24,7 +24,7 @@ export function OnboardingProgress({ step }: { step: number }) {
             </div>
             <span
               className={cn(
-                "hidden text-[11px] sm:block",
+                "hidden text-xs sm:block",
                 i <= step ? "text-lp-muted" : "text-lp-muted-dark"
               )}
             >
@@ -35,7 +35,7 @@ export function OnboardingProgress({ step }: { step: number }) {
       </div>
       <div className="mt-4 h-1 overflow-hidden rounded-full bg-lp-panel">
         <div
-          className="h-full bg-gradient-to-r from-lp-cold-blue to-lp-ice-blue transition-all duration-500"
+          className="h-full bg-lp-cold-blue transition-all duration-500"
           style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
         />
       </div>

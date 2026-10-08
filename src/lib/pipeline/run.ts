@@ -10,7 +10,7 @@ import type {
   VerifiedLead,
 } from "./types";
 
-/** People delivered per user-approved batch. One call, one batch — never a loop. */
+/** People delivered per user-approved batch. One call, one batch, never a loop. */
 export const BATCH_SIZE = clampBatchSize(process.env.LEAD_BATCH_SIZE);
 
 /** Search pages one batch may read, so a bad filter cannot spin. */
@@ -41,11 +41,11 @@ export type BatchReason =
 const NOTES: Record<BatchReason, string> = {
   delivered: "Batch saved.",
   fulfilled: "You already have every lead you asked for.",
-  exhausted: "That's everyone matching these filters — widen the roles or the location for more.",
+  exhausted: "That's everyone matching these filters. Widen the roles or the location for more.",
   no_matches_this_pass:
     "No matches on those pages. Try again to keep looking, or widen the roles.",
   provider_unavailable:
-    "Verification is temporarily unavailable. Nothing was charged — try again shortly.",
+    "Verification is temporarily unavailable. Nothing was charged. Try again shortly.",
   failed: "The batch stopped before finishing. Nothing was charged.",
 };
 
@@ -65,7 +65,7 @@ export interface BatchOutcome {
 
 export interface SearchPageResult {
   people: unknown[];
-  /** Absent metadata, not evidence — null means unknown, keep going. */
+  /** Absent metadata, not evidence, null means unknown, keep going. */
   totalPages: number | null;
 }
 
@@ -331,7 +331,7 @@ export async function runBatch(
   } catch (error) {
     // The user's plan credits and the provider's credits are different currencies.
     // When a step after the unlock fails, the provider cost is already spent and
-    // unrecoverable — but the user received zero rows. Charging them for our failed
+    // unrecoverable: but the user received zero rows. Charging them for our failed
     // step converts our cost into their debt. The hold releases. The provider cost is
     // ours to eat and ours to fix.
     await release(hold.id).catch((releaseError) => {

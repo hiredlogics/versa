@@ -21,7 +21,7 @@ export interface Brief {
   location: string | null;
   industry: string | null;
   employeeRanges: string[];
-  /** Needs and timing cues. For ranking and the why column only — never filters. */
+  /** Needs and timing cues. For ranking and the why column only, never filters. */
   signals: string[];
   excludeTitles: string[];
   excludeIndustries: string[];

@@ -23,6 +23,9 @@ import { Button } from "@/components/ui/Button";
 import { ExportButtons } from "@/components/app/ExportButtons";
 import { emailConfidence, emailConfidenceLabel } from "@/lib/email-confidence";
 import type { LeadRecord } from "@/lib/types/lead-finder";
+import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
+import { ScoreWhy } from "@/components/app/ScoreWhy";
+import { OPEN_TO_WORK_NOTE, OpenToWorkBadge, openToWorkRank } from "@/components/app/OpenToWorkBadge";
 
 export const LEADS_PAGE_SIZE = 200;
 
@@ -66,14 +69,20 @@ export function LeadResultsTable({
   resuming,
   loadingMore,
 }: LeadResultsTableProps) {
-  // No default sort: the server already returns leads best-score-first, and Score is not a column.
+  // No default sort: the server already returns leads best-score-first.
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"default" | "open_to_work">("default");
 
-  const filteredLeads = useMemo(
-    () => leads.filter((l) => l.leadScore >= minScoreFilter),
-    [leads, minScoreFilter]
-  );
+  const filteredLeads = useMemo(() => {
+    let list = leads.filter((l) => l.leadScore >= minScoreFilter);
+    if (sortBy === "open_to_work") {
+      list = [...list].sort(
+        (a, b) => openToWorkRank(b.openToWorkLevel) - openToWorkRank(a.openToWorkLevel)
+      );
+    }
+    return list;
+  }, [leads, minScoreFilter, sortBy]);
 
   const savedCount = totalSaved ?? filteredLeads.length;
   const offset = Math.max(0, pageOffset);
@@ -89,15 +98,42 @@ export function LeadResultsTable({
     () => [
       columnHelper.accessor("name", {
         header: "Name",
-        cell: (info) => <span className="font-medium text-lp-white">{info.getValue()}</span>,
+        cell: (info) => {
+          const { openToWorkLevel, openToWorkReasons } = info.row.original;
+          const tooltip = [...(openToWorkReasons ?? []), OPEN_TO_WORK_NOTE].join("\n");
+          return (
+            <div className="flex flex-col gap-1">
+              <span className="font-medium text-lp-white">{info.getValue()}</span>
+              <OpenToWorkBadge level={openToWorkLevel} title={tooltip} />
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor("leadScore", {
+        header: "Score",
+        cell: ({ row }) => (
+          <ScoreWhy
+            score={row.original.leadScore}
+            pros={row.original.scorePros}
+            cons={row.original.scoreCons}
+            reasoning={row.original.reasoning}
+          />
+        ),
       }),
       columnHelper.accessor("reasoning", {
         header: "Why",
-        cell: (info) => (
-          <span className="line-clamp-3 max-w-[360px] text-xs leading-relaxed text-lp-muted">
-            {info.getValue() || "Personalized fit note pending"}
-          </span>
-        ),
+        cell: (info) => {
+          const { leadScore, matchedSkills, missingSkills } = info.row.original;
+          const breakdown = formatSkillsBreakdown(leadScore, matchedSkills, missingSkills);
+          return (
+            <div className="flex max-w-[360px] flex-col gap-1">
+              {breakdown && <span className="text-xs font-medium text-lp-white">{breakdown}</span>}
+              <span className="line-clamp-3 text-xs leading-relaxed text-lp-muted">
+                {info.getValue() || "Personalized fit note pending"}
+              </span>
+            </div>
+          );
+        },
       }),
       columnHelper.accessor("email", {
         header: "Email",
@@ -126,7 +162,7 @@ export function LeadResultsTable({
                     title={
                       confidence === "verified"
                         ? "Confirmed mailbox"
-                        : "Built from the company's email pattern — may bounce"
+                        : "Built from the company's email pattern, so it may bounce"
                     }
                   >
                     {confidence === "verified" ? (
@@ -163,7 +199,7 @@ export function LeadResultsTable({
               Profile
             </a>
           ) : (
-            <span className="text-xs text-lp-muted-dark">—</span>
+            <span className="text-xs text-lp-muted-dark">None</span>
           ),
       }),
     ],
@@ -200,7 +236,7 @@ export function LeadResultsTable({
             {savedCount.toLocaleString()} saved lead{savedCount !== 1 ? "s" : ""}
           </p>
           <p className="text-xs text-lp-muted">
-            Showing {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of{" "}
+            Showing {rangeStart.toLocaleString()} to {rangeEnd.toLocaleString()} of{" "}
             {savedCount.toLocaleString()}
             {savedCount > LEADS_PAGE_SIZE
               ? ` · batch ${currentBatch} of ${totalBatches}`
@@ -231,6 +267,15 @@ export function LeadResultsTable({
               className="app-input w-full py-1.5 pl-8 text-xs sm:w-48"
             />
           </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as "default" | "open_to_work")}
+            className="app-input rounded-lg border border-lp-border bg-lp-panel py-1.5 text-xs text-lp-off-white"
+            aria-label="Sort order"
+          >
+            <option value="default">Default order</option>
+            <option value="open_to_work">Most likely to be looking</option>
+          </select>
           <ExportButtons searchId={searchId} />
         </div>
       </div>

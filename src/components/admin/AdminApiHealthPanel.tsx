@@ -77,13 +77,13 @@ export function AdminApiHealthPanel({
                   </Badge>
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
-                  {log.latencyMs != null ? `${log.latencyMs}ms` : "—"}
+                  {log.latencyMs != null ? `${log.latencyMs}ms` : "None"}
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
                   {new Date(log.createdAt).toLocaleString()}
                 </AdminTableCell>
                 <AdminTableCell className="max-w-xs truncate text-xs text-muted">
-                  {log.errorMessage || "—"}
+                  {log.errorMessage || "None"}
                 </AdminTableCell>
               </AdminTableRow>
             ))}
@@ -113,15 +113,15 @@ export function AdminApiHealthPanel({
                     {log.statusCode ?? (log.errorMessage ? "Error" : "OK")}
                   </Badge>
                 </AdminTableCell>
-                <AdminTableCell>{log.resultCount ?? "—"}</AdminTableCell>
+                <AdminTableCell>{log.resultCount ?? "None"}</AdminTableCell>
                 <AdminTableCell className="text-muted">
-                  {log.latencyMs != null ? `${log.latencyMs}ms` : "—"}
+                  {log.latencyMs != null ? `${log.latencyMs}ms` : "None"}
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
                   {new Date(log.createdAt).toLocaleString()}
                 </AdminTableCell>
                 <AdminTableCell className="max-w-xs truncate text-xs text-muted">
-                  {log.errorMessage || "—"}
+                  {log.errorMessage || "None"}
                 </AdminTableCell>
               </AdminTableRow>
             ))}

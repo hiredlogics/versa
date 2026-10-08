@@ -10,15 +10,15 @@ import { BRAND } from "@/config/brand";
 const FAQS = [
   {
     q: "How does prompt search work?",
-    a: `You describe your ideal customer in plain language. ${BRAND.name} parses intent into Apollo-ready filters, searches millions of profiles, enriches contacts, and scores every result against your criteria.`,
+    a: `You describe your ideal customer in plain language. ${BRAND.name} turns that into a focused search across millions of B2B profiles and scores every result against your criteria.`,
   },
   {
-    q: `Which AI models power ${BRAND.name}?`,
-    a: "We route across OpenAI, Groq, Gemini, and Claude with automatic fallback. If one provider fails or returns invalid data, the next model takes over seamlessly.",
+    q: "How reliable is the scoring?",
+    a: "Every lead gets a score from 1 to 10 with a short reason, so you can check the logic yourself instead of trusting a bare number.",
   },
   {
-    q: "What data does Apollo provide?",
-    a: "Apollo enrichment adds verified emails, job titles, company firmographics, and more — so your outreach starts with accurate, actionable contact data.",
+    q: "What data do I get for each lead?",
+    a: "Name, job title, company, industry, company size, location and LinkedIn profile, plus a work email when one is available.",
   },
   {
     q: "Can I export leads to my CRM?",
@@ -26,7 +26,7 @@ const FAQS = [
   },
   {
     q: "Is there a free trial?",
-    a: "Every account starts with a free trial — 25 leads and 3 searches per month. Upgrade anytime when you're ready to scale.",
+    a: "Yes. Every new account gets 25 free leads and 3 searches, once. After that, choose a plan to keep searching.",
   },
 ];
 

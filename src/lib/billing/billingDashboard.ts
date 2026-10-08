@@ -7,16 +7,47 @@ import {
 } from "./planLimits";
 import type { AvailablePlan, FullBillingStatus, UsageSnapshot } from "./billingTypes";
 import { isBillingEnforced } from "./constants";
-import { getSubscriptionForUser, isActiveSubscription } from "./subscription";
+import {
+  FREE_TRIAL_PLAN_SLUG,
+  getSubscriptionForUser,
+  isActiveSubscription,
+  isOnFreeTrial,
+  type SubscriptionWithPlan,
+} from "./subscription";
 import { buildUsageSnapshot } from "@/lib/services/billing/usageLimits";
 
 export async function getFullBillingStatus(userId: string): Promise<FullBillingStatus> {
   const subscription = await getSubscriptionForUser(userId);
+  const usage = await buildUsageSnapshot(userId, subscription);
+
+  // A free-trial user is in good standing; any leftover unpaid checkout row is ignored.
+  if (isOnFreeTrial(subscription)) {
+    return {
+      planName: "freeTrial",
+      planSlug: FREE_TRIAL_PLAN_SLUG,
+      displayPlanName: PLAN_LIMITS.freeTrial.name,
+      subscriptionStatus: null,
+      isActive: true,
+      hasActiveSubscription: false,
+      cancelAtPeriodEnd: false,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      stripeCustomerId: subscription?.stripeCustomerId ?? null,
+      usage,
+      availablePlans: CHECKOUT_PLAN_KEYS.map((key) => ({
+        key,
+        name: PLAN_LIMITS[key].name,
+        monthlyLeads: PLAN_LIMITS[key].monthlyLeads,
+        monthlySearches: PLAN_LIMITS[key].monthlySearches,
+        features: [...PLAN_LIMITS[key].features],
+        isCurrent: false,
+      })),
+    };
+  }
+
   const isActive = isActiveSubscription(subscription);
   const planSlug = subscription?.plan.slug ?? null;
   const limitKey = planLimitKeyFromSlug(planSlug);
-
-  const usage = await buildUsageSnapshot(userId, subscription);
 
   const availablePlans: AvailablePlan[] = CHECKOUT_PLAN_KEYS.map((key) => ({
     key,
@@ -47,11 +78,17 @@ export async function getFullBillingStatus(userId: string): Promise<FullBillingS
 }
 
 /** Legacy shape for /api/billing/usage */
-export async function getLegacyUsageSummary(userId: string) {
-  const subscription = await getSubscriptionForUser(userId);
+export async function getLegacyUsageSummary(
+  userId: string,
+  knownSubscription?: SubscriptionWithPlan | null
+) {
+  const subscription =
+    knownSubscription !== undefined ? knownSubscription : await getSubscriptionForUser(userId);
   const usage = await buildUsageSnapshot(userId, subscription);
   return {
-    plan: subscription?.plan.name ?? "No active plan",
+    plan: isOnFreeTrial(subscription)
+      ? PLAN_LIMITS.freeTrial.name
+      : (subscription?.plan.name ?? "No active plan"),
     leadsUsed: usage.leadsUsed,
     leadsLimit: usage.leadsLimit,
     searchesUsed: usage.searchesUsed,

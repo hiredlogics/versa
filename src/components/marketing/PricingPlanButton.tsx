@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { CheckoutPlanSlug } from "@/lib/billing/constants";
+import { cn } from "@/lib/utils/cn";
 
 const billingEnforced = process.env.NEXT_PUBLIC_BILLING_ENFORCE === "true";
 
@@ -15,6 +16,7 @@ type PricingPlanButtonProps = {
   highlight?: boolean;
   href?: string;
   contactSales?: boolean;
+  className?: string;
 };
 
 export function PricingPlanButton({
@@ -23,6 +25,7 @@ export function PricingPlanButton({
   highlight,
   href = "/register",
   contactSales,
+  className,
 }: PricingPlanButtonProps) {
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -79,7 +82,7 @@ export function PricingPlanButton({
     <div>
       <Button
         variant={highlight ? "primary" : "secondary"}
-        className="w-full btn-lift"
+        className={cn("w-full btn-lift", className)}
         disabled={loading}
         onClick={handleClick}
       >

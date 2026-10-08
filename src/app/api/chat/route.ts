@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           id: randomUUID(),
           role: "assistant",
           content:
-            "I don't have any leads in this conversation yet. First, tell me who you want to find — for example: *Find SaaS founders in the US at 10-500 employee companies* — then I can help you with outreach, emails, and messaging.",
+            "I don't have any leads in this conversation yet. First, tell me who you want to find, for example: *Find SaaS founders in the US at 10 to 500 employee companies*, then I can help you with outreach, emails, and messaging.",
           type: "text",
           createdAt: new Date().toISOString(),
         };
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Groq daily token limit reached. Searches now use rule-based scoring (no AI tokens). Wait ~15 minutes or upgrade at console.groq.com. Try your search again.",
+            "Groq daily token limit reached. Searches now use scoring based on fixed rules (no AI tokens). Wait ~15 minutes or upgrade at console.groq.com. Try your search again.",
         },
         { status: 429 }
       );

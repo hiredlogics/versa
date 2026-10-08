@@ -59,7 +59,7 @@ describe("the gate", () => {
 
   it("does not coerce a stringy quantity into a number", async () => {
     // A model returning "500" must not become 500 silently, nor become 0 and
-    // trap the user in a loop — it is a gap, and the next round asks.
+    // trap the user in a loop, it is a gap, and the next round asks.
     reply({ brief: { ...COMPLETE_BRIEF, requestedTotal: "500" }, gaps: [], questions: [] });
 
     const result = await understand({ prompt: "HR managers in Toronto, 500" });
@@ -157,7 +157,7 @@ describe("sanitising", () => {
       questions: [
         {
           id: "location",
-          prompt: "You mentioned recruiters — which country?",
+          prompt: "You mentioned recruiters, which country?",
           options: ["United States", "Canada", "United Kingdom", "Germany", "France"],
         },
       ],

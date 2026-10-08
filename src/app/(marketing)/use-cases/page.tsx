@@ -1,7 +1,20 @@
 import { GlassCard } from "@/components/ui/Card";
+import type { Metadata } from "next";
+import { BRAND } from "@/config/brand";
+
+export const metadata: Metadata = {
+  title: "Use cases",
+  description: "Lead discovery workflows for growing teams.",
+  openGraph: {
+    title: `${BRAND.name} Use cases`,
+    description: "Lead discovery workflows for growing teams.",
+    images: ["/og.png"],
+  },
+  twitter: { card: "summary_large_image" },
+};
 
 const cases = [
-  { title: "SaaS sales teams", desc: "Find CTOs and founders at mid-market software companies." },
+  { title: "SaaS sales teams", desc: "Find CTOs and founders at midsize software companies." },
   { title: "AI consultancies", desc: "Target ops leaders interested in automation and AI solutions." },
   { title: "Agencies", desc: "Build prospect lists for outbound campaigns at scale." },
   { title: "Recruiters", desc: "Find professionals by role, location, and company size." },

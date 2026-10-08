@@ -75,6 +75,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
           search.totalAvailable,
           search.relaxNote
         ),
+        jobRequirements: search.jobRequirements,
       },
       leads,
     });

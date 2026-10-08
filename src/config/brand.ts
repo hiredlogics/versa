@@ -1,4 +1,4 @@
-/** Single source of truth for product branding — change name here only */
+/** Single source of truth for product branding, change name here only */
 export const BRAND = {
   name: "VARSA",
   tagline: "From intent to qualified pipeline.",
@@ -9,24 +9,24 @@ export const BRAND = {
   /** URL-safe slug for exports, filenames, etc. */
   slug: "varsa",
   description:
-    "VARSA turns rough prompts, saved ICP context, and buyer criteria into enriched, scored, outreach-ready B2B leads.",
+    "VARSA turns rough prompts, saved ICP context, and buyer criteria into enriched, scored B2B leads ready for outreach.",
   shortDescription:
-    "VARSA helps teams find, score, save, and revisit qualified leads using Apollo enrichment and multi-model AI reasoning.",
+    "VARSA helps teams find, score, save, and revisit qualified leads using data enrichment and several AI models.",
   positioning:
     "VARSA turns business context and rough prompts into qualified, scored B2B leads.",
   headline: "Turn intent to qualified pipeline.",
   longTagline:
-    "VARSA transforms rough prompts and saved ICP context into enriched, scored, outreach-ready B2B leads.",
+    "VARSA transforms rough prompts and saved ICP context into enriched, scored B2B leads ready for outreach.",
   onboardingHeadline: "Teach VARSA your ideal buyer.",
   onboardingSubheadline:
     "Saved buyer context helps VARSA interpret vague prompts and score leads against your ICP.",
-  emptyStateHeadline: "What buyers should we find today?",
+  emptyStateHeadline: "Who should we find today?",
   billingSubheadline: "Manage your VARSA subscription and lead credits.",
   searchSteps: {
     understand: "VARSA is structuring your buyer intent.",
     extract: "Extracting search filters from your prompt.",
-    search: "Searching for matching companies and decision-makers.",
-    decision: "Finding decision-makers at target companies.",
+    search: "Searching for matching companies and decision makers.",
+    decision: "Finding decision makers at target companies.",
     enrich: "Unlocking verified contact details.",
     score: "Scoring leads against your saved context.",
     save: "Saving qualified opportunities.",
