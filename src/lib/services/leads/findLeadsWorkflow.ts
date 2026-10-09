@@ -12,7 +12,7 @@ import {
 } from "@/lib/services/leads/processLeadBatches";
 import { serveFromPool, type PoolServeResult } from "@/lib/services/leads/leadPool";
 import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
-import { poolPersonKeys, promptAsksForEmail } from "@/lib/lead-pool";
+import { poolPersonKeys, promptWantsProfilesOnly } from "@/lib/lead-pool";
 import { assertApolloConfigured } from "@/lib/platform-readiness";
 import { parsePromptWithAi } from "@/lib/services/ai/parsePrompt";
 import {
@@ -356,6 +356,17 @@ async function runSearchStep(args: {
   return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
 }
 
+/**
+ * When the data provider has no credits left, emails cannot be unlocked. Say so plainly
+ * (admins learn the real cause) instead of "none had a verified email".
+ */
+function creditsNote(saved: number, isAdmin: boolean): string {
+  const cause = isAdmin
+    ? "The data provider account has run out of credits, so emails could not be unlocked. Top up the plan, then"
+    : "We couldn't unlock emails right now. Please try again later, then";
+  return saved > 0 ? ` ${cause} click Get next 100 for more.` : `${cause} run the search again. No credits were used.`;
+}
+
 /** Where leads came from (our saved pool or a new lookup) is internal, so users never see it. */
 const OUT_OF_LOOKUPS =
   " We can't look up more people right now. Please try again later, then click Get next 100.";
@@ -570,7 +581,7 @@ export async function runFindLeadsJob(
   const maxLeadsThisRun = Math.min(batchSize, access.leadsRemaining, requestedCap);
 
   const { criteria, parseProvider } = started;
-  const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(started.prompt);
+  const wantsEmail = Boolean(criteria.requireEmail) || !promptWantsProfilesOnly(started.prompt);
 
   try {
     const { result, pool, charged } = await runSearchStep({
@@ -606,7 +617,13 @@ export async function runFindLeadsJob(
       return;
     }
 
-    const partialNote = result.canResume
+    const creditsOut = Boolean(result.creditsExhausted || pool.creditsExhausted);
+    if (creditsOut) {
+      console.error(`[leads/find] email unlocks failed: data provider credits are used up (search ${searchId})`);
+    }
+    const partialNote = creditsOut
+      ? creditsNote(result.leadsWithEmail, user.role === "ADMIN")
+      : result.canResume
       ? result.creditsExhausted
         ? OUT_OF_LOOKUPS
         : result.stopReason === "max_auto_batches" || result.stopReason === "credit_cap"
@@ -628,7 +645,9 @@ export async function runFindLeadsJob(
         : `Saved ${savedTotal.toLocaleString()} lead${savedTotal === 1 ? "" : "s"} (${verifiedEmailCount.toLocaleString()} with a verified email).`;
 
     const outcomeNote =
-      result.totalAvailable === 0 && savedTotal === 0
+      creditsOut && savedTotal === 0
+        ? ""
+        : result.totalAvailable === 0 && savedTotal === 0
         ? "No people matched this exact role and location. Try a wider location or more job titles."
         : savedTotal === 0 && result.leadsFetched === 0
           ? "You already have every person who matches this search. Try a wider location or more job titles to find new people."
@@ -724,7 +743,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     briefSearch: Boolean(parsed.briefSearch),
     apollo: resumeFilters,
   };
-  const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(search.prompt);
+  const wantsEmail = Boolean(criteria.requireEmail) || !promptWantsProfilesOnly(search.prompt);
 
   await prisma.leadSearch.update({
     where: { id: searchId },
@@ -766,7 +785,13 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     await incrementUsage(user.id, charged, 0);
 
     const totalSaved = result.leadsWithEmail;
-    const partialNote = result.canResume
+    const creditsOut = Boolean(result.creditsExhausted || pool.creditsExhausted);
+    if (creditsOut) {
+      console.error(`[leads/find] email unlocks failed: data provider credits are used up (search ${searchId})`);
+    }
+    const partialNote = creditsOut
+      ? creditsNote(result.leadsWithEmail, user.role === "ADMIN")
+      : result.canResume
       ? result.creditsExhausted
         ? OUT_OF_LOOKUPS
         : " Click Get next 100 for more."

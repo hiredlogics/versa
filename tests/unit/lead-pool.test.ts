@@ -200,3 +200,12 @@ describe("search helpers", () => {
     expect(poolLocationTerms(["USA"], "United States")).toEqual([]);
   });
 });
+
+describe("promptWantsProfilesOnly", () => {
+  it("asks for emails unless the prompt opts out", async () => {
+    const { promptWantsProfilesOnly } = await import("@/lib/lead-pool");
+    expect(promptWantsProfilesOnly("find 10 ai/ml engineers from atlanta")).toBe(false);
+    expect(promptWantsProfilesOnly("CTOs in Texas, LinkedIn profiles only")).toBe(true);
+    expect(promptWantsProfilesOnly("founders without emails")).toBe(true);
+  });
+});

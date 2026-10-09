@@ -104,6 +104,16 @@ export function buildLocationText(parts: Array<string | null | undefined>): stri
 }
 
 /** Deterministic backup for the AI's `requireEmail` flag. */
+/**
+ * Emails are the default. Only an explicit "no emails" / "LinkedIn profiles only"
+ * runs the cheaper profiles-only search.
+ */
+export function promptWantsProfilesOnly(prompt: string): boolean {
+  return /\b(?:no|without|skip)\s+e-?mails?\b|\b(?:linkedin\s+)?profiles?\s+only\b|\blinkedin\s+only\b/i.test(
+    prompt
+  );
+}
+
 export function promptAsksForEmail(prompt: string): boolean {
   return /\b(e-?mails?|e-?mail address(es)?|contact (info|information|details))\b/i.test(prompt);
 }

@@ -159,7 +159,11 @@ function buildConversationPrompt(
 
   // Merge follow-ups into one clear search brief, never dump "Conversation context" raw into the parser
   let base = trimmed;
-  if (prior.length > 0 && trimmed) {
+  // A long brief is a complete request on its own; merging it with earlier lines
+  // would hide its structure from the brief reader.
+  if (trimmed.length >= 400) {
+    base = trimmed;
+  } else if (prior.length > 0 && trimmed) {
     base = [
       "Lead search request (combine all lines into ONE search):",
       ...prior.map((line, i) => `- Earlier: ${line}`),

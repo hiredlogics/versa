@@ -49,7 +49,7 @@ PHASE 2: Convert that understanding into accurate Apollo filters
   Never omit titles or keywords just because openToWork is true, that balloons the Apollo pool.
   For HR roles use titles like ["HR Manager","Human Resources Manager","Head of People"], not bare "HR".
   For New York / NY / NYC use personLocations: ["New York"] (not United States).
-- companyDomains: when the prompt names specific employers ("works at Apple", "people at Stripe"), put their real primary domains here: ["apple.com"], ["stripe.com"]. Leave empty when no employer is named. Never guess a domain you are unsure of.
+- companyDomains: when the prompt names specific employers ("works at Apple", "people at Stripe"), put their real primary domains here: ["apple.com"], ["stripe.com"]. Leave empty when no employer is named. Never guess a domain you are unsure of. The company the leads are FOR (the seller, e.g. "leads for Acme (acme.com)") is never an employer.
 - Do not invent unrelated industries, countries, or titles.
 - Support searches in any country. Preserve the requested country in the country
   field, and keep the most specific city/state/province in personLocations.
