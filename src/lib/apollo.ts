@@ -155,7 +155,17 @@ interface ApolloSearchRawPerson extends ApolloProfileRaw {
     city?: string;
     state?: string;
     country?: string;
+    website_url?: string | null;
+    primary_domain?: string | null;
   };
+}
+
+/** "http://www.stripe.com" or a bare domain → "https://stripe.com"; null when unknown. */
+function companyWebsiteOf(org: ApolloSearchRawPerson["organization"]): string | null {
+  const raw = org?.website_url?.trim() || org?.primary_domain?.trim();
+  if (!raw) return null;
+  const host = raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").replace(/\/.*$/, "");
+  return host ? `https://${host.toLowerCase()}` : null;
 }
 
 export interface EnrichedApolloResult {
@@ -263,6 +273,7 @@ function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string):
       city: org?.city || "",
       state: org?.state || "",
       country: org?.country || "",
+      website: companyWebsiteOf(org),
     },
   };
 }
@@ -285,7 +296,7 @@ function buildParamsFromFilters(
       : typeof filters.personTitles === "string"
         ? [filters.personTitles]
         : ["Director"]
-    ).slice(0, 5),
+    ).slice(0, 15),
     include_similar_titles: filters.includeSimilarTitles === false ? "false" : "true",
   };
 
@@ -305,6 +316,12 @@ function buildParamsFromFilters(
   }
   if (filters.organizationDomains?.length) {
     params.q_organization_domains_list = filters.organizationDomains;
+  }
+  if (filters.organizationKeywordTags?.length) {
+    params.q_organization_keyword_tags = filters.organizationKeywordTags;
+  }
+  if (filters.personSeniorities?.length) {
+    params.person_seniorities = filters.personSeniorities;
   }
 
   return params;
@@ -350,7 +367,8 @@ async function searchWithSmartFallback(
   const variants = buildApolloSearchVariants(criteria);
   // OTW keyword hits are rare; accepting a pool of 1 often means unlock finds
   // no verified email. Prefer a larger pool before stopping (still OTW-biased).
-  const minAcceptPool = criteria.openToWork ? 25 : 1;
+  // A brief asks for "highly relevant" leads: keep the tight search unless it is tiny.
+  const minAcceptPool = criteria.openToWork ? 25 : criteria.briefSearch ? 40 : 1;
 
   logLeadFetch("apollo_filters_input", {
     filters: JSON.parse(formatApolloFiltersLog(criteria)) as Record<string, unknown>,
@@ -960,6 +978,7 @@ export function formatApolloPerson(person: ApolloPerson) {
     name: `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Unknown",
     title: person.title || "N/A",
     company: org?.name || "Unknown",
+    companyWebsite: org?.website ?? null,
     industry: org?.industry || "N/A",
     employees: org?.estimated_num_employees || 0,
     // Show where the person is; the employer HQ is only a fallback.

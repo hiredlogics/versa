@@ -38,6 +38,7 @@ import { resolveSupportedCountry } from "@/lib/location-policy";
 import { Prisma, type User, type AiProvider } from "@prisma/client";
 import { rescoreSearchLeads } from "@/lib/services/leads/rescoreSearch";
 import { buildCompanyCriteria } from "@/lib/services/leads/companySearch";
+import { buildBriefCriteria, looksLikeBrief } from "@/lib/services/ai/parseBrief";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
 import {
   parseJobDescription,
@@ -54,6 +55,8 @@ export interface FindLeadsInput {
   companyName?: string;
   /** Set by the preview so starting the same company search does not look it up twice. */
   companyCriteria?: SearchCriteria;
+  /** Same for a brief; null means "read, but not a usable brief" (use the normal reader). */
+  briefCriteria?: SearchCriteria | null;
   jobDescription?: string;
   jobRequirements?: ParsedJobDescription | null;
   minScore?: number;
@@ -109,6 +112,21 @@ async function companyCriteriaFor(input: FindLeadsInput, userId: string): Promis
     userId,
   });
   return input.companyCriteria;
+}
+
+/**
+ * A long client brief (industries, titles, keywords, rules) gets its own reader, so all
+ * titles and industries are kept. Returns null for ordinary prompts.
+ */
+async function briefCriteriaFor(input: FindLeadsInput, prompt: string, userId: string) {
+  if (input.inputType !== "prompt" && input.inputType !== undefined) return null;
+  if (!looksLikeBrief(prompt)) return null;
+  if (input.briefCriteria === undefined) {
+    const brief = await buildBriefCriteria(prompt, userId);
+    input.briefCriteria = brief?.criteria ?? null;
+    if (brief?.leadCount && !input.requestedLeadCount) input.requestedLeadCount = brief.leadCount;
+  }
+  return input.briefCriteria;
 }
 
 /**
@@ -180,6 +198,7 @@ export function criteriaForClient(criteria: SearchCriteria) {
     companyNames: [] as string[],
     companyDomains: criteria.apollo?.organizationDomains ?? [],
     companyOnly: Boolean(criteria.companyOnly),
+    briefSearch: Boolean(criteria.briefSearch),
     linkedinUrls: [] as string[],
     intentSummary,
     openToWork: Boolean(criteria.openToWork),
@@ -365,9 +384,13 @@ export async function previewFindClarification(
 
   const access = await requireLeadSearchAccess(user, input.requestedLeadCount);
 
-  // A company search needs no questions: the company is the whole filter.
-  if (input.inputType === "company") {
-    const criteria = await companyCriteriaFor(input, user.id);
+  // A company search or a full brief needs no questions: the filters are all there.
+  const ready =
+    input.inputType === "company"
+      ? await companyCriteriaFor(input, user.id)
+      : await briefCriteriaFor(input, prompt, user.id);
+  if (ready) {
+    const criteria = ready;
     return {
       prompt,
       criteria,
@@ -463,10 +486,13 @@ export async function startFindLeadsWorkflow(
   });
 
   try {
+    const brief = input.inputType === "company" ? null : await briefCriteriaFor(input, prompt, user.id);
     const parsed =
       input.inputType === "company"
         ? { criteria: await companyCriteriaFor(input, user.id), provider: "HEURISTIC", parseMode: "company" }
-        : await parsePromptWithAi(prompt, { userId: user.id, searchId: search.id, leadContext });
+        : brief
+          ? { criteria: brief, provider: "OPENAI", parseMode: "brief" }
+          : await parsePromptWithAi(prompt, { userId: user.id, searchId: search.id, leadContext });
     const criteria = resolveSupportedCountry(parsed.criteria);
     const parseProvider = parsed.provider;
     const parseMode = parsed.parseMode;
@@ -695,6 +721,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     openToWork: Boolean(parsed.openToWork),
     requireEmail: Boolean(parsed.requireEmail),
     companyOnly: Boolean(parsed.companyOnly),
+    briefSearch: Boolean(parsed.briefSearch),
     apollo: resumeFilters,
   };
   const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(search.prompt);

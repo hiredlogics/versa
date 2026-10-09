@@ -41,6 +41,7 @@ function toData(row: LeadPoolPerson): PoolPersonData {
     emailStatus: row.emailStatus,
     emailCheckedAt: row.emailCheckedAt,
     openToWorkSignal: row.openToWorkSignal,
+    companyWebsite: row.companyWebsite,
     sources: row.sources,
     profile: (row.profile as object | null) ?? null,
   };
@@ -183,7 +184,15 @@ export async function findPoolCandidates(
   if (titles.length === 0 || limit <= 0) return [];
   // The pool knows company names, not websites, so it cannot answer "people at
   // stripe.com" reliably; a company search always looks the people up fresh.
-  if (criteria.companyOnly || criteria.apollo?.organizationDomains?.length) return [];
+  // Nor can it check company tags, so briefs look people up fresh as well.
+  if (
+    criteria.companyOnly ||
+    criteria.briefSearch ||
+    criteria.apollo?.organizationDomains?.length ||
+    criteria.apollo?.organizationKeywordTags?.length
+  ) {
+    return [];
+  }
 
   const locationTerms = poolLocationTerms(criteria.apollo?.personLocations ?? [], criteria.country);
   const where: Prisma.LeadPoolPersonWhereInput = {
@@ -356,6 +365,7 @@ export async function serveFromPool(input: {
         name: row.name,
         title: row.title,
         company: row.company || "Unknown",
+        companyWebsite: row.companyWebsite,
         industry: row.industry,
         employees: row.employees,
         location,

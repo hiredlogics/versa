@@ -28,6 +28,7 @@ export type PoolPersonInput = {
   /** True when Apollo was asked for this person's email, even if none came back. */
   emailChecked?: boolean;
   openToWorkSignal?: string | null;
+  companyWebsite?: string | null;
   source: string;
   /** Trimmed profile snapshot for caching job history. */
   profile?: object | null;
@@ -52,6 +53,7 @@ export type PoolPersonData = {
   emailStatus: string | null;
   emailCheckedAt: Date | null;
   openToWorkSignal: string | null;
+  companyWebsite: string | null;
   sources: string[];
   /** Trimmed profile snapshot; non-null beats null (never overwrite with null). */
   profile: object | null;
@@ -183,6 +185,7 @@ export function mergePoolPerson(
     emailStatus: takeIncomingEmail ? incomingStatus : existing?.emailStatus ?? null,
     emailCheckedAt: incoming.emailChecked ? now : existing?.emailCheckedAt ?? null,
     openToWorkSignal: clean(incoming.openToWorkSignal) ?? existing?.openToWorkSignal ?? null,
+    companyWebsite: clean(incoming.companyWebsite) ?? existing?.companyWebsite ?? null,
     sources: [...sources].sort(),
     profile: mergedProfile,
   };
@@ -213,6 +216,7 @@ export function poolInputFromApolloPerson(
     title: person.title,
     headline: person.headline ?? null,
     company: org?.name ?? null,
+    companyWebsite: org?.website ?? null,
     industry: org?.industry ?? null,
     employees: org?.estimated_num_employees ?? null,
     city: person.city ?? null,

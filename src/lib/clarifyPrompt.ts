@@ -76,7 +76,10 @@ const JOB_SEEKER_INTENT =
 
 /** Pull an explicit lead count from the user prompt when present. */
 export function extractRequestedLeadCount(prompt: string): number | undefined {
-  const match = prompt.match(/\b(\d{1,5})\s*(leads?|people|contacts|profiles|results)\b/i);
+  // Up to 3 describing words may sit in between: "20 highly relevant leads".
+  const match = prompt.match(
+    /\b(\d{1,5})\s*(?:[a-z-]+\s+){0,3}?(leads?|people|contacts|profiles|results|prospects)\b/i
+  );
   if (match) {
     const n = parseInt(match[1], 10);
     if (Number.isFinite(n) && n > 0) return Math.min(50_000, n);

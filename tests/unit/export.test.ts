@@ -63,10 +63,10 @@ describe("CSV writer", () => {
   });
 
   it("writes empty cells instead of N/A or 0", () => {
-    const [, row] = rows(leadsToCSV([lead({ industry: "N/A", employees: 0, location: "N/A" })]));
-    expect(row[3]).toBe("");
-    expect(row[4]).toBe("");
-    expect(row[5]).toBe("");
+    const [header, row] = rows(leadsToCSV([lead({ industry: "N/A", employees: 0, location: "N/A" })]));
+    for (const column of ["Industry", "Employees", "Location"]) {
+      expect(row[header.indexOf(column)]).toBe("");
+    }
   });
 
   it("exports Matched Skills and Missing Skills columns", () => {
@@ -78,14 +78,12 @@ describe("CSV writer", () => {
         }),
       ])
     );
-    expect(header[10]).toBe("Matched Skills");
-    expect(header[11]).toBe("Missing Skills");
-    expect(row1[10]).toBe("Spark, AWS");
-    expect(row1[11]).toBe("Airflow");
+    expect(row1[header.indexOf("Matched Skills")]).toBe("Spark, AWS");
+    expect(row1[header.indexOf("Missing Skills")]).toBe("Airflow");
 
     const [, row2] = rows(leadsToCSV([lead()]));
-    expect(row2[10]).toBe("");
-    expect(row2[11]).toBe("");
+    expect(row2[header.indexOf("Matched Skills")]).toBe("");
+    expect(row2[header.indexOf("Missing Skills")]).toBe("");
   });
 });
 
@@ -197,5 +195,12 @@ describe("database lead mapping", () => {
   it("has no search tag when the search has no job title", () => {
     expect(searchTagFor({ prompt: "x", parsedCriteria: {} })).toBeNull();
     expect(searchTagFor(null)).toBeNull();
+  });
+});
+
+describe("company website column", () => {
+  it("exports the company website", () => {
+    const [header, row] = rows(leadsToCSV([lead({ companyWebsite: "https://stripe.com" })]));
+    expect(row[header.indexOf("Company Website")]).toBe("https://stripe.com");
   });
 });

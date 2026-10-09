@@ -549,6 +549,26 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     return variants;
   }
 
+  // Brief: one search over all company tags. Widen only as the brief allows:
+  // first by seniority instead of exact titles, then any company size.
+  if (criteria.briefSearch && base.organizationKeywordTags?.length) {
+    const briefTitles = asStringArray(base.personTitles).slice(0, 15);
+    const common = {
+      personLocations: primaryLocation,
+      organizationKeywordTags: base.organizationKeywordTags,
+      personSeniorities: base.personSeniorities,
+      includeSimilarTitles: true,
+    };
+    add(0, "titles at matching companies", { ...common, personTitles: briefTitles, employeeRanges });
+    if (base.personSeniorities?.length) {
+      add(1, "seniority at matching companies", { ...common, personTitles: [], employeeRanges });
+      add(2, "seniority at matching companies of any size", { ...common, personTitles: [] });
+    } else {
+      add(2, "titles at matching companies of any size", { ...common, personTitles: briefTitles });
+    }
+    return variants;
+  }
+
   const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
 
   // Open-to-work: prioritize keyword/title variants that surface self-stated

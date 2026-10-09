@@ -6,6 +6,10 @@ export interface ApolloSearchFilters {
   includeSimilarTitles?: boolean;
   /** Employer domains, e.g. ["apple.com"] for "people who work at Apple". */
   organizationDomains?: string[];
+  /** Company product/industry tags; a company matching ANY tag counts (briefs). */
+  organizationKeywordTags?: string[];
+  /** Seniority levels such as founder, c_suite, vp, director, head. */
+  personSeniorities?: string[];
 }
 
 export interface SearchCriteria {
@@ -26,6 +30,8 @@ export interface SearchCriteria {
   excludedIndustries?: string[];
   /** Company search: only people at apollo.organizationDomains, any title, anywhere. */
   companyOnly?: boolean;
+  /** Read from a long client brief: company tags, many titles and seniorities. */
+  briefSearch?: boolean;
   assumptionsUsedFromContext?: string[];
   explicitOverridesFromPrompt?: string[];
   /** AI-generated filters sent directly to Apollo API */
@@ -69,6 +75,8 @@ export interface ApolloPerson {
     city: string;
     state: string;
     country: string;
+    /** Employer website, only after enrichment (the free search leaves it out). */
+    website?: string | null;
   };
 }
 
@@ -84,6 +92,7 @@ export interface ScoredLead {
   /** Provider email confidence: "verified" | "guessed" | null when unknown. */
   emailStatus?: string | null;
   linkedinUrl: string | null;
+  companyWebsite?: string | null;
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";

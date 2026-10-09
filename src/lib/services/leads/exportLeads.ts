@@ -42,6 +42,7 @@ export function dbLeadToExport(lead: LeadWithSearch): ExportLead {
     email: lead.email,
     emailStatus: lead.emailStatus,
     linkedinUrl: lead.linkedinUrl,
+    companyWebsite: lead.companyWebsite ?? null,
     score: lead.leadScore,
     matchedSkills: lead.matchedSkills ?? [],
     missingSkills: lead.missingSkills ?? [],

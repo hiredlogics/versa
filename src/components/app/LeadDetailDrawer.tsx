@@ -166,6 +166,18 @@ export function LeadDetailDrawer({
                 <InfoRow icon={Building2} label="Company">
                   {lead.company}
                 </InfoRow>
+                {lead.companyWebsite && (
+                  <InfoRow icon={ExternalLink} label="Website">
+                    <a
+                      href={lead.companyWebsite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-lp-cold-blue hover:text-lp-ice-blue"
+                    >
+                      {lead.companyWebsite.replace(/^https:\/\//, "")}
+                    </a>
+                  </InfoRow>
+                )}
                 <InfoRow icon={Users} label="Employees">
                   {lead.employees ?? "Unknown"}
                 </InfoRow>

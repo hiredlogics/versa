@@ -95,6 +95,7 @@ function applyEnrichmentToLeads(
     emailStatus?: string | null;
     linkedinUrl: string | null;
     hasEmail: boolean;
+    companyWebsite?: string | null;
   }>,
   enriched: EnrichedApolloResult[]
 ): {
@@ -116,6 +117,7 @@ function applyEnrichmentToLeads(
     lead.employees = full.employees || lead.employees;
     lead.location = full.location !== "N/A" ? full.location : lead.location;
     lead.linkedinUrl = full.linkedinUrl || lead.linkedinUrl;
+    lead.companyWebsite = full.companyWebsite ?? lead.companyWebsite ?? null;
     if (isUsableEmail(full.email)) {
       lead.email = full.email;
       lead.hasEmail = true;
@@ -404,6 +406,7 @@ export async function runSequentialLeadBatches(input: {
         emailStatus: lead.emailStatus ?? null,
         linkedinUrl: lead.linkedinUrl,
         hasEmail: lead.hasEmail,
+        companyWebsite: lead.companyWebsite ?? null,
         leadScore: scored.scores[i].leadScore,
         priorityLevel: toDbPriority(scored.scores[i].priorityLevel),
         reasoning: scored.scores[i].reasoning,
@@ -579,6 +582,7 @@ export async function runSequentialLeadBatches(input: {
       email: lead.email,
       emailStatus: lead.emailStatus ?? null,
       linkedinUrl: lead.linkedinUrl,
+      companyWebsite: lead.companyWebsite ?? null,
       leadScore: lead.leadScore,
       priorityLevel: lead.priorityLevel,
       reasoning: lead.reasoning,

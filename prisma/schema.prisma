@@ -260,6 +260,8 @@ model Lead {
   reasoning           String?
   recommendedApproach String?
   hasEmail            Boolean       @default(false)
+  /// Employer website, e.g. "https://stripe.com", from enrichment.
+  companyWebsite      String?
   rawApolloData       Json?
   matchedSkills       String[]      @default([])
   missingSkills       String[]      @default([])
@@ -295,6 +297,7 @@ model LeadPoolPerson {
   titleNormalized  String
   headline         String?
   company          String?
+  companyWebsite   String?
   industry         String?
   employees        Int?
   city             String?

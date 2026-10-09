@@ -185,22 +185,35 @@ export function LeadResultsTable({
       }),
       columnHelper.display({
         id: "linkedin",
-        header: "LinkedIn",
-        cell: ({ row }) =>
-          row.original.linkedinUrl ? (
-            <a
-              href={row.original.linkedinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-lp-cold-blue hover:text-lp-ice-blue"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Profile
-            </a>
-          ) : (
-            <span className="text-xs text-lp-muted-dark">None</span>
-          ),
+        header: "Links",
+        cell: ({ row }) => {
+          const { linkedinUrl, companyWebsite } = row.original;
+          if (!linkedinUrl && !companyWebsite) {
+            return <span className="text-xs text-lp-muted-dark">None</span>;
+          }
+          return (
+            <div className="flex flex-col gap-1">
+              {[
+                { href: linkedinUrl, label: "Profile" },
+                { href: companyWebsite, label: "Website" },
+              ].map(({ href, label }) =>
+                href ? (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-lp-cold-blue hover:text-lp-ice-blue"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    {label}
+                  </a>
+                ) : null
+              )}
+            </div>
+          );
+        },
       }),
     ],
     []
