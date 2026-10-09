@@ -534,6 +534,21 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     variants.push({ level, label, filters: merged });
   }
 
+  // Company search: only that company. Try the roles asked for, then everyone there.
+  if (criteria.companyOnly && organizationDomains.length > 0) {
+    // No location given means anywhere (normalizeLocations would default to the US).
+    const locations = asStringArray(base.personLocations).length ? primaryLocation : [];
+    add(0, "people at this company", {
+      personTitles,
+      personLocations: locations,
+      includeSimilarTitles: true,
+    });
+    if (personTitles.length > 0) {
+      add(1, "everyone at this company", { personTitles: [], personLocations: locations });
+    }
+    return variants;
+  }
+
   const titles = personTitles.length ? personTitles : ["Director", "Founder", "CEO"];
 
   // Open-to-work: prioritize keyword/title variants that surface self-stated

@@ -289,6 +289,14 @@ function buildParamsFromFilters(
     include_similar_titles: filters.includeSimilarTitles === false ? "false" : "true",
   };
 
+  // An empty list means "any" (a company search: everyone at the company, anywhere).
+  if (Array.isArray(filters.personLocations) && filters.personLocations.length === 0) {
+    delete params.person_locations;
+  }
+  if (Array.isArray(filters.personTitles) && filters.personTitles.length === 0) {
+    delete params.person_titles;
+    delete params.include_similar_titles;
+  }
   if (filters.employeeRanges?.length) {
     params.organization_num_employees_ranges = filters.employeeRanges;
   }

@@ -1,3 +1,4 @@
+import { CompanyNotFoundError } from "@/lib/services/leads/companySearch";
 import { after, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/get-current-user";
 import {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
       inputType: parsed.inputType,
       jobDescription: parsed.jobDescription,
       jobRequirements: parsed.jobRequirements,
+      companyName: parsed.companyName,
       minScore: parsed.minScore,
       requestedLeadCount: parsed.requestedLeadCount,
       skipClarification: parsed.skipClarification,
@@ -98,6 +100,9 @@ export async function POST(request: Request) {
       batchSize: started.batchSize,
     });
   } catch (error) {
+    if (error instanceof CompanyNotFoundError) {
+      return NextResponse.json({ error: error.message, code: "COMPANY_NOT_FOUND" }, { status: 400 });
+    }
     if (error instanceof SubscriptionRequiredError) {
       return NextResponse.json(
         { error: "Active subscription required.", code: "NO_ACTIVE_SUBSCRIPTION" },

@@ -37,6 +37,7 @@ import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
 import { resolveSupportedCountry } from "@/lib/location-policy";
 import { Prisma, type User, type AiProvider } from "@prisma/client";
 import { rescoreSearchLeads } from "@/lib/services/leads/rescoreSearch";
+import { buildCompanyCriteria } from "@/lib/services/leads/companySearch";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
 import {
   parseJobDescription,
@@ -49,6 +50,10 @@ export { USER_STOPPED_MESSAGE, canResumeSearch };
 export interface FindLeadsInput {
   prompt: string;
   inputType?: string;
+  /** Company search: the company's name or website ("Stripe" or "stripe.com"). */
+  companyName?: string;
+  /** Set by the preview so starting the same company search does not look it up twice. */
+  companyCriteria?: SearchCriteria;
   jobDescription?: string;
   jobRequirements?: ParsedJobDescription | null;
   minScore?: number;
@@ -75,6 +80,11 @@ async function resolvePromptAndRequirements(
   input: FindLeadsInput,
   userId?: string
 ): Promise<{ prompt: string; jobRequirements: ParsedJobDescription | null }> {
+  if (input.inputType === "company") {
+    const company = input.companyName?.trim() ?? "";
+    const roles = input.prompt.trim();
+    return { prompt: roles ? `${roles} at ${company}` : `People at ${company}`, jobRequirements: null };
+  }
   if (input.inputType !== "job_description") {
     return { prompt: input.prompt, jobRequirements: null };
   }
@@ -89,6 +99,16 @@ async function resolvePromptAndRequirements(
     : (input.jobDescription ?? "").trim();
   const prompt = [base, input.prompt.trim()].filter(Boolean).join(". ");
   return { prompt, jobRequirements };
+}
+
+/** Company search criteria, looked up once per request (the preview stores it on the input). */
+async function companyCriteriaFor(input: FindLeadsInput, userId: string): Promise<SearchCriteria> {
+  input.companyCriteria ??= await buildCompanyCriteria({
+    company: input.companyName ?? "",
+    roles: input.prompt,
+    userId,
+  });
+  return input.companyCriteria;
 }
 
 /**
@@ -158,7 +178,8 @@ export function criteriaForClient(criteria: SearchCriteria) {
       ? criteria.keywords.split(/[,\s]+/).filter(Boolean).slice(0, 8)
       : [],
     companyNames: [] as string[],
-    companyDomains: [] as string[],
+    companyDomains: criteria.apollo?.organizationDomains ?? [],
+    companyOnly: Boolean(criteria.companyOnly),
     linkedinUrls: [] as string[],
     intentSummary,
     openToWork: Boolean(criteria.openToWork),
@@ -343,6 +364,26 @@ export async function previewFindClarification(
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
   const access = await requireLeadSearchAccess(user, input.requestedLeadCount);
+
+  // A company search needs no questions: the company is the whole filter.
+  if (input.inputType === "company") {
+    const criteria = await companyCriteriaFor(input, user.id);
+    return {
+      prompt,
+      criteria,
+      clientCriteria: criteriaForClient(criteria),
+      parseProvider: "HEURISTIC",
+      clarification: {
+        needsClarification: false,
+        questions: [],
+        message: "",
+        requestedLeadCount: input.requestedLeadCount,
+      },
+      leadsRemaining: access.leadsRemaining,
+      jobRequirements: null,
+    };
+  }
+
   const parsed = await parsePromptWithAi(prompt, {
     userId: user.id,
     leadContext,
@@ -422,11 +463,10 @@ export async function startFindLeadsWorkflow(
   });
 
   try {
-    const parsed = await parsePromptWithAi(prompt, {
-      userId: user.id,
-      searchId: search.id,
-      leadContext,
-    });
+    const parsed =
+      input.inputType === "company"
+        ? { criteria: await companyCriteriaFor(input, user.id), provider: "HEURISTIC", parseMode: "company" }
+        : await parsePromptWithAi(prompt, { userId: user.id, searchId: search.id, leadContext });
     const criteria = resolveSupportedCountry(parsed.criteria);
     const parseProvider = parsed.provider;
     const parseMode = parsed.parseMode;
@@ -628,7 +668,11 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
   const resumeFilters = stripFetchProgress(
     search.apolloFilters as unknown as ApolloSearchFilters
   );
-  if (!resumeFilters?.personTitles?.length && !resumeFilters?.personLocations?.length) {
+  if (
+    !resumeFilters?.personTitles?.length &&
+    !resumeFilters?.personLocations?.length &&
+    !resumeFilters?.organizationDomains?.length
+  ) {
     throw new Error("Missing search filters to resume. Run a new search.");
   }
 
@@ -650,6 +694,7 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     searchIntent: (parsed.searchIntent as string) || (parsed.intentSummary as string) || search.prompt,
     openToWork: Boolean(parsed.openToWork),
     requireEmail: Boolean(parsed.requireEmail),
+    companyOnly: Boolean(parsed.companyOnly),
     apollo: resumeFilters,
   };
   const wantsEmail = Boolean(criteria.requireEmail) || promptAsksForEmail(search.prompt);

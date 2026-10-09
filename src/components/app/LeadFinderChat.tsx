@@ -70,6 +70,7 @@ const EMPTY_CRITERIA: ParsedSearchCriteria = {
 const EMPTY_COMPOSER: ComposerValues = {
   prompt: "",
   jobDescription: "",
+  companyName: "",
   mode: "describe",
 };
 
@@ -79,8 +80,10 @@ function composerForSubmit(values: ComposerValues): ComposerValues {
   return {
     ...EMPTY_COMPOSER,
     mode,
-    prompt: mode === "describe" ? values.prompt : "",
+    // In the Company tab, `prompt` holds the optional roles.
+    prompt: mode === "describe" || mode === "company" ? values.prompt : "",
     jobDescription: mode === "job_description" ? values.jobDescription || values.prompt : "",
+    companyName: mode === "company" ? (values.companyName ?? "").trim() : "",
   };
 }
 
@@ -90,6 +93,8 @@ type UserTurn = {
   text: string;
   /** Set when this turn was a pasted job description (text is the description). */
   isJobDescription?: boolean;
+  /** Set when this turn was a company search, so Retry repeats it exactly. */
+  company?: { name: string; roles: string };
 };
 
 type AssistantTurn = {
@@ -114,7 +119,7 @@ type ChatTurn = UserTurn | AssistantTurn;
 /** Earlier user lines to merge into a follow-up. Pasted job descriptions are left out. */
 function priorUserTextsOf(history: ChatTurn[]): string[] {
   return history
-    .filter((turn): turn is UserTurn => turn.role === "user" && !turn.isJobDescription)
+    .filter((turn): turn is UserTurn => turn.role === "user" && !turn.isJobDescription && !turn.company)
     .map((turn) => turn.text);
 }
 
@@ -668,9 +673,11 @@ export function LeadFinderChat() {
       if (userTurn.role !== "user") return;
 
       displayText = userTurn.text;
-      snapshot = userTurn.isJobDescription
-        ? { ...EMPTY_COMPOSER, jobDescription: displayText, mode: "job_description" }
-        : { ...EMPTY_COMPOSER, prompt: displayText };
+      snapshot = userTurn.company
+        ? { ...EMPTY_COMPOSER, companyName: userTurn.company.name, prompt: userTurn.company.roles, mode: "company" }
+        : userTurn.isJobDescription
+          ? { ...EMPTY_COMPOSER, jobDescription: displayText, mode: "job_description" }
+          : { ...EMPTY_COMPOSER, prompt: displayText };
       history = turns.slice(0, assistantIndex - 1);
       assistantTurnId = retryAssistantTurnId;
     } else if (editingUserTurnId) {
@@ -722,27 +729,37 @@ export function LeadFinderChat() {
     } else {
       snapshot = override ? { ...EMPTY_COMPOSER, prompt: override.prompt } : composerForSubmit(composer);
       const isJobDesc = snapshot.mode === "job_description";
+      const company =
+        snapshot.mode === "company"
+          ? { name: snapshot.companyName ?? "", roles: snapshot.prompt.trim() }
+          : undefined;
 
-      const currentText = isJobDesc ? (snapshot.jobDescription || snapshot.prompt) : snapshot.prompt;
+      const currentText = company
+        ? company.name
+        : isJobDesc
+          ? snapshot.jobDescription || snapshot.prompt
+          : snapshot.prompt;
       const hasInput = currentText.trim();
 
       if (!hasInput) {
         setComposerError({
           kind: "missing_prompt",
-          message: "Describe who you want to find.",
+          message: company ? "Enter a company name or website." : "Describe who you want to find.",
         });
         return;
       }
 
       history = turns;
-      displayText = currentText.trim();
+      displayText = company
+        ? `${company.roles || "People"} at ${company.name}`
+        : currentText.trim();
 
       const userTurnId = newId();
       assistantTurnId = newId();
 
       setTurns((prev) => [
         ...prev,
-        { id: userTurnId, role: "user", text: displayText, isJobDescription: isJobDesc },
+        { id: userTurnId, role: "user", text: displayText, isJobDescription: isJobDesc, company },
         {
           id: assistantTurnId,
           role: "assistant",
@@ -763,7 +780,8 @@ export function LeadFinderChat() {
       snapshot.mode === "job_description"
         ? (snapshot.jobDescription || snapshot.prompt).trim()
         : undefined;
-    const jobRequirements = newJobDescription ? undefined : latestJobRequirements(history);
+    const jobRequirements =
+      newJobDescription || snapshot.mode === "company" ? undefined : latestJobRequirements(history);
 
     setComposerError(null);
     setRestoreError(null);
@@ -797,15 +815,22 @@ export function LeadFinderChat() {
 
     startStepAnimation();
 
-    const inputType = newJobDescription || jobRequirements ? "job_description" : "prompt";
+    const companySearch = snapshot.mode === "company";
+    const inputType = companySearch
+      ? "company"
+      : newJobDescription || jobRequirements
+        ? "job_description"
+        : "prompt";
 
     try {
       const res = await fetch("/api/leads/find", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: newJobDescription ? undefined : fullPrompt,
+          // A company search sends only its roles; earlier messages do not change the company.
+          prompt: companySearch ? snapshot.prompt.trim() : newJobDescription ? undefined : fullPrompt,
           jobDescription: newJobDescription,
+          companyName: companySearch ? snapshot.companyName : undefined,
           jobRequirements,
           inputType,
           minScore: filters.minScore ?? 5,

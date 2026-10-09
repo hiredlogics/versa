@@ -90,10 +90,12 @@ export const findLeadsInputSchema = z
       .string()
       .max(20_000, "Job description must be 20,000 characters or fewer")
       .optional(),
+    /** Company search: the company's name or website. */
+    companyName: z.string().max(200, "Company name must be 200 characters or fewer").optional(),
     /** Requirements already read from this conversation's job description (follow-ups). */
     jobRequirements: parsedJobDescriptionSchema.optional(),
     inputType: z
-      .enum(["prompt", "persona", "job_description"])
+      .enum(["prompt", "persona", "job_description", "company"])
       .default("prompt"),
     minScore: z.number().min(1).max(10).optional(),
     /** How many leads the user wants this run (clamped to remaining credits + batch size). */
@@ -107,7 +109,11 @@ export const findLeadsInputSchema = z
       Boolean(data.jobDescription?.trim()) ||
       Boolean(data.jobRequirements),
     { message: "Paste a job description to search with.", path: ["jobDescription"] }
-  );
+  )
+  .refine((data) => data.inputType !== "company" || Boolean(data.companyName?.trim()), {
+    message: "Enter a company name or website.",
+    path: ["companyName"],
+  });
 
 export const leadScoreResultSchema = z.object({
   leadScore: z.number().min(1).max(10),

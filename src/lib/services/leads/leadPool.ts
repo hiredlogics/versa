@@ -181,6 +181,9 @@ export async function findPoolCandidates(
     Boolean
   );
   if (titles.length === 0 || limit <= 0) return [];
+  // The pool knows company names, not websites, so it cannot answer "people at
+  // stripe.com" reliably; a company search always looks the people up fresh.
+  if (criteria.companyOnly || criteria.apollo?.organizationDomains?.length) return [];
 
   const locationTerms = poolLocationTerms(criteria.apollo?.personLocations ?? [], criteria.country);
   const where: Prisma.LeadPoolPersonWhereInput = {

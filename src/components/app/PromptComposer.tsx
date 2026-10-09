@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils/cn";
 export interface ComposerValues {
   prompt: string;
   jobDescription?: string;
-  mode?: "describe" | "job_description";
+  /** Company tab: the company's name or website; `prompt` holds the optional roles. */
+  companyName?: string;
+  mode?: "describe" | "job_description" | "company";
 }
 
 interface PromptComposerProps {
@@ -41,9 +43,14 @@ export function PromptComposer({
 }: PromptComposerProps) {
   // The parent owns the mode, so a reset or restored search always shows the right tab.
   const mode = values.mode ?? "describe";
-  const tabs = ["describe", "job_description"] as const;
+  const tabs = ["describe", "job_description", "company"] as const;
 
-  const currentText = mode === "job_description" ? values.jobDescription ?? values.prompt : values.prompt;
+  const currentText =
+    mode === "job_description"
+      ? values.jobDescription ?? values.prompt
+      : mode === "company"
+        ? values.companyName ?? ""
+        : values.prompt;
   const canSubmit =
     !loading &&
     !disabled &&
@@ -87,6 +94,7 @@ export function PromptComposer({
             [
               ["describe", "Describe buyers"],
               ["job_description", "Paste job description"],
+              ["company", "Company"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -143,13 +151,46 @@ export function PromptComposer({
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {["Location", "Industry", "Company size", "Job title", "Seniority"].map((label) => (
-            <button key={label} type="button" onClick={onOpenFilters} className="app-chip text-xs">
-              {label}
-            </button>
-          ))}
-        </div>
+        {mode === "company" && (
+          <div className="grid gap-2">
+            <input
+              id="composer-company"
+              type="text"
+              autoComplete="off"
+              value={values.companyName ?? ""}
+              onChange={(e) => onChange({ ...values, companyName: e.target.value, mode: "company" })}
+              disabled={loading || disabled}
+              placeholder="Company name or website, e.g. Stripe or stripe.com"
+              aria-label="Company name or website"
+              className="app-input"
+            />
+            <input
+              id="composer-company-roles"
+              type="text"
+              autoComplete="off"
+              value={values.prompt}
+              onChange={(e) => onChange({ ...values, prompt: e.target.value, mode: "company" })}
+              disabled={loading || disabled}
+              placeholder="Roles (optional), e.g. CTO, engineering managers. Leave empty for everyone"
+              aria-label="Roles to find (optional)"
+              className="app-input"
+            />
+            <p className="text-[11px] text-lp-muted-dark">
+              Finds people who work at this company, anywhere in the world. A website is the most exact.
+            </p>
+          </div>
+        )}
+
+        {/* Filters do not apply to a company search: the company is the filter. */}
+        {mode !== "company" && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {["Location", "Industry", "Company size", "Job title", "Seniority"].map((label) => (
+              <button key={label} type="button" onClick={onOpenFilters} className="app-chip text-xs">
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-lp-border px-4 py-3">

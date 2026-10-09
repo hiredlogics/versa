@@ -24,6 +24,8 @@ export interface SearchCriteria {
   requireEmail?: boolean;
   excludedTitles?: string[];
   excludedIndustries?: string[];
+  /** Company search: only people at apollo.organizationDomains, any title, anywhere. */
+  companyOnly?: boolean;
   assumptionsUsedFromContext?: string[];
   explicitOverridesFromPrompt?: string[];
   /** AI-generated filters sent directly to Apollo API */
