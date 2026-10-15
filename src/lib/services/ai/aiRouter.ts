@@ -13,6 +13,8 @@ export interface AiCallOptions {
   user: string;
   jsonMode?: boolean;
   temperature?: number;
+  /** Only try these providers. A yes/no judge must not silently swap to a weaker model. */
+  onlyProviders?: AiProvider[];
 }
 
 const TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
@@ -80,7 +82,9 @@ export async function aiChat(options: AiCallOptions): Promise<{
   content: string;
   provider: AiProvider;
 }> {
-  const providers = getProviders();
+  const providers = getProviders().filter(
+    (p) => !options.onlyProviders || options.onlyProviders.includes(p.name)
+  );
   if (providers.length === 0) {
     throw new Error("No AI providers configured");
   }

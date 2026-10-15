@@ -24,6 +24,7 @@ PHASE 2: Convert that understanding into accurate Apollo filters
   Real estate examples: ["Broker","Managing Broker","Property Manager","Real Estate Investor","Founder","CEO"]
   SaaS examples: ["CEO","Founder","CTO","VP Sales"]
   CRITICAL: If industry is Real Estate / property / brokerage, NEVER use CTO, VP Engineering, Head of Product, or other software titles unless the user explicitly asked for tech roles.
+  CRITICAL: When the user wants the people who HIRE a role ("managers hiring React developers", "who hires nurses"), personTitles are the managers or leaders of that team (e.g. ["Engineering Manager","VP Engineering","Head of Engineering"]), never the role being hired.
 - personLocations: exactly the places the user listed (max 3). Never pair a country with one of its own states/cities (no ["California","United States"]).
 - Extract city and state/province separately when they are stated. Use the city
   as personLocations when one is available; otherwise use the state/province,
@@ -60,11 +61,17 @@ PHASE 2: Convert that understanding into accurate Apollo filters
   ("with emails", "their email addresses", "contact info"). Otherwise false:
   unlocking emails costs credits, so never assume it.
 - Respect excluded titles/industries only when the prompt itself states them.
+- fitCriteria: up to 5 short checks for what the filters above CANNOT express,
+  written so someone could judge them from a person's title, headline and company.
+  Examples: "works on payments, not general finance", "leads an engineering team",
+  "company sells to other businesses". Do not repeat titles, location or company
+  size here. Leave empty when the titles and location already say everything.
 
 Return ONLY valid JSON:
 {
   "summary": "string",
   "searchIntent": "full intent including industry AND needs",
+  "fitCriteria": ["string"],
   "industry": "primary industry",
   "country": "primary country",
   "city": "city or null",
@@ -117,6 +124,22 @@ function buildUserMessage(prompt: string, leadContext: UserLeadContextDTO | null
   );
 }
 
+/** At most 5 short, distinct checks; anything else from the model is dropped. */
+export function cleanFitCriteria(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of value) {
+    const text = String(item ?? "").trim().slice(0, 120);
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
 function applyParsedCriteria(
   parsed: Record<string, unknown>,
   userPrompt: string,
@@ -143,6 +166,7 @@ function applyParsedCriteria(
     ? ((parsed.assumptionsUsedFromContext as string[]) ?? [])
     : [];
   criteria.explicitOverridesFromPrompt = (parsed.explicitOverridesFromPrompt as string[]) ?? [];
+  criteria.fitCriteria = cleanFitCriteria(parsed.fitCriteria);
   return criteria;
 }
 
@@ -224,6 +248,7 @@ export async function parsePromptWithAi(
       employeeRanges: criteria.apollo?.employeeRanges ?? null,
       industry: criteria.industry,
       openToWork: Boolean(criteria.openToWork),
+      fitCriteria: criteria.fitCriteria ?? [],
     });
 
     return { criteria, provider, parseMode: "ai" };

@@ -24,6 +24,8 @@ export interface SearchCriteria {
   keywords?: string;
   summary: string;
   searchIntent?: string;
+  /** Things Apollo cannot filter on, checked by the AI before an email is unlocked. */
+  fitCriteria?: string[];
   openToWork?: boolean;
   requireEmail?: boolean;
   excludedTitles?: string[];
@@ -183,6 +185,8 @@ export interface LeadScoreContext {
   excludedTitles?: string[];
   excludedIndustries?: string[];
   targetSkills?: string[];
+  /** Soft requirements from the parser, judged before unlocking. */
+  fitCriteria?: string[];
   /** Score the leads relative to each other (all from the same search). */
   compareAcrossLeads?: boolean;
 }

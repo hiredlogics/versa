@@ -59,7 +59,7 @@ export function startStageTimer(): { startedAt: number; elapsedMs: () => number 
  * Log a named pipeline stage (fetch | unlock | why | score) with duration + outcome.
  */
 export function logStageTiming(input: {
-  stage: "fetch" | "unlock" | "why" | "score" | "save" | "widen";
+  stage: "fetch" | "unlock" | "why" | "score" | "save" | "widen" | "relevance_gate";
   searchId?: string;
   durationMs: number;
   ok: boolean;

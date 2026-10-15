@@ -269,6 +269,7 @@ async function runSearchStep(args: {
     args.prompt
   );
   scoreContext.openToWork = args.criteria.openToWork;
+  scoreContext.fitCriteria = args.criteria.fitCriteria;
   scoreContext.requireEmail = args.wantsEmail;
 
   // After new leads are saved, score the whole search again side by side.

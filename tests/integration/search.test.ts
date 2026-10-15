@@ -174,6 +174,19 @@ describe("search-criteria helpers", () => {
     expect(runA).toEqual(runB);
   });
 
+  it("keeps manager titles when the user wants the people who hire developers", async () => {
+    const { normalizeSoftwareEngineerTitles } = await import("@/lib/search-criteria");
+    const titles = ["Engineering Manager", "VP Engineering", "Head of Engineering"];
+
+    expect(
+      normalizeSoftwareEngineerTitles(titles, "Engineering managers hiring React developers in the US")
+    ).toEqual(titles);
+    // A plain developer search is still stabilized.
+    expect(
+      normalizeSoftwareEngineerTitles(["Programmer"], "Find React developers in the US")
+    ).toContain("Software Engineer");
+  });
+
   it("keeps industry keyword when smart-relax widens filters", () => {
     const variants = buildApolloSearchVariants({
       industry: "Real Estate",

@@ -13,6 +13,13 @@ import {
   generateLeadReasoningBatch,
 } from "@/lib/services/ai/leadReasoning";
 import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
+import {
+  applyRelevanceGate,
+  gateModeFor,
+  gateRank,
+  judgeRelevance,
+  type GateResult,
+} from "@/lib/services/ai/relevanceGate";
 import { filterLeadsWithUsableEmail } from "@/lib/services/leads/enrichWhyBatch";
 import {
   getMaxAutoBatches,
@@ -185,6 +192,8 @@ export async function runSequentialLeadBatches(input: {
   let otwScanned = 0;
   let otwSignalHits = 0;
   const openToWorkMode = Boolean(input.criteria.openToWork);
+  const gateMode = gateModeFor(input.criteria);
+  let gateSkipped = 0;
 
   const batchesThisRunCap = maxBatches === 0 ? Number.POSITIVE_INFINITY : maxBatches;
   const unlockBudget = getUnlockAttemptBudget(batchSize);
@@ -308,6 +317,48 @@ export async function runSequentialLeadBatches(input: {
       });
     }
 
+    // Yes/no relevance check on free data, before anyone is paid for.
+    let verdicts = new Map<string, GateResult>();
+    let gateSkippedThisBatch = 0;
+    if (gateMode !== "off" && people.length > 0) {
+      const gateTimer = startStageTimer();
+      verdicts = await judgeRelevance(
+        people.map((p) => ({
+          id: p.id,
+          title: p.title,
+          headline: p.headline ?? null,
+          company: p.organization?.name ?? "",
+          industry: p.organization?.industry ?? null,
+          employees: p.organization?.estimated_num_employees ?? null,
+          location: [p.city, p.state, p.country].filter(Boolean).join(", ") || null,
+        })),
+        input.scoreContext,
+        { userId: input.userId, searchId: input.searchId }
+      );
+      const gated = applyRelevanceGate(
+        people,
+        verdicts,
+        gateMode,
+        activeFilters.personTitles ?? input.criteria.jobTitles ?? []
+      );
+      gateSkippedThisBatch = gated.rejected.length;
+      gateSkipped += gateSkippedThisBatch;
+      people = gated.kept;
+      logStageTiming({
+        stage: "relevance_gate",
+        searchId: input.searchId,
+        durationMs: gateTimer.elapsedMs(),
+        ok: true,
+        counts: {
+          batchIndex,
+          ...gated.summary,
+          skipped: gateSkippedThisBatch,
+          keptByTitle: gated.protectedCount,
+        },
+        extra: { gateMode },
+      });
+    }
+
     if (people.length === 0) {
       logLeadFetch("batch_empty", {
         searchId: input.searchId,
@@ -315,8 +366,9 @@ export async function runSequentialLeadBatches(input: {
         lastPage,
         totalPages,
         openToWorkFiltered: openToWorkMode,
+        relevanceSkipped: gateSkippedThisBatch,
       });
-      if (openToWorkMode) {
+      if (openToWorkMode || gateSkippedThisBatch > 0) {
         peoplePulled += fetched.people.length;
         leadsFetched += fetched.people.length;
         await prisma.leadSearch.update({
@@ -330,8 +382,9 @@ export async function runSequentialLeadBatches(input: {
               withEmail: leadsWithEmail,
               batchIndex,
               batchSize,
-              phase:
-                otwSignalHits > 0
+              phase: !openToWorkMode
+                ? `${gateSkipped.toLocaleString()} people so far didn't fit your brief and were skipped before unlocking. Checking more pages…`
+                : otwSignalHits > 0
                   ? openToWorkNote || "Checking more pages for open to work signals…"
                   : `Scanned ${otwScanned.toLocaleString()} profiles, ${otwSignalHits} with open to work wording so far. Checking more pages…`,
             }),
@@ -373,7 +426,9 @@ export async function runSequentialLeadBatches(input: {
           batchSize,
           phase: openToWorkNote
             ? `${openToWorkNote} Scoring ${people.length.toLocaleString()}…`
-            : `Scoring ${people.length.toLocaleString()}…`,
+            : gateSkippedThisBatch > 0
+              ? `${gateSkippedThisBatch.toLocaleString()} didn't fit your brief and were skipped. Scoring ${people.length.toLocaleString()}…`
+              : `Scoring ${people.length.toLocaleString()}…`,
         }),
       },
     });
@@ -418,6 +473,15 @@ export async function runSequentialLeadBatches(input: {
       }))
     );
 
+    // When the gate is enforced, clear matches unlock before maybes.
+    if (gateMode === "enforce") {
+      workList = [...workList].sort(
+        (a, b) =>
+          gateRank(verdicts.get(a.apolloPersonId)?.verdict) -
+          gateRank(verdicts.get(b.apolloPersonId)?.verdict)
+      );
+    }
+
     // Unlock highest-scored first so credit exhaustion still keeps the best fits,
     // and never spend more unlock credits than this run is allowed.
     const peopleById = new Map(people.map((p) => [p.id, p]));
@@ -426,6 +490,20 @@ export async function runSequentialLeadBatches(input: {
       .filter((p): p is ApolloPerson => Boolean(p))
       .slice(0, Math.max(0, unlockBudget - unlockAttempts));
     unlockAttempts += unlockPeople.length;
+
+    // The number that says whether enforcing is worth it: how many people the
+    // gate would have dropped are being unlocked anyway.
+    if (gateMode === "log") {
+      logLeadFetch("relevance_gate_would_skip", {
+        searchId: input.searchId,
+        batchIndex,
+        unlocking: unlockPeople.length,
+        unlockingJudgedNo: unlockPeople.filter((p) => verdicts.get(p.id)?.verdict === "no").length,
+        heuristicScoresOfNo: workList
+          .filter((l) => verdicts.get(l.apolloPersonId)?.verdict === "no")
+          .map((l) => l.leadScore),
+      });
+    }
 
     await prisma.leadSearch.update({
       where: { id: input.searchId },
@@ -609,8 +687,8 @@ export async function runSequentialLeadBatches(input: {
       if (key) input.seenIds.add(key);
     }
 
-    leadsFetched += people.length;
-    peoplePulled += people.length;
+    leadsFetched += people.length + gateSkippedThisBatch;
+    peoplePulled += people.length + gateSkippedThisBatch;
     leadsWithEmail += batchSaved;
     savedThisRun += batchSaved;
     batchesCompleted += 1;
@@ -656,7 +734,9 @@ export async function runSequentialLeadBatches(input: {
               ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email. Click Get next 100 to check more people.`
               : morePages
                 ? "Checking more people for verified emails…"
-                : "All available pages processed.",
+                : gateSkipped > 0
+                  ? `All available pages processed. ${gateSkipped.toLocaleString()} didn't fit your brief and were skipped before unlocking.`
+                  : "All available pages processed.",
         }),
       },
     });

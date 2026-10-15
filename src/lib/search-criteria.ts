@@ -135,6 +135,14 @@ function wantsSoftwareEngineers(prompt?: string, industry?: string, titles?: str
 }
 
 /**
+ * "Managers hiring React developers" names developers but wants the people who
+ * hire them. Swapping in IC titles there searched the candidates, not the buyers.
+ */
+export function wantsPeopleWhoHire(prompt?: string): boolean {
+  return /\b(hiring|hire|hires|recruit\w*)\b/i.test(prompt || "");
+}
+
+/**
  * Stabilize IC titles when searching software engineers so ChatGPT synonyms
  * (Software Architect vs Engineering Manager) don't change Apollo results run-to-run.
  */
@@ -143,7 +151,7 @@ export function normalizeSoftwareEngineerTitles(
   userPrompt?: string,
   industry?: string
 ): string[] {
-  if (!wantsSoftwareEngineers(userPrompt, industry, titles)) {
+  if (!wantsSoftwareEngineers(userPrompt, industry, titles) || wantsPeopleWhoHire(userPrompt)) {
     return titles.slice(0, 5);
   }
 

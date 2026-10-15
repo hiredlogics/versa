@@ -26,6 +26,7 @@ export const aiParsePromptOutputSchema = z
   .object({
     summary: z.string().optional(),
     searchIntent: z.string().optional(),
+    fitCriteria: z.array(z.string()).optional(),
     industry: z.union([z.string(), z.null()]).optional(),
     country: z.union([z.string(), z.null()]).optional(),
     city: z.union([z.string(), z.null()]).optional(),
@@ -47,7 +48,9 @@ export const aiParsePromptOutputSchema = z
     apollo: z
       .object({
         personTitles: z.array(z.string()).min(1, "apollo.personTitles must be non-empty"),
-        personLocations: z.array(z.string()).min(1, "apollo.personLocations must be non-empty"),
+        // May be empty: normalizeSearchCriteria falls back to the country, then United
+        // States. Requiring it sent every prompt without a place to the keyword parser.
+        personLocations: z.array(z.string()).optional().default([]),
         qKeywords: z.union([z.string(), z.array(z.string()), z.null()]).optional(),
         employeeRanges: z.array(z.string()).optional(),
         includeSimilarTitles: z.boolean().optional(),

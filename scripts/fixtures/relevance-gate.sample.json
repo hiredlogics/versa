@@ -1,0 +1,299 @@
+[
+  {
+    "name": "US fintech payments leaders",
+    "prompt": "Find heads of payments or payment operations at US fintech startups",
+    "people": [
+      {
+        "id": "1",
+        "title": "Head of Payments",
+        "company": "Ramp",
+        "industry": "financial services",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "VP Payment Operations",
+        "company": "Brex",
+        "industry": "financial services",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Payments Product Manager",
+        "company": "Mercury",
+        "industry": "financial services",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "Executive Chef",
+        "company": "Payless Diner",
+        "industry": "restaurants",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Head of Talent",
+        "company": "Stripe",
+        "industry": "financial services",
+        "expected": "drop"
+      },
+      {
+        "id": "6",
+        "title": "Director",
+        "company": "Unknown",
+        "expected": "keep"
+      }
+    ]
+  },
+  {
+    "name": "Hiring managers for React developers",
+    "prompt": "Engineering managers hiring React developers at SaaS companies",
+    "people": [
+      {
+        "id": "1",
+        "title": "Engineering Manager, Frontend",
+        "company": "Notion",
+        "industry": "computer software",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "VP Engineering",
+        "company": "Linear",
+        "industry": "computer software",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Real Estate Agent",
+        "company": "Keller Williams",
+        "industry": "real estate",
+        "expected": "drop"
+      },
+      {
+        "id": "4",
+        "title": "Nurse Manager",
+        "company": "Mercy Hospital",
+        "industry": "hospital & health care",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Software Engineer",
+        "company": "Figma",
+        "headline": "React and TypeScript",
+        "industry": "computer software",
+        "expected": "drop"
+      }
+    ]
+  },
+  {
+    "name": "Real estate owners who need automation",
+    "prompt": "Need automation. Brokers and owners at real estate companies in Texas",
+    "people": [
+      {
+        "id": "1",
+        "title": "Managing Broker",
+        "company": "Compass",
+        "industry": "real estate",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "Owner",
+        "company": "Lone Star Realty",
+        "industry": "real estate",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Property Manager",
+        "company": "Greystar",
+        "industry": "real estate",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "CTO",
+        "company": "Shopify",
+        "industry": "computer software",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Barista",
+        "company": "Starbucks",
+        "industry": "food & beverages",
+        "expected": "drop"
+      }
+    ]
+  },
+  {
+    "name": "HR people open to work in New York",
+    "prompt": "HR managers in New York who are open to work",
+    "people": [
+      {
+        "id": "1",
+        "title": "HR Manager | Open to work",
+        "company": "Between roles",
+        "headline": "Open to new opportunities",
+        "industry": "human resources",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "Human Resources Manager",
+        "company": "Acme Corp",
+        "headline": "Seeking my next HR role",
+        "industry": "human resources",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Head of People",
+        "company": "Startup",
+        "industry": "computer software",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "Software Engineer",
+        "company": "Google",
+        "headline": "Open to work",
+        "industry": "computer software",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Dentist",
+        "company": "Smile Dental",
+        "industry": "medical practice",
+        "expected": "drop"
+      }
+    ]
+  },
+  {
+    "name": "Healthcare clinic decision makers",
+    "prompt": "Owners and practice managers at dental and medical clinics in Florida",
+    "people": [
+      {
+        "id": "1",
+        "title": "Practice Manager",
+        "company": "Sunshine Dental",
+        "industry": "medical practice",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "Owner",
+        "company": "Miami Family Clinic",
+        "industry": "medical practice",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Medical Director",
+        "company": "Orlando Health Clinic",
+        "industry": "hospital & health care",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "Marketing Intern",
+        "company": "Coca-Cola",
+        "industry": "food & beverages",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Truck Driver",
+        "company": "FedEx",
+        "industry": "logistics",
+        "expected": "drop"
+      }
+    ]
+  },
+  {
+    "name": "B2B SaaS founders",
+    "prompt": "Founders and CEOs of B2B SaaS companies with 11 to 50 employees in Canada",
+    "people": [
+      {
+        "id": "1",
+        "title": "Co-Founder & CEO",
+        "company": "Clio",
+        "headline": "Building legal software for firms",
+        "industry": "computer software",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "Founder",
+        "company": "Small SaaS Co",
+        "industry": "computer software",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "CEO",
+        "company": "Unknown",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "Founder",
+        "company": "Toronto Bakehouse",
+        "headline": "Artisan bread",
+        "industry": "food production",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "Junior Accountant",
+        "company": "KPMG",
+        "industry": "accounting",
+        "expected": "drop"
+      }
+    ]
+  },
+  {
+    "name": "Data leaders at ecommerce brands",
+    "prompt": "Heads of data or analytics at ecommerce brands",
+    "people": [
+      {
+        "id": "1",
+        "title": "Head of Data",
+        "company": "Allbirds",
+        "industry": "retail",
+        "expected": "keep"
+      },
+      {
+        "id": "2",
+        "title": "Director of Analytics",
+        "company": "Warby Parker",
+        "industry": "retail",
+        "expected": "keep"
+      },
+      {
+        "id": "3",
+        "title": "Data Analytics Lead",
+        "company": "Unknown",
+        "expected": "keep"
+      },
+      {
+        "id": "4",
+        "title": "Head of HR",
+        "company": "Allbirds",
+        "industry": "retail",
+        "expected": "drop"
+      },
+      {
+        "id": "5",
+        "title": "School Teacher",
+        "company": "City School District",
+        "industry": "education",
+        "expected": "drop"
+      }
+    ]
+  }
+]
