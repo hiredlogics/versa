@@ -6,11 +6,18 @@ export interface ApolloSearchFilters {
   includeSimilarTitles?: boolean;
   /** Employer domains, e.g. ["apple.com"] for "people who work at Apple". */
   organizationDomains?: string[];
+  /** Company product/industry tags; a company matching ANY tag counts (briefs). */
+  organizationKeywordTags?: string[];
+  /** Seniority levels such as founder, c_suite, vp, director, head. */
+  personSeniorities?: string[];
 }
 
 export interface SearchCriteria {
   industry: string;
   country: string;
+  /** LLM-extracted location fields retained for display and auditing. */
+  city?: string;
+  state?: string;
   companySizeMin: number;
   companySizeMax: number;
   jobTitles: string[];
@@ -21,6 +28,10 @@ export interface SearchCriteria {
   requireEmail?: boolean;
   excludedTitles?: string[];
   excludedIndustries?: string[];
+  /** Company search: only people at apollo.organizationDomains, any title, anywhere. */
+  companyOnly?: boolean;
+  /** Read from a long client brief: company tags, many titles and seniorities. */
+  briefSearch?: boolean;
   assumptionsUsedFromContext?: string[];
   explicitOverridesFromPrompt?: string[];
   /** AI-generated filters sent directly to Apollo API */
@@ -51,6 +62,12 @@ export interface ApolloPerson {
   city?: string;
   state?: string;
   country?: string;
+  /** GitHub profile URL when Apollo includes it. */
+  github_url?: string | null;
+  /** Employment history from the enriched Apollo profile. */
+  employment_history?: import("@/lib/lead-profile").ApolloEmploymentEntry[];
+  seniority?: string | null;
+  departments?: string[];
   organization?: {
     name: string;
     industry: string;
@@ -58,6 +75,8 @@ export interface ApolloPerson {
     city: string;
     state: string;
     country: string;
+    /** Employer website, only after enrichment (the free search leaves it out). */
+    website?: string | null;
   };
 }
 
@@ -73,12 +92,17 @@ export interface ScoredLead {
   /** Provider email confidence: "verified" | "guessed" | null when unknown. */
   emailStatus?: string | null;
   linkedinUrl: string | null;
+  companyWebsite?: string | null;
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";
   recommendedApproach?: string | null;
   openToWork?: boolean;
   hasEmail?: boolean;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  openToWorkLevel?: string | null;
+  openToWorkReasons?: string[];
   searchPrompt?: string;
   searchTitle?: string;
   history?: LeadHistoryEntry[];
@@ -144,6 +168,9 @@ export interface LeadScoreResult {
   score: number;
   reasoning: string;
   priority: "High" | "Medium" | "Low";
+  /** What raised the score / what held it back, in short plain words. */
+  pros?: string[];
+  cons?: string[];
 }
 
 export interface LeadScoreContext {
@@ -155,4 +182,7 @@ export interface LeadScoreContext {
   leadContext?: import("@/lib/validations/onboarding-context").UserLeadContextDTO | null;
   excludedTitles?: string[];
   excludedIndustries?: string[];
+  targetSkills?: string[];
+  /** Score the leads relative to each other (all from the same search). */
+  compareAcrossLeads?: boolean;
 }

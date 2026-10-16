@@ -25,13 +25,13 @@ async function main() {
 
   if (!prompt) {
     console.error('Usage: npx tsx scripts/smoke-search.ts "<prompt>" [leadCount] [--dry]');
-    console.error("  --dry  parse and show filters only — spends no contact credits");
+    console.error("  --dry  parse and show filters only, spends no contact credits");
     process.exit(1);
   }
 
   const user = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
   if (!user) {
-    console.error("No user in the database — sign in through the app once first.");
+    console.error("No user in the database, sign in through the app once first.");
     process.exit(1);
   }
 
@@ -48,13 +48,13 @@ async function main() {
   console.log("   credits remaining:", preview.leadsRemaining);
 
   if (preview.clarification.needsClarification) {
-    console.log("\nPrompt needs answers first — re-run with a more specific prompt.");
+    console.log("\nPrompt needs answers first, re-run with a more specific prompt.");
     await prisma.$disconnect();
     return;
   }
 
   if (dryRun) {
-    console.log("\n2. FILTERS (dry run — no credits spent)");
+    console.log("\n2. FILTERS (dry run, no credits spent)");
     console.log(JSON.stringify(preview.criteria.apollo, null, 2));
     console.log("   industry:", preview.criteria.industry);
     await prisma.$disconnect();
@@ -89,7 +89,7 @@ async function main() {
   const uniqueWhy = new Set(leads.map((l) => (l.reasoning || "").slice(0, 80))).size;
 
   console.log(`   saved leads: ${leads.length} (verified emails: ${verified})`);
-  console.log(`   distinct Why openings: ${uniqueWhy} of ${leads.length} — 1 means the AI Why did not run`);
+  console.log(`   distinct Why openings: ${uniqueWhy} of ${leads.length}, 1 means the AI Why did not run`);
   console.log(`   distinct locations: ${new Set(leads.map((l) => l.location)).size}`);
 
   await prisma.$disconnect();

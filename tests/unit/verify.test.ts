@@ -51,7 +51,7 @@ describe("toFilters", () => {
     expect(toFilters({ ...brief, location: null }).personLocations).toEqual([]);
   });
 
-  it("is deterministic — batch 5 queries like batch 1", () => {
+  it("is deterministic, batch 5 queries like batch 1", () => {
     expect(toFilters(brief)).toEqual(toFilters(brief));
   });
 });
@@ -148,12 +148,12 @@ describe("job-seeking signals only", () => {
   const seeking: Brief = { ...brief, jobSeekingOnly: true };
 
   it("keeps people who say it themselves", () => {
-    // Self-written statements are the only honest evidence — there is no
+    // Self-written statements are the only honest evidence, there is no
     // job-seeking field in the data.
     for (const headline of [
       "#OpenToWork | HR Manager",
       "Actively looking for new HR roles",
-      "Available for hire — people ops",
+      "Available for hire, people ops",
       "Between jobs, ex-Shopify",
     ]) {
       expect(check(candidate({ headline }), seeking).keep).toBe(true);

@@ -18,9 +18,9 @@ const PLANS: Array<{
   {
     name: "Free Trial",
     price: "$0",
-    desc: "Create your account, then choose a plan to unlock the workspace",
-    features: ["Account + workspace setup", "Secure Clerk auth", "Upgrade anytime", "Stripe-managed billing"],
-    cta: "Create account",
+    desc: "Try VARSA free, then choose a plan when you need more",
+    features: ["25 free leads, one time", "3 searches", "AI lead scoring", "CSV export"],
+    cta: "Start free",
     href: "/register",
     highlight: false,
   },
@@ -51,7 +51,7 @@ const PLANS: Array<{
   {
     name: "Agency",
     price: "$399",
-    desc: "For agencies and multi-client workflows",
+    desc: "For agencies that work for many clients",
     features: [
       "10,000 leads/month",
       "Team workspace",
@@ -71,7 +71,7 @@ export function PricingPreview() {
       <SectionHeader
         badge="Pricing"
         title="Simple plans. Serious pipeline."
-        subtitle="Authenticate with Clerk, subscribe through Stripe, then run lead searches from one intelligent prompt."
+        subtitle="Start free with 25 leads. Upgrade when you're ready to search at scale."
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
         {PLANS.map((plan, i) => (
@@ -92,7 +92,7 @@ export function PricingPreview() {
               <p className="mt-1 text-xs text-lp-muted">{plan.desc}</p>
               <p className="mt-4 text-4xl font-bold text-lp-white">
                 {plan.price}
-                <span className="text-sm font-normal text-lp-muted">/mo</span>
+                {plan.price !== "$0" && <span className="text-sm font-normal text-lp-muted">/mo</span>}
               </p>
               <ul className="mt-6 flex-1 space-y-2.5">
                 {plan.features.map((f) => (

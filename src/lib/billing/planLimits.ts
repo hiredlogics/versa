@@ -1,4 +1,4 @@
-/** Central plan limits — keep in sync with prisma/seed.ts Plan rows */
+/** Central plan limits: keep in sync with prisma/seed.ts Plan rows */
 export const PLAN_LIMITS = {
   freeTrial: {
     slug: "free-trial",
@@ -28,6 +28,17 @@ export const PLAN_LIMITS = {
     monthlySearches: 1000,
     features: ["Team workspace", "Admin analytics", "Priority support"],
   },
+} as const;
+
+/**
+ * The free trial is a one-time allowance (25 leads, 3 searches in total), not a
+ * monthly one. All trial usage is recorded in this single fixed period so it
+ * never resets.
+ */
+export const FREE_TRIAL_PERIOD = {
+  start: new Date(Date.UTC(1970, 0, 1)),
+  end: new Date(Date.UTC(9999, 11, 31, 23, 59, 59, 999)),
+  periodKey: "free-trial",
 } as const;
 
 export type PlanLimitKey = keyof typeof PLAN_LIMITS;

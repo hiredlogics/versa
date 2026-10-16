@@ -8,6 +8,7 @@ import { Logo } from "@/components/brand/Logo";
 import { useAppShellData } from "@/components/app/AppShellDataProvider";
 import { cn } from "@/lib/utils/cn";
 import { BRAND } from "@/config/brand";
+import { ThemeToggle } from "@/components/marketing/ThemeToggle";
 
 const nav = [
   { href: "/app", label: "Lead Finder", icon: Search, exact: true },
@@ -62,7 +63,7 @@ export function AppSidebar({
   const sidebar = (
     <aside className="flex h-full w-60 flex-col border-r border-lp-border bg-lp-graphite">
       <div className="border-b border-lp-border p-4">
-        <Logo size="lg" animated variant="nav" href="/app" showText className="origin-left" />
+        <Logo size="lg" animated variant="nav" href="/" showText className="origin-left" />
         <p className="mt-2 text-[11px] text-lp-muted-dark">{BRAND.tagline}</p>
       </div>
       <NavLinks onNavigate={onMobileClose} />
@@ -79,6 +80,7 @@ export function AppSidebar({
             <p className="truncate text-xs font-medium text-lp-off-white">Account</p>
             <p className="truncate text-[11px] text-lp-muted-dark">Manage profile</p>
           </div>
+          <ThemeToggle />
         </div>
       </div>
     </aside>

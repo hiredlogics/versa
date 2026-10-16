@@ -262,8 +262,7 @@ describe("concurrency", () => {
 describe("the lock itself", () => {
   // The race tests would still pass if reserve stopped locking but the
   // scheduler happened to serialise them. This asserts the lock actually
-  // blocks, so a refactor to a predicate-based lock fails here first —
-  // a predicate on periodStart matches zero rows and locks nothing.
+  // blocks, so a refactor to a predicate-based lock fails here first,   // a predicate on periodStart matches zero rows and locks nothing.
   it("blocks a second transaction until the first commits", async () => {
     await reserve({ userId, searchId, amount: 1, idempotencyKey: key(1) });
 

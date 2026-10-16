@@ -40,7 +40,7 @@ export function BusinessContextStep({
           className="app-input resize-none"
           value={data.businessDescription}
           onChange={(e) => onChange({ businessDescription: e.target.value })}
-          placeholder="We sell AI automation and custom software for mid-market SaaS companies..."
+          placeholder="We sell AI automation and custom software for midsize SaaS companies..."
         />
       </label>
       <label className="block space-y-1.5">
@@ -58,7 +58,7 @@ export function BusinessContextStep({
           className="app-input"
           value={data.mainOffer}
           onChange={(e) => onChange({ mainOffer: e.target.value })}
-          placeholder="Done-for-you workflow automation"
+          placeholder="Workflow automation done for you"
         />
       </label>
     </div>

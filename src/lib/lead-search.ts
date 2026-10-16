@@ -49,7 +49,7 @@ function filterLeads(
 ): ScoredLead[] {
   let filtered = allScored.filter((lead) => lead.score >= minScore);
 
-  // Open-to-work: Apollo has no OTW filter — ensure we return useful volume
+  // Open-to-work: Apollo has no OTW filter, ensure we return useful volume
   if (criteria.openToWork) {
     if (filtered.length < 10) {
       filtered = allScored.filter((l) => l.score >= 5);
@@ -67,7 +67,7 @@ function filterLeads(
     filtered = filtered.slice(0, maxResults);
   }
 
-  // Optionally drop leads without email (off by default — keeps all Apollo results)
+  // Optionally drop leads without email (off by default, keeps all Apollo results)
   if (requireEmailFilter && criteria.requireEmail && !criteria.openToWork) {
     const withEmail = filtered.filter((l) => l.email || l.hasEmail);
     if (withEmail.length >= 3) filtered = withEmail;
@@ -123,7 +123,7 @@ export async function runLeadSearch(
   });
 
   const allScored = buildScoredLeads(formattedLeads, scores, criteria, prompt).map((lead) => {
-    // Boost: Apollo marks has_email — ensure email holders aren't filtered out
+    // Boost: Apollo marks has_email, ensure email holders aren't filtered out
     if (criteria.openToWork && lead.hasEmail && lead.score < 6) {
       return { ...lead, score: 6, reasoning: `${lead.reasoning} (boosted: email available)` };
     }
@@ -143,7 +143,7 @@ export async function runLeadSearch(
   }
   if (requireEmailFilter && criteria.requireEmail) {
     const emailOnly = scoredLeads.filter((l) => l.email || l.hasEmail).length;
-    console.log(`[lead-search] email filter on — ${emailOnly}/${scoredLeads.length} have email`);
+    console.log(`[lead-search] email filter on, ${emailOnly}/${scoredLeads.length} have email`);
   }
 
   console.log(
@@ -196,7 +196,7 @@ export async function runLeadSearch(
   const message =
     scoredLeads.length > 0
       ? criteria.openToWork
-        ? `Searched ${people.length} of ${totalAvailable.toLocaleString()} Apollo results → ${scoredLeads.length} ${focusLabel} (${emailCount} with email). Note: Apollo can't filter "open to work" — these are matching professionals ranked by outreach potential.\n\nAsk me to draft outreach emails or LinkedIn messages.`
+        ? `Searched ${people.length} of ${totalAvailable.toLocaleString()} Apollo results → ${scoredLeads.length} ${focusLabel} (${emailCount} with email). Note: Apollo can't filter "open to work", these are matching professionals ranked by outreach potential.\n\nAsk me to draft outreach emails or LinkedIn messages.`
         : `Searched ${people.length} of ${totalAvailable.toLocaleString()} Apollo results → ${scoredLeads.length} qualified ${focusLabel} (${emailCount} with email).${apolloRelaxNote ? `\n\n${apolloRelaxNote}` : ""}\n\n**Apollo filters used:** ${criteria.apollo?.personTitles?.slice(0, 3).join(", ")}${criteria.apollo?.qKeywords ? ` · keywords: "${criteria.apollo.qKeywords}"` : ""}${criteria.apollo?.personLocations?.length ? ` · ${criteria.apollo.personLocations.join(", ")}` : ""}\n\nAsk me to draft outreach emails or LinkedIn messages.`
       : `Searched ${people.length} professionals but none matched. Try a more specific role or broader location.`;
 

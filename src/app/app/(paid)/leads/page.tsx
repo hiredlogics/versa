@@ -34,7 +34,12 @@ export default function AllLeadsPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">All saved leads</h1>
-        <a href="/api/export/csv" className="text-sm text-electric hover:underline">Export all CSV</a>
+        <div className="flex items-center gap-4">
+          <a href="/api/export/csv" className="text-sm text-electric hover:underline">CSV</a>
+          <a href="/api/export/csv?format=ats" className="text-sm text-electric hover:underline">
+            CSV for ATS import
+          </a>
+        </div>
       </div>
       <LeadDataTable leads={leads as never[]} />
     </div>

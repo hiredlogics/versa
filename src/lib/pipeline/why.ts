@@ -2,7 +2,7 @@ import { aiChat } from "@/lib/services/ai/aiRouter";
 import type { Brief, VerifiedLead } from "./types";
 
 /**
- * The why column is the product. Every lead gets one — a thin reason beats a
+ * The why column is the product. Every lead gets one, a thin reason beats a
  * blank cell, which reads as broken.
  */
 
@@ -94,7 +94,7 @@ function usableWhy(value: unknown): value is string {
   return text.length >= MIN_WHY_LENGTH && !GENERIC_WHY.test(text);
 }
 
-/** Hand-rolled pool — no dependency for something this small. */
+/** Hand-rolled pool: no dependency for something this small. */
 async function runPool<T, R>(
   items: T[],
   limit: number,
@@ -179,7 +179,7 @@ export async function writeWhy(
 
   return leads.map((lead) => {
     const aiWhy = written.get(lead.candidate.providerId);
-    // whySource records what happened, not what was attempted — it is how we
+    // whySource records what happened, not what was attempted, it is how we
     // measure AI failure rate in production later.
     return aiWhy
       ? { ...lead, why: aiWhy, whySource: "AI" as const }

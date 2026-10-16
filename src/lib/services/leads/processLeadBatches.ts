@@ -25,7 +25,10 @@ import {
 import { isVerifiedEmail } from "@/lib/email-confidence";
 import { logLeadFetch, logStageTiming, startStageTimer } from "@/lib/services/leads/fetchLog";
 import { filterExcludedLeads } from "@/lib/context/exclusions";
+import { normalizeLinkedInUrl } from "@/lib/lead-pool";
+import { recordApolloPeopleInPool } from "@/lib/services/leads/leadPool";
 import { extractProfileSummary, toStoredApolloProfile } from "@/lib/lead-profile";
+import { scoreOpenToWorkForLeads } from "@/lib/services/leads/openToWorkSignals";
 import {
   filterPeopleForOpenToWork,
   OPEN_TO_WORK_APOLLO_DISCLAIMER,
@@ -92,6 +95,7 @@ function applyEnrichmentToLeads(
     emailStatus?: string | null;
     linkedinUrl: string | null;
     hasEmail: boolean;
+    companyWebsite?: string | null;
   }>,
   enriched: EnrichedApolloResult[]
 ): {
@@ -113,6 +117,7 @@ function applyEnrichmentToLeads(
     lead.employees = full.employees || lead.employees;
     lead.location = full.location !== "N/A" ? full.location : lead.location;
     lead.linkedinUrl = full.linkedinUrl || lead.linkedinUrl;
+    lead.companyWebsite = full.companyWebsite ?? lead.companyWebsite ?? null;
     if (isUsableEmail(full.email)) {
       lead.email = full.email;
       lead.hasEmail = true;
@@ -215,7 +220,7 @@ export async function runSequentialLeadBatches(input: {
           batchIndex,
           batchSize,
           phase: openToWorkMode
-            ? "Fetching matches to scan for open-to-work title/headline signals…"
+            ? "Fetching matches to scan for open to work signals in titles and headlines…"
             : "Fetching matches…",
         }),
       },
@@ -258,6 +263,7 @@ export async function runSequentialLeadBatches(input: {
       stopped = true;
       stopReason = "stopped_by_user";
     }
+    await recordApolloPeopleInPool(fetched.people, "apollo_search");
 
     logStageTiming({
       stage: "fetch",
@@ -287,7 +293,7 @@ export async function runSequentialLeadBatches(input: {
       otwSignalHits += otw.signalCount;
       people = otw.people;
       openToWorkNote = otw.note;
-      if (!apolloRelaxNote?.includes("open to work") && !apolloRelaxNote?.includes("Open-to-work")) {
+      if (!apolloRelaxNote?.includes("open to work") && !apolloRelaxNote?.includes("Open to work")) {
         apolloRelaxNote = OPEN_TO_WORK_APOLLO_DISCLAIMER;
       }
       logLeadFetch("open_to_work_pre_unlock", {
@@ -326,8 +332,8 @@ export async function runSequentialLeadBatches(input: {
               batchSize,
               phase:
                 otwSignalHits > 0
-                  ? openToWorkNote || "Checking more pages for open-to-work signals…"
-                  : `Scanned ${otwScanned.toLocaleString()} profiles — ${otwSignalHits} with open-to-work wording so far. Checking more pages…`,
+                  ? openToWorkNote || "Checking more pages for open to work signals…"
+                  : `Scanned ${otwScanned.toLocaleString()} profiles, ${otwSignalHits} with open to work wording so far. Checking more pages…`,
             }),
           },
         });
@@ -348,6 +354,9 @@ export async function runSequentialLeadBatches(input: {
       const full = formatApolloPerson(p);
       return {
         ...full,
+        headline: p.headline ?? null,
+        employmentHistory: p.employment_history ?? null,
+        rawApolloData: p,
         hasEmail: Boolean(isUsableEmail(full.email) || p.has_email),
       };
     });
@@ -397,9 +406,14 @@ export async function runSequentialLeadBatches(input: {
         emailStatus: lead.emailStatus ?? null,
         linkedinUrl: lead.linkedinUrl,
         hasEmail: lead.hasEmail,
+        companyWebsite: lead.companyWebsite ?? null,
         leadScore: scored.scores[i].leadScore,
         priorityLevel: toDbPriority(scored.scores[i].priorityLevel),
         reasoning: scored.scores[i].reasoning,
+        matchedSkills: scored.scores[i].matchedSkills ?? [],
+        missingSkills: scored.scores[i].missingSkills ?? [],
+        scorePros: scored.scores[i].pros ?? [],
+        scoreCons: scored.scores[i].cons ?? [],
         recommendedApproach: "",
       }))
     );
@@ -488,8 +502,19 @@ export async function runSequentialLeadBatches(input: {
       }
     }
 
+    // Only people Apollo actually matched were checked; the rest are padding.
+    await recordApolloPeopleInPool(
+      enriched.filter((r) => r.raw).map((r) => r.person),
+      "apollo_enrich",
+      { emailChecked: true }
+    );
     const { storedById, summaryById } = applyEnrichmentToLeads(workList, enriched);
 
+    // Skip anyone this search already delivered, e.g. from the lead pool.
+    workList = workList.filter((lead) => {
+      const key = normalizeLinkedInUrl(lead.linkedinUrl);
+      return !key || !input.seenIds.has(key);
+    });
     const withAnyEmail = filterLeadsWithUsableEmail(workList);
     const keep = verifiedOnly
       ? withAnyEmail.filter((lead) => isVerifiedEmail(lead.email, lead.emailStatus))
@@ -518,6 +543,9 @@ export async function runSequentialLeadBatches(input: {
       searchId: input.searchId,
     });
 
+    const whySourceByApolloId = new Map(
+      workList.map((lead, i) => [lead.apolloPersonId, whyResults[i]?.source ?? "TEMPLATE"])
+    );
     workList = workList.map((lead, i) => {
       const baseWhy =
         whyResults[i]?.reasoning ||
@@ -527,13 +555,21 @@ export async function runSequentialLeadBatches(input: {
         email: lead.email!.trim(),
         hasEmail: true,
         reasoning: openToWorkMode
-          ? `Open-to-work signal in title/headline. ${baseWhy}`
+          ? `Open to work signal in title or headline. ${baseWhy}`
           : baseWhy,
         recommendedApproach: "",
       };
     });
 
-    const leadRows = workList.map((lead) => ({
+    const otwScores = await scoreOpenToWorkForLeads(
+      workList.map((lead) => ({
+        title: lead.title,
+        company: lead.company,
+        profile: storedById.get(lead.apolloPersonId),
+      }))
+    );
+
+    const leadRows = workList.map((lead, i) => ({
       userId: input.userId,
       searchId: input.searchId,
       apolloPersonId: lead.apolloPersonId,
@@ -546,9 +582,17 @@ export async function runSequentialLeadBatches(input: {
       email: lead.email,
       emailStatus: lead.emailStatus ?? null,
       linkedinUrl: lead.linkedinUrl,
+      companyWebsite: lead.companyWebsite ?? null,
       leadScore: lead.leadScore,
       priorityLevel: lead.priorityLevel,
       reasoning: lead.reasoning,
+      matchedSkills: lead.matchedSkills ?? [],
+      missingSkills: lead.missingSkills ?? [],
+      scorePros: lead.scorePros ?? [],
+      scoreCons: lead.scoreCons ?? [],
+      openToWorkLevel: otwScores[i].level,
+      openToWorkReasons: otwScores[i].reasons,
+      whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",
       recommendedApproach: "",
       hasEmail: true,
       rawApolloData: (storedById.get(lead.apolloPersonId) as object | undefined) ?? undefined,
@@ -559,6 +603,10 @@ export async function runSequentialLeadBatches(input: {
       const chunk = leadRows.slice(i, i + 500);
       const result = await prisma.lead.createMany({ data: chunk });
       batchSaved += result.count;
+    }
+    for (const lead of workList) {
+      const key = normalizeLinkedInUrl(lead.linkedinUrl);
+      if (key) input.seenIds.add(key);
     }
 
     leadsFetched += people.length;
@@ -603,9 +651,9 @@ export async function runSequentialLeadBatches(input: {
           batchIndex,
           batchSize,
           phase: creditsExhausted
-            ? "Provider credits exhausted — saved this batch and paused."
+            ? "Paused: we can't look up more people right now. This batch is saved."
             : hitSaveCap || !underAutoCap || unlockAttempts >= unlockBudget
-              ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email — click Get next 100 to check more people.`
+              ? `${skippedUnverified.toLocaleString()} of ${unlockAttempts.toLocaleString()} checked had no verified email. Click Get next 100 to check more people.`
               : morePages
                 ? "Checking more people for verified emails…"
                 : "All available pages processed.",
@@ -630,7 +678,7 @@ export async function runSequentialLeadBatches(input: {
       break;
     }
     // Verified emails are a minority, so a run keeps checking more people until
-    // it fills the batch or spends its unlock budget — whichever comes first.
+    // it fills the batch or spends its unlock budget, whichever comes first.
     if (unlockAttempts >= unlockBudget) {
       stopReason = "unlock_budget";
       break;
@@ -652,7 +700,7 @@ export async function runSequentialLeadBatches(input: {
   }
 
   if (openToWorkMode && savedThisRun === 0 && otwScanned > 0) {
-    apolloRelaxNote = `${OPEN_TO_WORK_NONE_FOUND} Scanned ${otwScanned.toLocaleString()} profiles; ${otwSignalHits} had open-to-work wording.`;
+    apolloRelaxNote = `${OPEN_TO_WORK_NONE_FOUND} Scanned ${otwScanned.toLocaleString()} profiles; ${otwSignalHits} had open to work wording.`;
   } else if (openToWorkMode && savedThisRun > 0) {
     apolloRelaxNote = `${OPEN_TO_WORK_APOLLO_DISCLAIMER} Saved ${savedThisRun} after scanning ${otwScanned.toLocaleString()} profiles (${otwSignalHits} with signals).`;
   }

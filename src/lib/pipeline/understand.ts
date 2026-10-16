@@ -31,13 +31,13 @@ The search can filter on: job titles, ONE person location, industry, company hea
 It CANNOT filter on gender, age, ethnicity, visa status, shift or hours availability, salary, or "open to work" status.
 
 Rules:
-- location: ONE place only — country OR state OR city, never two. Never widen a city to its country.
-- industry: the domain phrase kept whole — "real estate", not "real".
+- location: ONE place only, country OR state OR city, never two. Never widen a city to its country.
+- industry: the domain phrase kept whole, "real estate", not "real".
 - titles: 2-5 real job titles, matched to the stated industry. Real estate gets Broker or Property Manager, not CTO.
 - employeeRanges: only "1,10" "11,50" "51,200" "201,500" "501,1000" "1001,5000". Never invent "20,43", never use hyphens.
-- signals: needs and timing cues such as "automation" or "hiring now". These are for ranking and the why column ONLY — never put them in titles or industry, it wrecks recall.
+- signals: needs and timing cues such as "automation" or "hiring now". These are for ranking and the why column ONLY, never put them in titles or industry, it wrecks recall.
 - requestedTotal: a NUMBER, not a string. Use 0 when the prompt does not say how many.
-- Questions must quote what the user actually said: "You mentioned recruiters — which country?", not "What is your target location?". Give 2-4 concrete tappable options, never "Other". Quantity always offers ["100","250","500","1000"].
+- Questions must quote what the user actually said: "You mentioned recruiters, which country?", not "What is your target location?". Give 2-4 concrete tappable options, never "Other". Quantity always offers ["100","250","500","1000"].
 
 Return JSON only:
 {
@@ -66,7 +66,7 @@ const questionSchema = z.object({
 });
 
 // Strict types on purpose: a model returning "500" must not silently coerce to
-// a number, and must not coerce to 0 either — both hide the real problem.
+// a number, and must not coerce to 0 either, both hide the real problem.
 const responseSchema = z.object({
   brief: z.object({
     intent: z.string().optional().nullable(),
@@ -256,7 +256,7 @@ export async function understand(
       return {
         status: "ready",
         brief: { ...brief, requestedTotal: DEFAULT_TOTAL } as Brief,
-        note: `I'll start with ${DEFAULT_TOTAL} leads — ask for more once you've seen them.`,
+        note: `I'll start with ${DEFAULT_TOTAL} leads. Ask for more once you've seen them.`,
       };
     }
     return {

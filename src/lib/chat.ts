@@ -137,7 +137,7 @@ export async function generateFollowUpResponse(
     .slice(0, 10)
     .map(
       (l, i) =>
-        `${i + 1}. ${l.name} — ${l.title} at ${l.company} (${l.industry}, ${l.employees} employees, score ${l.score}/10)${l.email ? `, email: ${l.email}` : ""}${l.linkedinUrl ? `, LinkedIn: ${l.linkedinUrl}` : ""}\n   Why qualified: ${l.reasoning}`
+        `${i + 1}. ${l.name}, ${l.title} at ${l.company} (${l.industry}, ${l.employees} employees, score ${l.score}/10)${l.email ? `, email: ${l.email}` : ""}${l.linkedinUrl ? `, LinkedIn: ${l.linkedinUrl}` : ""}\n   Why qualified: ${l.reasoning}`
     )
     .join("\n\n");
 
@@ -166,7 +166,7 @@ Format emails/messages clearly with subject lines when relevant.`,
       ...history,
       {
         role: "user",
-        content: `Available leads in this conversation:\n\n${leadsSummary || "No leads yet — tell the user to run a search first."}\n\nUser request: ${message}`,
+        content: `Available leads in this conversation:\n\n${leadsSummary || "No leads yet, tell the user to run a search first."}\n\nUser request: ${message}`,
       },
     ],
     temperature: 0.7,

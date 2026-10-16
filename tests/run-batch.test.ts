@@ -256,7 +256,7 @@ describe("the three no-reserve states", () => {
 describe("the stale escape hatch racing a slow batch", () => {
   // /next allows a call when a RUNNING search looks stale. If the original
   // batch was merely slow rather than dead, two runBatch calls execute at the
-  // same batchNo — this is where the escape hatch and the idempotency
+  // same batchNo: this is where the escape hatch and the idempotency
   // guarantee have to hold together.
   const RUNS = 3;
 

@@ -33,9 +33,11 @@ export function Badge({
 export function ScoreBadge({ score }: { score: number }) {
   const color =
     score >= 9 ? "high" : score >= 8 ? "blue" : ("default" as keyof typeof colors);
+  // Same bands as toPriority() in services/ai/scoreLead.ts.
+  const level = score >= 9 ? "Very high" : score >= 8 ? "High" : score >= 6 ? "Medium" : "Low";
   return (
     <Badge color={color} className="border border-lp-border bg-lp-panel text-lp-ice-blue">
-      {score}/10
+      {level} · {score}/10
     </Badge>
   );
 }

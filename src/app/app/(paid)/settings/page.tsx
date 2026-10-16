@@ -32,7 +32,7 @@ export default function SettingsPage() {
           id="lead-context"
           icon={Target}
           title="Lead context & ICP"
-          description="Your business profile powers vague prompts, scoring, and exclusions. Update anytime — changes apply to the next search."
+          description="Your business profile powers vague prompts, scoring, and exclusions. Update it anytime. Changes apply to the next search."
         >
           <LeadContextForm embedded />
         </SettingsSectionCard>
@@ -40,7 +40,7 @@ export default function SettingsPage() {
         <SettingsSectionCard
           icon={UserCircle}
           title="Account"
-          description="Manage your sign-in, profile, and security preferences."
+          description="Manage your login, profile, and security preferences."
         >
           <div className="overflow-hidden rounded-xl border border-lp-border bg-lp-black/40">
             <UserProfile routing="hash" />

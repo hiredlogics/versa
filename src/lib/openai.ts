@@ -60,13 +60,13 @@ async function chatWithRetry(
     try {
       return await client.chat.completions.create(params);
     } catch (error) {
-      // Daily token limit — don't retry (wait would be 14+ minutes)
+      // Daily token limit: don't retry (wait would be 14+ minutes)
       if (isDailyLimitError(error)) {
         throw error;
       }
       if (isRateLimitError(error) && attempt < retries - 1) {
         const waitMs = Math.min(parseRetryDelayMs(error) * (attempt + 1), 8000);
-        console.log(`[ai] Rate limited — retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
+        console.log(`[ai] Rate limited, retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
         await sleep(waitMs);
         continue;
       }
@@ -81,11 +81,11 @@ import { normalizeSearchCriteria } from "./search-criteria";
 
 const PARSE_PROMPT_SYSTEM = `You convert natural language lead-search requests into Apollo.io API search filters.
 
-READ the user's message carefully. Extract THEIR specific intent — titles, locations, industries, interests, company size. Do NOT apply generic templates.
+READ the user's message carefully. Extract THEIR specific intent, titles, locations, industries, interests, company size. Do NOT apply generic templates.
 
 Apollo.io accepts these filters (derive from the user prompt):
 - personTitles: job titles (1-5)
-- personLocations: ONE best location — prefer state/city over country (use "California" NOT both "California" and "United States")
+- personLocations: ONE best location, prefer state/city over country (use "California" NOT both "California" and "United States")
 - qKeywords: 1-2 INDUSTRY or COMPANY-TYPE words ONLY (e.g. "e-commerce", "healthcare", "SaaS"). Put interest topics like "AI chatbots" in searchIntent, NOT qKeywords
 - employeeRanges: Apollo buckets like ["11,50","51,200"] from company size
 - includeSimilarTitles: true
@@ -165,7 +165,7 @@ function buildScorePrompt(context?: LeadScoreContext): string {
   if (context?.openToWork) {
     return `You are a recruiting expert helping find professionals to contact about job opportunities.
 
-IMPORTANT: Apollo does NOT have "open to work" status. Most leads are currently employed — that is EXPECTED and OK.
+IMPORTANT: Apollo does NOT have "open to work" status. Most leads are currently employed, that is EXPECTED and OK.
 
 Score EACH lead 1-10 based on:
 1. Role/title match (Software Engineer, Developer, PM, Designer, Consultant = good fit)
@@ -273,7 +273,7 @@ export async function scoreLeadsBatch(
     parseInt(process.env.AI_MAX_SCORE_COUNT || "0", 10)
   );
 
-  // Fast rule-based scoring — no API tokens (default for Groq free tier)
+  // Fast rule-based scoring: no API tokens (default for Groq free tier)
   const results = heuristicScoreLeadsBatch(leads, context);
   onProgress?.(leads.length, leads.length);
 
@@ -308,9 +308,9 @@ export async function scoreLeadsBatch(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (isDailyLimitError(error)) {
-      console.warn("[ai] Daily token limit reached — using heuristic scores only");
+      console.warn("[ai] Daily token limit reached, using heuristic scores only");
     } else {
-      console.warn(`[ai] AI scoring failed — using heuristic scores: ${message}`);
+      console.warn(`[ai] AI scoring failed, using heuristic scores: ${message}`);
     }
   }
 

@@ -8,7 +8,7 @@ import type {
 import { hasOpenToWorkTitleSignal } from "@/lib/open-to-work";
 
 /**
- * Filters and verification. No AI, no network, no database — given the same
+ * Filters and verification. No AI, no network, no database, given the same
  * brief this must produce the same query on batch 5 as on batch 1.
  */
 
@@ -168,7 +168,7 @@ export function check(candidate: Candidate, brief: Brief): CheckResult {
 
   let fit = titleScore;
 
-  // Missing location also passes — the provider already filtered by location
+  // Missing location also passes, the provider already filtered by location
   // server-side, so its patchy per-person copy is a bonus, not a gate.
   if (brief.location && candidate.location) {
     if (candidate.location.toLowerCase().includes(brief.location.trim().toLowerCase())) {
@@ -203,7 +203,7 @@ export function check(candidate: Candidate, brief: Brief): CheckResult {
 /**
  * Phrases people write about themselves when they are looking. There is no
  * job-seeking field in the data, so a self-written statement is the only honest
- * evidence — inferring it from seniority or tenure produces confident nonsense.
+ * evidence: inferring it from seniority or tenure produces confident nonsense.
  */
 export function statesJobSeeking(candidate: Pick<Candidate, "title" | "headline">): boolean {
   return hasOpenToWorkTitleSignal(candidate);

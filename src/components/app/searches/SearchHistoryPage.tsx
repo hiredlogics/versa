@@ -42,6 +42,7 @@ export function SearchHistoryPage() {
   const [searches, setSearches] = useState<SearchHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<SearchStatusFilter>("all");
   const [dateFilter, setDateFilter] = useState<SearchDateFilter>("all");
@@ -51,10 +52,12 @@ export function SearchHistoryPage() {
   const loadSearches = useCallback(async () => {
     setLoading(true);
     setError(false);
+    setSignedOut(false);
     try {
       const res = await fetch("/api/searches", { cache: "no-store" });
       if (res.status === 401) {
         setSearches([]);
+        setSignedOut(true);
         return;
       }
       if (!res.ok) throw new Error("Failed");
@@ -144,7 +147,8 @@ export function SearchHistoryPage() {
 
       {error && !loading && <SearchHistoryError onRetry={loadSearches} />}
 
-      {!loading && !error && searches.length === 0 && <SearchHistoryEmpty />}
+      {!loading && !error && signedOut && <div className="app-panel rounded-3xl p-10 text-center"><p className="text-sm text-lp-muted">Sign in to see your searches</p><Link href="/login" className="mt-4 inline-flex rounded-xl bg-lp-white px-4 py-2 text-sm font-medium text-lp-black">Sign in</Link></div>}
+      {!loading && !error && !signedOut && searches.length === 0 && <SearchHistoryEmpty />}
 
       {!loading && !error && searches.length > 0 && (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">

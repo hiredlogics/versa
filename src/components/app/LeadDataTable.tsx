@@ -6,20 +6,12 @@ import {
   flexRender,
   createColumnHelper,
 } from "@tanstack/react-table";
-import { ScoreBadge } from "@/components/ui/Badge";
+import { ScoreWhy } from "@/components/app/ScoreWhy";
+import type { LeadDTO } from "@/lib/pipeline/dto";
 import { Mail, ExternalLink, Download } from "lucide-react";
 
-type LeadRow = {
-  id: string;
-  name: string;
-  title: string;
-  company: string;
-  email: string | null;
-  linkedinUrl: string | null;
-  leadScore: number;
-  reasoning: string | null;
-  hasEmail: boolean;
-};
+/** One row from GET /api/leads (score is `score`, reason is `why`). */
+type LeadRow = LeadDTO;
 
 const columnHelper = createColumnHelper<LeadRow>();
 
@@ -29,11 +21,18 @@ const columns = [
   columnHelper.accessor("company", { header: "Company" }),
   columnHelper.accessor("email", {
     header: "Email",
-    cell: (info) => info.getValue() || <span className="text-muted">—</span>,
+    cell: (info) => info.getValue() || <span className="text-muted">None</span>,
   }),
-  columnHelper.accessor("leadScore", {
+  columnHelper.accessor("score", {
     header: "Score",
-    cell: (info) => <ScoreBadge score={info.getValue()} />,
+    cell: ({ row }) => (
+      <ScoreWhy
+        score={row.original.score}
+        pros={row.original.pros}
+        cons={row.original.cons}
+        reasoning={row.original.why}
+      />
+    ),
   }),
   columnHelper.display({
     id: "links",
@@ -62,12 +61,20 @@ export function LeadDataTable({ leads, searchId }: { leads: LeadRow[]; searchId?
       <div className="flex items-center justify-between px-4 py-2 border-b border-glass-border bg-charcoal-light">
         <span className="text-sm text-muted">{leads.length} leads</span>
         {searchId && (
-          <a
-            href={`/api/export/csv?searchId=${searchId}`}
-            className="text-xs text-electric flex items-center gap-1 hover:underline"
-          >
-            <Download className="w-3 h-3" /> CSV
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href={`/api/export/csv?searchId=${searchId}`}
+              className="text-xs text-electric flex items-center gap-1 hover:underline"
+            >
+              <Download className="w-3 h-3" /> CSV
+            </a>
+            <a
+              href={`/api/export/csv?searchId=${searchId}&format=ats`}
+              className="text-xs text-electric flex items-center gap-1 hover:underline"
+            >
+              <Download className="w-3 h-3" /> CSV for ATS import
+            </a>
+          </div>
         )}
       </div>
       <div className="overflow-x-auto max-h-[520px] overflow-y-auto">

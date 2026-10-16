@@ -263,7 +263,7 @@ export default function SettingsForm() {
       <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
         <p className="text-xs text-gray-600 dark:text-gray-400">
           Keys are saved to <code className="text-emerald-600">.env.local</code> on your machine.
-          Searches pick them up immediately — no dev server restart needed.
+          Searches pick them up right away. No restart needed.
         </p>
       </div>
     </form>

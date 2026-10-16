@@ -9,13 +9,13 @@
  *
  * Expected CSV columns (any casing / common aliases):
  *   linkedin_url  (required for unlock if no apollo_id)
- *   apollo_id     (optional — Apollo person id)
+ *   apollo_id     (optional: Apollo person id)
  *   title, headline
  *   first_name, last_name  (or name)
- *   country / location     (optional — keeps US rows when present)
+ *   country / location     (optional, keeps US rows when present)
  *
  * Writes: data/unlock-csv-otw-result.csv  (gitignored under /data/)
- * Spends real Apollo contact credits — default unlock cap is 10.
+ * Spends real Apollo contact credits, default unlock cap is 10.
  */
 import fs from "fs";
 import path from "path";
@@ -227,7 +227,7 @@ async function main() {
 
 CSV needs linkedin_url and/or apollo_id. Optional: title, headline, first_name, last_name, country.
 --otw-only  only unlock rows with open-to-work wording in title/headline
---dry       scan CSV only — spend no Apollo credits`);
+--dry       scan CSV only, spend no Apollo credits`);
     process.exit(1);
   }
 
@@ -260,7 +260,7 @@ CSV needs linkedin_url and/or apollo_id. Optional: title, headline, first_name, 
   console.log(`Selected for unlock: ${selected.length} (limit=${limit}, otwOnly=${otwOnly})`);
   for (const c of selected) {
     console.log(
-      `  [${c.otw ? "OTW" : "—"}] ${c.firstName} ${c.lastName} | ${c.title || c.headline || "(no title)"} | ${c.linkedinUrl || c.apolloId}`
+      `  [${c.otw ? "OTW" : "None"}] ${c.firstName} ${c.lastName} | ${c.title || c.headline || "(no title)"} | ${c.linkedinUrl || c.apolloId}`
     );
   }
 
@@ -279,7 +279,7 @@ CSV needs linkedin_url and/or apollo_id. Optional: title, headline, first_name, 
   }
 
   if (!process.env.APOLLO_API_KEY) {
-    console.error("APOLLO_API_KEY missing — set it in .env.local");
+    console.error("APOLLO_API_KEY missing, set it in .env.local");
     process.exit(1);
   }
 

@@ -17,7 +17,7 @@ export function QualificationStep({
         <p className="mt-1 text-sm text-lp-muted">How should AI score and prioritize leads for you?</p>
       </div>
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-lp-muted">Minimum lead score (1–10)</span>
+        <span className="text-xs font-medium text-lp-muted">Minimum lead score (1 to 10)</span>
         <input
           type="number"
           min={1}
@@ -40,13 +40,13 @@ export function QualificationStep({
         suggestions={BUYING_SIGNAL_SUGGESTIONS}
       />
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-lp-muted">What makes a lead high-quality?</span>
+        <span className="text-xs font-medium text-lp-muted">What makes a lead high quality?</span>
         <textarea
           rows={2}
           className="app-input resize-none"
           value={data.highQualityLeadNotes}
           onChange={(e) => onChange({ highQualityLeadNotes: e.target.value })}
-          placeholder="Decision-maker, right company size, clear automation need..."
+          placeholder="Decision maker, right company size, clear automation need..."
         />
       </label>
       <label className="block space-y-1.5">

@@ -6,7 +6,7 @@ import { SAMPLE_LEADS } from "./constants";
 
 const STEPS = [
   { label: "Prompt parsed", done: true },
-  { label: "Apollo search ready", done: true },
+  { label: "Search ready", done: true },
   { label: "AI scoring enabled", done: true },
   { label: "Qualified leads saved", done: false },
   { label: "Export ready", done: false },
@@ -37,7 +37,7 @@ export function ContactProductPanel() {
       <div className="rounded-xl border border-lp-border bg-lp-graphite/80 p-3 mb-4">
         <p className="text-xs text-lp-muted mb-1">Prompt</p>
         <p className="text-sm text-lp-off-white leading-relaxed">
-          Find B2B SaaS founders in the US with 20–300 employees.
+          Find B2B SaaS founders in the US with 20 to 300 employees.
         </p>
       </div>
 
@@ -86,7 +86,7 @@ export function ContactProductPanel() {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {["Apollo enriched", "AI scored", "Secure workspace"].map((pill) => (
+        {["Verified data", "AI scored", "Secure workspace"].map((pill) => (
           <span key={pill} className="text-[10px] text-lp-muted border border-lp-border rounded-full px-2 py-0.5">
             {pill}
           </span>

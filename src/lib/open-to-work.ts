@@ -31,10 +31,10 @@ export const OPEN_TO_WORK_TITLE_SIGNALS = [
 ] as const;
 
 export const OPEN_TO_WORK_APOLLO_DISCLAIMER =
-  "\"Open to work\" isn't a provider filter — we only keep people who wrote job-seeking wording in their title/headline, then unlock email for those.";
+  "\"Open to work\" isn't a provider filter, we only keep people who wrote job seeking wording in their title or headline, then unlock email for those.";
 
 export const OPEN_TO_WORK_NONE_FOUND =
-  "No one in this search pool wrote open-to-work / job-seeking wording in their title or headline. Try a tighter role + location, or use LinkedIn Recruiter for LinkedIn's real Open to Work flag.";
+  "No one in this search pool wrote open to work or job seeking wording in their title or headline. Try a tighter role + location, or use LinkedIn Recruiter for LinkedIn's real Open to Work flag.";
 
 /** Bias Apollo text search toward profiles that mention job-seeking (still not a real OTW flag). */
 export const OPEN_TO_WORK_APOLLO_KEYWORDS = "open to work";
@@ -84,7 +84,7 @@ export function filterPeopleForOpenToWork<T extends OpenToWorkPerson>(
       usedTitleSignals: true,
       signalCount: withSignal.length,
       scanned: people.length,
-      note: `Open-to-work scan: kept ${withSignal.length.toLocaleString()} / ${people.length.toLocaleString()} with job-seeking wording in title/headline.`,
+      note: `Open to work scan: kept ${withSignal.length.toLocaleString()} / ${people.length.toLocaleString()} with job seeking wording in title/headline.`,
     };
   }
 
@@ -94,7 +94,7 @@ export function filterPeopleForOpenToWork<T extends OpenToWorkPerson>(
       usedTitleSignals: false,
       signalCount: 0,
       scanned: people.length,
-      note: `Open-to-work scan: 0 / ${people.length.toLocaleString()} self-stated job seekers in this batch — checking more pages…`,
+      note: `Open to work scan: 0 / ${people.length.toLocaleString()} job seekers who said so themselves in this batch, checking more pages…`,
     };
   }
 

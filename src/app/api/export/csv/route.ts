@@ -8,14 +8,20 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const { searchParams } = new URL(request.url);
     const searchId = searchParams.get("searchId") || undefined;
+    const csvFormat = searchParams.get("format") === "ats" ? "ats" : "standard";
 
-    const result = await exportUserLeads({ userId: user.id, searchId, format: "csv" });
+    const result = await exportUserLeads({ userId: user.id, searchId, format: "csv", csvFormat });
     if (!result) return NextResponse.json({ error: "No leads to export" }, { status: 404 });
+
+    const date = new Date().toISOString().slice(0, 10);
+    const name = [BRAND.slug, result.fileTag ?? "leads", csvFormat === "ats" ? "ats" : null, date]
+      .filter(Boolean)
+      .join("-");
 
     return new NextResponse(result.csv, {
       headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${BRAND.slug}-leads-${result.count}.csv"`,
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${name}.csv"`,
       },
     });
   } catch (error) {

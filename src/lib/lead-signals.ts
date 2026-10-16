@@ -17,7 +17,7 @@ export function deriveMatchSignals(lead: {
     signals.push("LinkedIn profile");
   }
 
-  // Only short score-style fragments become chips — skip prose "Why Reach Out" paragraphs
+  // Only short score-style fragments become chips, skip prose "Why Reach Out" paragraphs
   if (lead.reasoning?.trim() && lead.reasoning.length < 160) {
     for (const part of lead.reasoning.split(/\.\s+/).map((s) => s.trim()).filter(Boolean)) {
       const normalized = part.replace(/\.$/, "");

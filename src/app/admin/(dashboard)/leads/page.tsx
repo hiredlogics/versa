@@ -40,7 +40,7 @@ export default async function AdminLeadsPage() {
                 <AdminTableCell className="font-medium">{lead.name}</AdminTableCell>
                 <AdminTableCell>{lead.title}</AdminTableCell>
                 <AdminTableCell>{lead.company}</AdminTableCell>
-                <AdminTableCell className="text-muted">{lead.email || "—"}</AdminTableCell>
+                <AdminTableCell className="text-muted">{lead.email || "None"}</AdminTableCell>
                 <AdminTableCell>
                   <ScoreBadge score={lead.leadScore} />
                 </AdminTableCell>

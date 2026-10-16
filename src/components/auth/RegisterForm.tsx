@@ -457,7 +457,7 @@ export function RegisterForm() {
       </p>
 
       <p className="mt-4 text-center text-[11px] leading-relaxed text-lp-muted-dark">
-        Protected by secure authentication, encrypted sessions, and workspace-level access controls.
+        Protected by secure authentication, encrypted sessions, and access controls for each workspace.
       </p>
     </AuthCard>
   );

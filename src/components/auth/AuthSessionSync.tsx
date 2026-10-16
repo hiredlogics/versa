@@ -12,7 +12,7 @@ function notifySessionChanged() {
 }
 
 /**
- * Clears client caches when auth changes. Does not navigate — middleware and
+ * Clears client caches when auth changes. Does not navigate, middleware and
  * server layouts handle route protection to avoid redirect loops with Clerk.
  */
 export function AuthSessionSync() {

@@ -5,7 +5,7 @@
 #   An empty result is evidence. A missing value is absence of evidence.
 #   They must never land on the same branch.
 #
-# Every instance of this bug so far had the same shape — a comparison or a
+# Every instance of this bug so far had the same shape, a comparison or a
 # default where the absent case and the legitimate-zero case were
 # indistinguishable, so "we don't know" quietly became a confident answer:
 #
@@ -33,7 +33,7 @@
 #   Don't create a record for something that didn't happen.
 #
 # A refund that nets to zero, a FAILED search for a request that never started,
-# a settled hold for work never attempted — each leaves a trace the user or the
+# a settled hold for work never attempted, each leaves a trace the user or the
 # next engineer has to interpret, and each is indistinguishable from the real
 # event it imitates. Applied so far:
 #

@@ -50,10 +50,10 @@ export default async function AdminAuditPage() {
                   {adminEmailById[log.adminId] || log.adminId}
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
-                  {log.targetType ? `${log.targetType}${log.targetId ? ` · ${log.targetId}` : ""}` : "—"}
+                  {log.targetType ? `${log.targetType}${log.targetId ? ` · ${log.targetId}` : ""}` : "None"}
                 </AdminTableCell>
                 <AdminTableCell className="max-w-sm truncate text-xs text-muted">
-                  {log.metadata ? JSON.stringify(log.metadata) : "—"}
+                  {log.metadata ? JSON.stringify(log.metadata) : "None"}
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
                   {log.createdAt.toLocaleString()}

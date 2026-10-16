@@ -107,7 +107,7 @@ export function AdvancedFiltersDrawer({
               placeholder="Executive, VP, Director"
             />
           </Field>
-          <Field label="Minimum score (1–10)">
+          <Field label="Minimum score (1 to 10)">
             <input
               type="number"
               min={1}
@@ -122,6 +122,9 @@ export function AdvancedFiltersDrawer({
         </div>
 
         <div className="flex gap-2 border-t border-lp-border p-5">
+          <Button variant="secondary" className="flex-1" onClick={() => onChange({})}>
+            Reset
+          </Button>
           <Button variant="secondary" className="flex-1" onClick={onClose}>
             Cancel
           </Button>

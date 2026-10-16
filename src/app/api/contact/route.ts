@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
     const { email, name, company, teamSize, intent, message } = parsed.data;
 
-    // Server-side log only — no sensitive persistence in v1
+    // Server-side log only: no sensitive persistence in v1
     console.info("[contact]", {
       at: new Date().toISOString(),
       email: email.replace(/(.{2}).+(@.+)/, "$1***$2"),

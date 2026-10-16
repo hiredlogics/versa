@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 export function configuredAdminEmails(): string[] {
   const raw = process.env.ADMIN_EMAILS?.trim() || process.env.ADMIN_EMAIL?.trim() || "";
   return raw
@@ -24,5 +26,12 @@ export function verifyAdminCredentials(email: string, password: string): boolean
   const allowedEmails = configuredAdminEmails();
   if (!allowedEmails.includes(normalizedEmail)) return false;
 
-  return password === configuredPassword;
+  return constantTimeEqual(password, configuredPassword);
+}
+
+/** Hashing first gives equal-length buffers, so timingSafeEqual also hides the length. */
+function constantTimeEqual(a: string, b: string): boolean {
+  const hashA = crypto.createHash("sha256").update(a).digest();
+  const hashB = crypto.createHash("sha256").update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 }

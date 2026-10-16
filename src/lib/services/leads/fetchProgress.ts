@@ -103,7 +103,7 @@ export function requireVerifiedEmail(): boolean {
 
 /**
  * How many people one click may spend unlock credits on. Verified emails are a
- * minority of any pool, so a single batch often yields nothing — this lets a run
+ * minority of any pool, so a single batch often yields nothing, this lets a run
  * keep looking while still capping what it can spend.
  */
 export function getUnlockAttemptBudget(batchSize: number): number {

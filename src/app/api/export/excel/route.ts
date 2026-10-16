@@ -12,10 +12,13 @@ export async function GET(request: Request) {
     const result = await exportUserLeads({ userId: user.id, searchId, format: "xlsx" });
     if (!result || !result.buffer) return NextResponse.json({ error: "No leads to export" }, { status: 404 });
 
+    const date = new Date().toISOString().slice(0, 10);
+    const name = [BRAND.slug, result.fileTag ?? "leads", date].join("-");
+
     return new NextResponse(new Uint8Array(result.buffer), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${BRAND.slug}-leads-${result.count}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${name}.xlsx"`,
       },
     });
   } catch (error) {

@@ -103,7 +103,7 @@ export default async function UsagePage() {
           />
           <StatCard
             label="Average score"
-            value={analytics.averageScore != null ? String(analytics.averageScore) : "—"}
+            value={analytics.averageScore != null ? String(analytics.averageScore) : "None"}
             hint={
               analytics.lastSearchAt
                 ? `Last search ${new Date(analytics.lastSearchAt).toLocaleDateString()}`

@@ -139,7 +139,7 @@ export function migrateSessionsToConversations(): void {
     const assistantMsg: ChatMessage = {
       id: randomUUID(),
       role: "assistant",
-      content: `Found ${session.leads.length} high-quality leads.`,
+      content: `Found ${session.leads.length} high quality leads.`,
       type: "search",
       session,
       createdAt: session.createdAt,

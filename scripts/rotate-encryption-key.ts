@@ -29,7 +29,7 @@ function deriveKey(secret: string): Buffer {
 function decryptWith(secret: string, payload: string): string {
   const [ivHex, tagHex, dataHex] = payload.split(":");
   if (!ivHex || !tagHex || !dataHex) {
-    throw new Error("Unrecognised payload format — expected iv:tag:data");
+    throw new Error("Unrecognised payload format, expected iv:tag:data");
   }
   const decipher = crypto.createDecipheriv(ALGO, deriveKey(secret), Buffer.from(ivHex, "hex"));
   decipher.setAuthTag(Buffer.from(tagHex, "hex"));
@@ -57,7 +57,7 @@ async function main() {
     process.exit(1);
   }
   if (oldSecret.trim() === newSecret.trim()) {
-    console.error("OLD_ENCRYPTION_KEY and ENCRYPTION_KEY are identical — nothing to rotate.");
+    console.error("OLD_ENCRYPTION_KEY and ENCRYPTION_KEY are identical, nothing to rotate.");
     process.exit(1);
   }
 
@@ -66,7 +66,7 @@ async function main() {
   });
 
   if (rows.length === 0) {
-    console.log("No ApiKeyConfig rows — rotating the env var alone is safe.");
+    console.log("No ApiKeyConfig rows, rotating the env var alone is safe.");
     await prisma.$disconnect();
     return;
   }
@@ -91,7 +91,7 @@ async function main() {
   console.log(`Re-encrypted ${rotated.length} row(s): ${rotated.map((r) => r.provider).join(", ")}`);
 
   if (!commit) {
-    console.log("Dry run — re-run with --commit to write.");
+    console.log("Dry run, re-run with --commit to write.");
     await prisma.$disconnect();
     return;
   }

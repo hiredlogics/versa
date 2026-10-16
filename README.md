@@ -1,6 +1,6 @@
 # LeadPilot AI
 
-Premium B2B lead finder SaaS — natural language prompts, Apollo enrichment, multi-provider AI scoring, Stripe billing.
+Premium B2B lead finder SaaS, natural language prompts, Apollo enrichment, multi-provider AI scoring, Stripe billing.
 
 ## Stack
 
@@ -32,7 +32,7 @@ npm run dev
 
 ### Database (Docker)
 
-Run PostgreSQL in Docker (port **5434** on host — avoids clash with local Postgres on 5432):
+Run PostgreSQL in Docker (port **5434** on host, avoids clash with local Postgres on 5432):
 
 ```bash
 npm run db:up
@@ -77,12 +77,12 @@ Sign up and go to `/app` for the lead finder dashboard.
 
 ## API
 
-- `POST /api/leads/find` — run a lead search
-- `GET /api/searches` — search history
-- `GET /api/export/csv?searchId=...` — CSV export
-- `POST /api/stripe/checkout` — Stripe checkout
-- `POST /api/stripe/webhook` — Stripe webhooks
-- `POST /api/webhooks/clerk` — Clerk user sync
+- `POST /api/leads/find`, run a lead search
+- `GET /api/searches`, search history
+- `GET /api/export/csv?searchId=...`, CSV export
+- `POST /api/stripe/checkout`, Stripe checkout
+- `POST /api/stripe/webhook`, Stripe webhooks
+- `POST /api/webhooks/clerk`, Clerk user sync
 
 ## Tests
 

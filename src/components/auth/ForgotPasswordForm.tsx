@@ -154,7 +154,7 @@ export function ForgotPasswordForm() {
 
     const signInStatus = signIn.status as string;
     if (signInStatus !== "complete") {
-      setFormError("Password updated, but sign-in could not be completed. Try signing in with your new password.");
+      setFormError("Password updated, but we could not log you in. Try signing in with your new password.");
       return;
     }
 

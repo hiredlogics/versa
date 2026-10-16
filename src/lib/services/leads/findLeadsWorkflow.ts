@@ -5,7 +5,14 @@ import {
   getLeadSearchConfig,
   shouldIgnoreLeadContext,
 } from "@/lib/apollo-config";
-import { runSequentialLeadBatches } from "@/lib/services/leads/processLeadBatches";
+import { runProfileDiscovery } from "@/lib/services/leads/profileDiscovery";
+import {
+  runSequentialLeadBatches,
+  type SequentialBatchResult,
+} from "@/lib/services/leads/processLeadBatches";
+import { serveFromPool, type PoolServeResult } from "@/lib/services/leads/leadPool";
+import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
+import { poolPersonKeys, promptWantsProfilesOnly } from "@/lib/lead-pool";
 import { assertApolloConfigured } from "@/lib/platform-readiness";
 import { parsePromptWithAi } from "@/lib/services/ai/parsePrompt";
 import {
@@ -14,7 +21,6 @@ import {
 } from "@/lib/services/billing/usageLimits";
 import { mapLeadToRecord } from "@/lib/services/searches/searchHistory";
 import { getUserLeadContext } from "@/lib/context/userLeadContext";
-import { buildScoringContextFromLeadContext } from "@/lib/context/exclusions";
 import {
   withFetchProgress,
   stripFetchProgress,
@@ -28,17 +34,31 @@ import { toUserFacingSearchError } from "@/lib/services/leads/searchError";
 import { logLeadFetch } from "@/lib/services/leads/fetchLog";
 import { extractRequestedLeadCount, type ClarificationNeed } from "@/lib/clarifyPrompt";
 import { clarifyWithAi } from "@/lib/services/ai/clarifyWithAi";
-import type { User, AiProvider } from "@prisma/client";
+import { resolveSupportedCountry } from "@/lib/location-policy";
+import { Prisma, type User, type AiProvider } from "@prisma/client";
+import { rescoreSearchLeads } from "@/lib/services/leads/rescoreSearch";
+import { buildCompanyCriteria } from "@/lib/services/leads/companySearch";
+import { buildBriefCriteria, looksLikeBrief } from "@/lib/services/ai/parseBrief";
 import type { SearchCriteria, ApolloSearchFilters } from "@/lib/types";
+import {
+  parseJobDescription,
+  buildSearchPromptFromJobDescription,
+  type ParsedJobDescription,
+} from "@/lib/services/ai/parseJobDescription";
 
 export { USER_STOPPED_MESSAGE, canResumeSearch };
 
 export interface FindLeadsInput {
   prompt: string;
   inputType?: string;
-  linkedinUrl?: string;
-  companyUrl?: string;
+  /** Company search: the company's name or website ("Stripe" or "stripe.com"). */
   companyName?: string;
+  /** Set by the preview so starting the same company search does not look it up twice. */
+  companyCriteria?: SearchCriteria;
+  /** Same for a brief; null means "read, but not a usable brief" (use the normal reader). */
+  briefCriteria?: SearchCriteria | null;
+  jobDescription?: string;
+  jobRequirements?: ParsedJobDescription | null;
   minScore?: number;
   /** User-requested lead count for this run (clamped to credits + one batch). */
   requestedLeadCount?: number;
@@ -54,17 +74,96 @@ export type FindLeadsStartResult = {
   async: true;
 };
 
-function buildPrompt(input: FindLeadsInput): string {
-  if (input.linkedinUrl) {
-    return `Find leads similar to this LinkedIn profile: ${input.linkedinUrl}. ${input.prompt || ""}`.trim();
+/**
+ * For job description searches: read the description once (or reuse the requirements a
+ * follow-up sends back), then search with a short prompt built from them. `input.prompt`
+ * is only the user's follow-up text here, never the description itself.
+ */
+async function resolvePromptAndRequirements(
+  input: FindLeadsInput,
+  userId?: string
+): Promise<{ prompt: string; jobRequirements: ParsedJobDescription | null }> {
+  if (input.inputType === "company") {
+    const company = input.companyName?.trim() ?? "";
+    const roles = input.prompt.trim();
+    return { prompt: roles ? `${roles} at ${company}` : `People at ${company}`, jobRequirements: null };
   }
-  if (input.companyUrl) {
-    return `Find decision makers at companies like ${input.companyUrl}. ${input.prompt || ""}`.trim();
+  if (input.inputType !== "job_description") {
+    return { prompt: input.prompt, jobRequirements: null };
   }
-  if (input.companyName) {
-    return `Find decision makers at ${input.companyName}. ${input.prompt || ""}`.trim();
+
+  const jobRequirements =
+    input.jobRequirements !== undefined
+      ? input.jobRequirements
+      : await parseJobDescription(input.jobDescription ?? "", { userId });
+  // If the description could not be read, search with its text like a normal prompt.
+  const base = jobRequirements
+    ? buildSearchPromptFromJobDescription(jobRequirements)
+    : (input.jobDescription ?? "").trim();
+  const prompt = [base, input.prompt.trim()].filter(Boolean).join(". ");
+  return { prompt, jobRequirements };
+}
+
+/** Company search criteria, looked up once per request (the preview stores it on the input). */
+async function companyCriteriaFor(input: FindLeadsInput, userId: string): Promise<SearchCriteria> {
+  input.companyCriteria ??= await buildCompanyCriteria({
+    company: input.companyName ?? "",
+    roles: input.prompt,
+    userId,
+  });
+  return input.companyCriteria;
+}
+
+/**
+ * A long client brief (industries, titles, keywords, rules) gets its own reader, so all
+ * titles and industries are kept. Returns null for ordinary prompts.
+ */
+async function briefCriteriaFor(input: FindLeadsInput, prompt: string, userId: string) {
+  if (input.inputType !== "prompt" && input.inputType !== undefined) return null;
+  if (!looksLikeBrief(prompt)) return null;
+  if (input.briefCriteria === undefined) {
+    const brief = await buildBriefCriteria(prompt, userId);
+    input.briefCriteria = brief?.criteria ?? null;
+    if (brief?.leadCount && !input.requestedLeadCount) input.requestedLeadCount = brief.leadCount;
   }
-  return input.prompt;
+  return input.briefCriteria;
+}
+
+/**
+ * Every person this user already has a lead for, in any search. A new search treats
+ * them as already seen, so asking again (even in other words) brings new people and
+ * never charges twice for the same person.
+ */
+async function userLeadKeys(userId: string): Promise<Set<string>> {
+  const leads = await prisma.lead.findMany({
+    where: { userId, deletedAt: null },
+    select: { apolloPersonId: true, linkedinUrl: true },
+  });
+  return new Set(leads.flatMap((lead) => poolPersonKeys(lead)));
+}
+
+type JobSkillLists = { mustHaveSkills?: string[]; niceToHaveSkills?: string[] };
+
+/**
+ * Skills to judge each lead against: the job description's skills when the search has
+ * them, otherwise the comma-separated keywords (so "machine learning" stays one skill).
+ */
+export function targetSkillsForSearch(
+  jobRequirements: JobSkillLists | null | undefined,
+  keywords: string | undefined
+): string[] | undefined {
+  const fromJob = [
+    ...(jobRequirements?.mustHaveSkills ?? []),
+    ...(jobRequirements?.niceToHaveSkills ?? []),
+  ];
+  const source = fromJob.length > 0 ? fromJob : (keywords ?? "").split(/[,;]/);
+  const unique = new Map<string, string>();
+  for (const raw of source) {
+    const skill = raw.trim();
+    if (skill.length > 1 && !unique.has(skill.toLowerCase())) unique.set(skill.toLowerCase(), skill);
+  }
+  const skills = [...unique.values()].slice(0, 16);
+  return skills.length > 0 ? skills : undefined;
 }
 
 function toDbAiProvider(provider: string, fallback: string): AiProvider {
@@ -80,12 +179,15 @@ export function criteriaForClient(criteria: SearchCriteria) {
   const role = titles[0] || "professionals";
   const where = criteria.country ? ` in ${criteria.country}` : "";
   const intentSummary = criteria.openToWork
-    ? `${role}${where} who wrote open-to-work / job-seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
-    : criteria.summary || criteria.searchIntent?.slice(0, 160) || "";
+    ? `${role}${where} who wrote open to work or job seeking wording in their title or headline. We scan matches, unlock email only for those signals, and save them`
+    : // Only a real summary: the raw search text can hold internal instructions.
+      criteria.summary || "";
 
   return {
     industry: criteria.industry ?? null,
     country: criteria.country ?? null,
+    city: criteria.city ?? null,
+    state: criteria.state ?? null,
     companySizeMin: criteria.companySizeMin ?? null,
     companySizeMax: criteria.companySizeMax ?? null,
     jobTitles: criteria.jobTitles ?? [],
@@ -94,10 +196,13 @@ export function criteriaForClient(criteria: SearchCriteria) {
       ? criteria.keywords.split(/[,\s]+/).filter(Boolean).slice(0, 8)
       : [],
     companyNames: [] as string[],
-    companyDomains: [] as string[],
+    companyDomains: criteria.apollo?.organizationDomains ?? [],
+    companyOnly: Boolean(criteria.companyOnly),
+    briefSearch: Boolean(criteria.briefSearch),
     linkedinUrls: [] as string[],
     intentSummary,
     openToWork: Boolean(criteria.openToWork),
+    requireEmail: Boolean(criteria.requireEmail),
     searchIntent: criteria.searchIntent,
     summary: criteria.summary,
   };
@@ -110,6 +215,161 @@ async function wasStoppedByUser(searchId: string): Promise<boolean> {
   });
   return row?.errorMessage === USER_STOPPED_MESSAGE;
 }
+
+type SearchStepResult = {
+  result: SequentialBatchResult;
+  pool: PoolServeResult;
+  /** Leads that cost Apollo credits this step; these count against the plan. */
+  charged: number;
+};
+
+/**
+ * One user-approved step of a search. Matching people already in the shared
+ * lead pool are delivered first; Apollo is only asked for the remainder. When
+ * the user wants emails, the email-unlock pipeline runs, otherwise the
+ * LinkedIn-profile-only pipeline does.
+ */
+async function runSearchStep(args: {
+  userId: string;
+  searchId: string;
+  criteria: SearchCriteria;
+  prompt: string;
+  wantsEmail: boolean;
+  leadContext: Awaited<ReturnType<typeof getUserLeadContext>> | null;
+  startPage: number;
+  resumeFilters?: ApolloSearchFilters;
+  seenIds: Set<string>;
+  batchesCompleted: number;
+  leadsFetched: number;
+  leadsWithEmail: number;
+  peoplePulled: number;
+  totalAvailable?: number | null;
+  maxLeadsThisRun: number;
+}): Promise<SearchStepResult> {
+  const searchRow = await prisma.leadSearch.update({
+    where: { id: args.searchId },
+    data: { relaxNote: "Looking for matching people…" },
+    select: { jobRequirements: true },
+  });
+
+  // One scoring setup for every way a lead can be saved (pool, email search, profiles),
+  // so no lead is saved with a fixed placeholder score.
+  const scoreContext = buildScoringContextFromLeadContext(
+    args.leadContext,
+    {
+      searchIntent: args.criteria.searchIntent,
+      keywords: args.criteria.keywords,
+      excludedTitles: args.criteria.excludedTitles,
+      excludedIndustries: args.criteria.excludedIndustries,
+      targetSkills: targetSkillsForSearch(
+        searchRow.jobRequirements as JobSkillLists | null,
+        args.criteria.keywords
+      ),
+    },
+    args.prompt
+  );
+  scoreContext.openToWork = args.criteria.openToWork;
+  scoreContext.requireEmail = args.wantsEmail;
+
+  // After new leads are saved, score the whole search again side by side.
+  const compareLeads = async (savedThisStep: number) => {
+    if (savedThisStep <= 0) return;
+    try {
+      await prisma.leadSearch.update({
+        where: { id: args.searchId },
+        data: { relaxNote: "Comparing the leads with each other to finish their scores…" },
+      });
+      await rescoreSearchLeads({ userId: args.userId, searchId: args.searchId, scoreContext });
+    } catch (error) {
+      console.warn("[findLeads] comparing scores skipped:", error instanceof Error ? error.message : error);
+    }
+  };
+
+  const pool = await serveFromPool({
+    userId: args.userId,
+    searchId: args.searchId,
+    criteria: args.criteria,
+    prompt: args.prompt,
+    limit: args.maxLeadsThisRun,
+    wantsEmail: args.wantsEmail,
+    seenIds: args.seenIds,
+    scoreContext,
+  });
+
+  const remaining = args.maxLeadsThisRun - pool.saved;
+  const savedSoFar = args.leadsWithEmail + pool.saved;
+
+  const stoppedNow = await wasStoppedByUser(args.searchId);
+  if (remaining <= 0 || pool.creditsExhausted || stoppedNow) {
+    // Nothing left to fetch this step. Apollo pages are untouched, so the
+    // next "Get next 100" starts from the same page.
+    await compareLeads(pool.saved);
+    return {
+      pool,
+      charged: pool.unlockedSaved,
+      result: {
+        activeFilters: args.resumeFilters ?? args.criteria.apollo!,
+        lastPage: args.startPage - 1,
+        totalPages: Math.max(args.startPage, 1),
+        totalAvailable: Math.max(args.totalAvailable ?? 0, savedSoFar),
+        batchesCompleted: args.batchesCompleted,
+        leadsFetched: args.leadsFetched,
+        leadsWithEmail: savedSoFar,
+        peoplePulled: args.peoplePulled,
+        savedThisRun: 0,
+        partial: true,
+        canResume: true,
+        stopped: stoppedNow,
+        creditsExhausted: pool.creditsExhausted,
+        scoreProvider: "HEURISTIC",
+        stopReason: stoppedNow
+          ? "stopped_by_user"
+          : pool.creditsExhausted
+            ? "apollo_credits_exhausted"
+            : "credit_cap",
+      },
+    };
+  }
+
+  const common = {
+    userId: args.userId,
+    searchId: args.searchId,
+    criteria: args.criteria,
+    prompt: args.prompt,
+    startPage: args.startPage,
+    resumeFilters: args.resumeFilters,
+    seenIds: args.seenIds,
+    batchesCompleted: args.batchesCompleted,
+    leadsFetched: args.leadsFetched,
+    leadsWithEmail: savedSoFar,
+    peoplePulled: args.peoplePulled,
+    maxLeadsThisRun: remaining,
+    wasStopped: () => wasStoppedByUser(args.searchId),
+    scoreContext,
+  };
+
+  const result: SequentialBatchResult = args.wantsEmail
+    ? await runSequentialLeadBatches(common)
+    : await runProfileDiscovery(common);
+  await compareLeads(pool.saved + result.savedThisRun);
+
+  return { result, pool, charged: result.savedThisRun + pool.unlockedSaved };
+}
+
+/**
+ * When the data provider has no credits left, emails cannot be unlocked. Say so plainly
+ * (admins learn the real cause) instead of "none had a verified email".
+ */
+function creditsNote(saved: number, isAdmin: boolean): string {
+  const cause = isAdmin
+    ? "The data provider account has run out of credits, so emails could not be unlocked. Top up the plan, then"
+    : "We couldn't unlock emails right now. Please try again later, then";
+  return saved > 0 ? ` ${cause} click Get next 100 for more.` : `${cause} run the search again. No credits were used.`;
+}
+
+/** Where leads came from (our saved pool or a new lookup) is internal, so users never see it. */
+const OUT_OF_LOOKUPS =
+  " We can't look up more people right now. Please try again later, then click Get next 100.";
 
 /**
  * Parse prompt and decide if we need clarifying questions before spending credits.
@@ -125,19 +385,51 @@ export async function previewFindClarification(
   parseProvider: string;
   clarification: ClarificationNeed;
   leadsRemaining: number;
+  jobRequirements?: ParsedJobDescription | null;
 }> {
   assertApolloConfigured();
-  const prompt = buildPrompt(input);
+  const { prompt, jobRequirements } = await resolvePromptAndRequirements(input, user.id);
+  input.jobRequirements = jobRequirements;
   const ignoreContext = shouldIgnoreLeadContext();
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
   const access = await requireLeadSearchAccess(user, input.requestedLeadCount);
-  const { criteria, provider: parseProvider } = await parsePromptWithAi(prompt, {
+
+  // A company search or a full brief needs no questions: the filters are all there.
+  const ready =
+    input.inputType === "company"
+      ? await companyCriteriaFor(input, user.id)
+      : await briefCriteriaFor(input, prompt, user.id);
+  if (ready) {
+    const criteria = ready;
+    return {
+      prompt,
+      criteria,
+      clientCriteria: criteriaForClient(criteria),
+      parseProvider: "HEURISTIC",
+      clarification: {
+        needsClarification: false,
+        questions: [],
+        message: "",
+        requestedLeadCount: input.requestedLeadCount,
+      },
+      leadsRemaining: access.leadsRemaining,
+      jobRequirements: null,
+    };
+  }
+
+  const parsed = await parsePromptWithAi(prompt, {
     userId: user.id,
     leadContext,
   });
+  const criteria = resolveSupportedCountry(parsed.criteria);
+  const parseProvider = parsed.provider;
 
-  const fromPrompt = extractRequestedLeadCount(prompt);
+  // Count only what the user typed: numbers inside a job description ("manage 10 people")
+  // are not a lead count.
+  const fromPrompt = extractRequestedLeadCount(
+    input.inputType === "job_description" ? input.prompt : prompt
+  );
   const clarification = await clarifyWithAi(prompt, criteria, {
     leadContext,
     userId: user.id,
@@ -155,6 +447,7 @@ export async function previewFindClarification(
     parseProvider,
     clarification,
     leadsRemaining: access.leadsRemaining,
+    jobRequirements,
   };
 }
 
@@ -176,10 +469,11 @@ export async function startFindLeadsWorkflow(
   async: true;
   leadsRemaining: number;
   batchSize: number;
+  jobRequirements?: ParsedJobDescription | null;
 }> {
   assertApolloConfigured();
 
-  const prompt = buildPrompt(input);
+  const { prompt, jobRequirements } = await resolvePromptAndRequirements(input, user.id);
   const ignoreContext = shouldIgnoreLeadContext();
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
   const batchSize = getProcessBatchSize();
@@ -198,15 +492,21 @@ export async function startFindLeadsWorkflow(
       inputType: input.inputType || "prompt",
       status: "RUNNING",
       relaxNote: "Parsing your prompt…",
+      jobRequirements: (jobRequirements as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull,
     },
   });
 
   try {
-    const { criteria, provider: parseProvider, parseMode } = await parsePromptWithAi(prompt, {
-      userId: user.id,
-      searchId: search.id,
-      leadContext,
-    });
+    const brief = input.inputType === "company" ? null : await briefCriteriaFor(input, prompt, user.id);
+    const parsed =
+      input.inputType === "company"
+        ? { criteria: await companyCriteriaFor(input, user.id), provider: "HEURISTIC", parseMode: "company" }
+        : brief
+          ? { criteria: brief, provider: "OPENAI", parseMode: "brief" }
+          : await parsePromptWithAi(prompt, { userId: user.id, searchId: search.id, leadContext });
+    const criteria = resolveSupportedCountry(parsed.criteria);
+    const parseProvider = parsed.provider;
+    const parseMode = parsed.parseMode;
 
     logLeadFetch("search_started", {
       searchId: search.id,
@@ -239,10 +539,11 @@ export async function startFindLeadsWorkflow(
       rawCriteria: criteria,
       prompt,
       parseProvider,
-      message: `Search started — unlocking up to ${Math.min(batchSize, access.leadsRemaining).toLocaleString()} leads this step (you have ${access.leadsRemaining.toLocaleString()} credits left).`,
+      message: `Search started, unlocking up to ${Math.min(batchSize, access.leadsRemaining).toLocaleString()} leads this step (you have ${access.leadsRemaining.toLocaleString()} credits left).`,
       async: true,
       leadsRemaining: access.leadsRemaining,
       batchSize,
+      jobRequirements,
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Search failed";
@@ -280,39 +581,26 @@ export async function runFindLeadsJob(
   const maxLeadsThisRun = Math.min(batchSize, access.leadsRemaining, requestedCap);
 
   const { criteria, parseProvider } = started;
+  const wantsEmail = Boolean(criteria.requireEmail) || !promptWantsProfilesOnly(started.prompt);
 
   try {
-    const scoreContext = buildScoringContextFromLeadContext(
-      leadContext,
-      {
-        searchIntent: criteria.searchIntent,
-        keywords: criteria.keywords,
-        excludedTitles: criteria.excludedTitles,
-        excludedIndustries: criteria.excludedIndustries,
-      },
-      started.prompt
-    );
-    scoreContext.openToWork = criteria.openToWork;
-    scoreContext.requireEmail = criteria.requireEmail;
-    if (ignoreContext) scoreContext.leadContext = null;
-
-    const result = await runSequentialLeadBatches({
+    const { result, pool, charged } = await runSearchStep({
       userId: user.id,
       searchId,
       criteria,
       prompt: started.prompt,
-      scoreContext,
+      wantsEmail,
+      leadContext,
       startPage: 1,
-      seenIds: new Set(),
+      seenIds: await userLeadKeys(user.id),
       batchesCompleted: 0,
       leadsFetched: 0,
       leadsWithEmail: 0,
       peoplePulled: 0,
       maxLeadsThisRun,
-      wasStopped: () => wasStoppedByUser(searchId),
     });
 
-    await incrementUsage(user.id, result.savedThisRun, 1);
+    await incrementUsage(user.id, charged, 1);
 
     if (result.stopped && result.leadsWithEmail === 0 && result.leadsFetched === 0) {
       await prisma.leadSearch.update({
@@ -329,24 +617,43 @@ export async function runFindLeadsJob(
       return;
     }
 
-    const partialNote = result.canResume
+    const creditsOut = Boolean(result.creditsExhausted || pool.creditsExhausted);
+    if (creditsOut) {
+      console.error(`[leads/find] email unlocks failed: data provider credits are used up (search ${searchId})`);
+    }
+    const partialNote = creditsOut
+      ? creditsNote(result.leadsWithEmail, user.role === "ADMIN")
+      : result.canResume
       ? result.creditsExhausted
-        ? " Data-provider credits ran out — top up, then click Get next 100."
+        ? OUT_OF_LOOKUPS
         : result.stopReason === "max_auto_batches" || result.stopReason === "credit_cap"
           ? ` Saved this batch. Click Get next 100 when you want more (you asked for more / more matches remain).`
           : result.stopped
-            ? " Stopped by you — click Get next 100 to continue."
-            : " More matches remain — click Get next 100 to continue."
+            ? " Stopped by you. Click Get next 100 to continue."
+            : " More matches remain. Click Get next 100 to continue."
       : "";
 
+    const verifiedEmailCount = await prisma.lead.count({
+      where: { searchId, userId: user.id, deletedAt: null, hasEmail: true },
+    });
+    const savedTotal = result.leadsWithEmail;
     const countNote =
-      result.leadsWithEmail === 0
+      savedTotal === 0
         ? criteria.openToWork
-          ? (result.otwSignalHits ?? 0) > 0
-            ? `Found ${result.otwSignalHits} profile(s) with open-to-work wording after scanning ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} (pool ≈ ${result.totalAvailable.toLocaleString()}), but none had a verified email to save.`
-            : `Scanned ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} profiles (pool ≈ ${result.totalAvailable.toLocaleString()}) for open-to-work title/headline signals — ${result.otwSignalHits ?? 0} matched.`
-          : `Checked ${result.leadsFetched.toLocaleString()} matches (pool ≈ ${result.totalAvailable.toLocaleString()}) but none had a verified email — only guessed addresses, which we skip.`
-        : `Saved ${result.leadsWithEmail.toLocaleString()} leads with a verified email after checking ${result.leadsFetched.toLocaleString()} / ${result.totalAvailable.toLocaleString()} matches.`;
+          ? `Checked ${(result.otwScanned ?? result.leadsFetched).toLocaleString()} matching people for open to work wording; ${result.otwSignalHits ?? 0} had it, but none had a verified email to save.`
+          : `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a verified email. We only save checked emails.`
+        : `Saved ${savedTotal.toLocaleString()} lead${savedTotal === 1 ? "" : "s"} (${verifiedEmailCount.toLocaleString()} with a verified email).`;
+
+    const outcomeNote =
+      creditsOut && savedTotal === 0
+        ? ""
+        : result.totalAvailable === 0 && savedTotal === 0
+        ? "No people matched this exact role and location. Try a wider location or more job titles."
+        : savedTotal === 0 && result.leadsFetched === 0
+          ? "You already have every person who matches this search. Try a wider location or more job titles to find new people."
+          : savedTotal === 0 && !wantsEmail
+          ? `Checked ${result.leadsFetched.toLocaleString()} matching people, but none had a public LinkedIn profile. Try a wider search.`
+          : countNote;
 
     await prisma.leadSearch.update({
       where: { id: searchId },
@@ -364,14 +671,14 @@ export async function runFindLeadsJob(
           batchesCompleted: result.batchesCompleted,
           leadsFetched: result.leadsFetched,
           leadsWithEmail: result.leadsWithEmail,
-          emailsUnlockedCount: result.leadsWithEmail,
+          emailsUnlockedCount: 0,
           totalToUnlock: result.totalAvailable,
         }) as object,
         totalAvailable: result.totalAvailable,
         leadsReturned: result.leadsWithEmail,
         durationMs: Date.now() - start,
         aiProviderUsed: toDbAiProvider(result.scoreProvider, parseProvider),
-        relaxNote: `${countNote}${partialNote}${result.apolloRelaxNote ? ` ${result.apolloRelaxNote}` : ""}`.trim(),
+        relaxNote: `${outcomeNote}${partialNote}${result.apolloRelaxNote ? ` ${result.apolloRelaxNote}` : ""}`.trim(),
       },
     });
   } catch (error) {
@@ -406,8 +713,12 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
   const resumeFilters = stripFetchProgress(
     search.apolloFilters as unknown as ApolloSearchFilters
   );
-  if (!resumeFilters?.personTitles?.length && !resumeFilters?.personLocations?.length) {
-    throw new Error("Missing search filters to resume — run a new search.");
+  if (
+    !resumeFilters?.personTitles?.length &&
+    !resumeFilters?.personLocations?.length &&
+    !resumeFilters?.organizationDomains?.length
+  ) {
+    throw new Error("Missing search filters to resume. Run a new search.");
   }
 
   if (!canResumeSearch(search.apolloFilters, search.leadsReturned, search.totalAvailable, search.relaxNote)) {
@@ -427,8 +738,12 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
     summary: (parsed.summary as string) || search.prompt.slice(0, 120),
     searchIntent: (parsed.searchIntent as string) || (parsed.intentSummary as string) || search.prompt,
     openToWork: Boolean(parsed.openToWork),
+    requireEmail: Boolean(parsed.requireEmail),
+    companyOnly: Boolean(parsed.companyOnly),
+    briefSearch: Boolean(parsed.briefSearch),
     apollo: resumeFilters,
   };
+  const wantsEmail = Boolean(criteria.requireEmail) || !promptWantsProfilesOnly(search.prompt);
 
   await prisma.leadSearch.update({
     where: { id: searchId },
@@ -443,40 +758,19 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
   const leadContext = ignoreContext ? null : await getUserLeadContext(user.id);
 
   try {
-    const existingIds = new Set(
-      (
-        await prisma.lead.findMany({
-          where: { searchId, deletedAt: null, apolloPersonId: { not: null } },
-          select: { apolloPersonId: true },
-        })
-      )
-        .map((l) => l.apolloPersonId)
-        .filter((id): id is string => Boolean(id))
-    );
-
-    const scoreContext = buildScoringContextFromLeadContext(
-      leadContext,
-      {
-        searchIntent: criteria.searchIntent,
-        keywords: criteria.keywords,
-        excludedTitles: criteria.excludedTitles,
-        excludedIndustries: criteria.excludedIndustries,
-      },
-      search.prompt
-    );
-    scoreContext.openToWork = criteria.openToWork;
-    if (ignoreContext) scoreContext.leadContext = null;
+    const existingIds = await userLeadKeys(user.id);
 
     const batchSize = getProcessBatchSize();
     const resumeAccess = await requireLeadSearchAccess(user, batchSize);
     const maxLeadsThisRun = Math.min(batchSize, resumeAccess.leadsRemaining);
 
-    const result = await runSequentialLeadBatches({
+    const { result, pool, charged } = await runSearchStep({
       userId: user.id,
       searchId,
       criteria,
       prompt: search.prompt,
-      scoreContext,
+      wantsEmail,
+      leadContext,
       startPage,
       resumeFilters,
       seenIds: existingIds,
@@ -484,16 +778,22 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
       leadsFetched: progress?.leadsFetched ?? progress?.peoplePulled ?? 0,
       leadsWithEmail: progress?.leadsWithEmail ?? search.leadsReturned,
       peoplePulled: progress?.peoplePulled ?? search.leadsReturned,
+      totalAvailable: search.totalAvailable,
       maxLeadsThisRun,
-      wasStopped: () => wasStoppedByUser(searchId),
     });
 
-    await incrementUsage(user.id, result.savedThisRun, 0);
+    await incrementUsage(user.id, charged, 0);
 
     const totalSaved = result.leadsWithEmail;
-    const partialNote = result.canResume
+    const creditsOut = Boolean(result.creditsExhausted || pool.creditsExhausted);
+    if (creditsOut) {
+      console.error(`[leads/find] email unlocks failed: data provider credits are used up (search ${searchId})`);
+    }
+    const partialNote = creditsOut
+      ? creditsNote(result.leadsWithEmail, user.role === "ADMIN")
+      : result.canResume
       ? result.creditsExhausted
-        ? " Provider credits ran out — top up, then click Get next 100."
+        ? OUT_OF_LOOKUPS
         : " Click Get next 100 for more."
       : "";
 
@@ -516,12 +816,12 @@ export async function resumeFindLeadsJob(user: User, searchId: string) {
           batchesCompleted: result.batchesCompleted,
           leadsFetched: result.leadsFetched,
           leadsWithEmail: totalSaved,
-          emailsUnlockedCount: totalSaved,
+          emailsUnlockedCount: 0,
           totalToUnlock: result.totalAvailable,
         }) as object,
         relaxNote: result.canResume
-          ? `Resume added ${result.savedThisRun.toLocaleString()} with email (total ${totalSaved.toLocaleString()} after ${result.leadsFetched.toLocaleString()} checked).${partialNote}`
-          : `Resume finished — ${totalSaved.toLocaleString()} leads with usable email saved for this prompt.`,
+          ? `Added ${(result.savedThisRun + pool.saved).toLocaleString()} more leads (${totalSaved.toLocaleString()} in total).${partialNote}`
+          : `Done: ${totalSaved.toLocaleString()} leads saved for this search.`,
       },
     });
   } catch (error) {

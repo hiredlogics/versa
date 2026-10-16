@@ -136,7 +136,7 @@ export function AdminApiKeysForm() {
     <form onSubmit={handleSave} className="max-w-2xl space-y-6">
       <p className="text-sm text-muted">
         Platform credentials for Apollo lead search and AI parsing. Stored in{" "}
-        <code className="text-electric">.env.local</code> on the server — never exposed to end users.
+        <code className="text-electric">.env.local</code> on the server, never exposed to end users.
       </p>
 
       {!apolloConfigured && (
@@ -163,7 +163,7 @@ export function AdminApiKeysForm() {
           apolloKey,
           setApolloKey,
           apolloConfigured ? "Enter new key to update…" : "Paste Apollo API key",
-          "Required for lead search — Apollo → Settings → Integrations → API",
+          "Required for lead search. Find it in Apollo → Settings → Integrations → API",
           apolloConfigured,
           maskedApollo
         )}
@@ -173,7 +173,7 @@ export function AdminApiKeysForm() {
           groqKey,
           setGroqKey,
           "gsk_…",
-          aiProvider === "Groq" ? "Active AI provider" : "Optional — fast prompt parsing",
+          aiProvider === "Groq" ? "Active AI provider" : "Optional: fast prompt parsing",
           aiConfigured && aiProvider === "Groq",
           maskedGroq
         )}

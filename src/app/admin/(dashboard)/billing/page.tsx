@@ -56,7 +56,7 @@ export default async function AdminBillingPage() {
               <AdminTableRow key={sub.id}>
                 <AdminTableCell>
                   <div>
-                    <p className="font-medium">{sub.user.name || "—"}</p>
+                    <p className="font-medium">{sub.user.name || "None"}</p>
                     <p className="text-xs text-muted">{sub.user.email}</p>
                   </div>
                 </AdminTableCell>
@@ -66,12 +66,12 @@ export default async function AdminBillingPage() {
                 </AdminTableCell>
                 <AdminTableCell className="text-muted">
                   {sub.currentPeriodStart && sub.currentPeriodEnd
-                    ? `${sub.currentPeriodStart.toLocaleDateString()} – ${sub.currentPeriodEnd.toLocaleDateString()}`
-                    : "—"}
+                    ? `${sub.currentPeriodStart.toLocaleDateString()} to ${sub.currentPeriodEnd.toLocaleDateString()}`
+                    : "None"}
                 </AdminTableCell>
                 <AdminTableCell>{sub.cancelAtPeriodEnd ? "Yes" : "No"}</AdminTableCell>
                 <AdminTableCell className="font-mono text-xs text-muted">
-                  {sub.stripeSubscriptionId || "—"}
+                  {sub.stripeSubscriptionId || "None"}
                 </AdminTableCell>
               </AdminTableRow>
             ))}

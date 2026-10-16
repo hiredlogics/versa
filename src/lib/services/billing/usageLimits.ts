@@ -2,8 +2,15 @@ import { prisma } from "@/lib/db/prisma";
 import type { Plan, Subscription, User } from "@prisma/client";
 import { APOLLO_HARD_MAX_RECORDS } from "@/lib/apollo-config";
 import { isBillingEnforced } from "@/lib/billing/constants";
+import { FREE_TRIAL_PERIOD } from "@/lib/billing/planLimits";
 import type { LeadSearchAccessCode } from "@/lib/billing/billingTypes";
-import { ensureDefaultPlanSubscription, getSubscriptionForUser, isActiveSubscription } from "@/lib/billing/subscription";
+import {
+  ensureDefaultPlanSubscription,
+  getEffectivePlan,
+  getSubscriptionForUser,
+  isOnFreeTrial,
+  paidSubscriptionOrNull,
+} from "@/lib/billing/subscription";
 import type { SubscriptionWithPlan } from "@/lib/billing/subscription";
 
 export class UsageLimitError extends Error {
@@ -50,6 +57,24 @@ export function getUsagePeriod(subscription: Pick<Subscription, "currentPeriodSt
   return { start, end, periodKey: formatPeriodKey(start) };
 }
 
+/** Paid plans count usage per billing period; the free trial is counted once and never resets. */
+export function usagePeriodFor(
+  subscription: Pick<
+    Subscription,
+    "status" | "stripeSubscriptionId" | "currentPeriodStart" | "currentPeriodEnd"
+  > | null,
+  date = new Date()
+) {
+  if (isOnFreeTrial(subscription)) {
+    return {
+      start: new Date(FREE_TRIAL_PERIOD.start),
+      end: new Date(FREE_TRIAL_PERIOD.end),
+      periodKey: FREE_TRIAL_PERIOD.periodKey,
+    };
+  }
+  return getUsagePeriod(paidSubscriptionOrNull(subscription), date);
+}
+
 export async function getOrCreateUsageRecord(
   userId: string,
   periodStart: Date,
@@ -63,12 +88,10 @@ export async function getOrCreateUsageRecord(
 }
 
 export async function getUserPlanLimits(user: User): Promise<Plan> {
-  const sub = await prisma.subscription.findUnique({
-    where: { userId: user.id },
-    include: { plan: true },
-  });
+  const sub = await getSubscriptionForUser(user.id);
 
-  if (sub?.plan) return sub.plan;
+  const effective = await getEffectivePlan(sub);
+  if (effective) return effective;
 
   if (!isBillingEnforced()) {
     await ensureDefaultPlanSubscription(user.id);
@@ -109,14 +132,20 @@ function buildUsageSnapshotFromRecord(
   };
 }
 
+/** Read-only: showing usage never writes; the usage row is created when a search runs. */
 export async function buildUsageSnapshot(userId: string, subscription: SubscriptionWithPlan | null) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new Error("User not found");
-
   try {
-    const plan = subscription?.plan ?? (await getUserPlanLimits(user));
-    const period = getUsagePeriod(subscription);
-    const usage = await getOrCreateUsageRecord(userId, period.start, period.end);
+    let plan = await getEffectivePlan(subscription);
+    if (!plan) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new Error("User not found");
+      plan = await getUserPlanLimits(user);
+    }
+    const period = usagePeriodFor(subscription);
+    const usage = (await prisma.usageRecord.findUnique({
+      where: { userId_periodStart: { userId, periodStart: period.start } },
+      select: { leadsUsed: true, searchesUsed: true },
+    })) ?? { leadsUsed: 0, searchesUsed: 0 };
     return buildUsageSnapshotFromRecord(usage, plan, period);
   } catch {
     const period = getUsagePeriod(null);
@@ -138,19 +167,10 @@ export async function buildUsageSnapshot(userId: string, subscription: Subscript
 }
 
 export async function requireLeadSearchAccess(user: User, requestedMaxLeads?: number) {
+  // Users without an active paid plan search on the free trial's limits.
   const subscription = await getSubscriptionForUser(user.id);
-  const active = isActiveSubscription(subscription);
-
-  if (isBillingEnforced() && !active) {
-    throw new LeadSearchAccessError(
-      "Active subscription required. Choose a plan to continue.",
-      "NO_ACTIVE_SUBSCRIPTION",
-      402
-    );
-  }
-
   const plan = await getUserPlanLimits(user);
-  const period = getUsagePeriod(subscription);
+  const period = usagePeriodFor(subscription);
   const usage = await getOrCreateUsageRecord(user.id, period.start, period.end);
 
   if (!isBillingEnforced()) {
@@ -232,8 +252,10 @@ export async function checkLeadsAllowed(user: User, count: number) {
 
 export async function incrementUsage(userId: string, leads: number, searches = 1) {
   const subscription = await getSubscriptionForUser(userId);
-  const period = getUsagePeriod(subscription);
-  const plan = subscription?.plan ?? (await prisma.plan.findUnique({ where: { slug: "starter" } }));
+  const period = usagePeriodFor(subscription);
+  const plan =
+    (await getEffectivePlan(subscription)) ??
+    (await prisma.plan.findUnique({ where: { slug: "starter" } }));
   if (!plan) throw new Error("Plan not configured");
 
   if (!isBillingEnforced()) {

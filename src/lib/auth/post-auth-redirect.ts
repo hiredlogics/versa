@@ -4,7 +4,7 @@ import { getPostAuthRedirectPath } from "@/lib/billing/subscription";
 
 /**
  * Server-side guard for auth pages.
- * Only redirects when the DB user can be loaded — avoids loops when Clerk
+ * Only redirects when the DB user can be loaded, avoids loops when Clerk
  * has a stale cookie but token refresh fails.
  */
 export async function redirectIfAuthenticated() {

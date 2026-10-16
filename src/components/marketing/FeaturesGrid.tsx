@@ -3,9 +3,9 @@ import { FadeIn } from "./AnimatedAurora";
 import { SectionHeader, SectionShell } from "./SectionShell";
 
 const FEATURES = [
-  { icon: Sparkles, title: "Prompt to filters", desc: "Natural language becomes Apollo-ready search criteria instantly." },
-  { icon: Zap, title: "AI scoring", desc: "Every lead ranked 1–10 with reasoning and outreach angles." },
-  { icon: Shield, title: "Enterprise-ready", desc: "Secure, multi-tenant, usage limits, and admin controls." },
+  { icon: Sparkles, title: "Describe your target", desc: "Plain language becomes useful search criteria instantly." },
+  { icon: Zap, title: "AI scoring", desc: "Every lead ranked 1 to 10 with reasoning and outreach angles." },
+  { icon: Shield, title: "Enterprise-ready", desc: "Secure workspaces, usage limits, and admin controls." },
   { icon: Download, title: "Export anywhere", desc: "CSV and Excel exports for your CRM workflow." },
 ];
 
@@ -15,7 +15,7 @@ export function FeaturesGrid() {
       <SectionHeader
         badge="Features"
         title="Everything you need to find and close B2B leads"
-        subtitle="Purpose-built tools for modern outbound — from prompt to export."
+        subtitle="Tools built for modern outbound, from prompt to export."
       />
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
         {FEATURES.map((f, i) => (

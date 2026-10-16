@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/get-current-user";
-import { requireActiveSubscription } from "@/lib/billing/subscription";
+import { ensureAppAccess } from "@/lib/billing/subscription";
 import {
   getUserLeadContext,
   patchUserLeadContext,
@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
-    await requireActiveSubscription(user.id);
+    await ensureAppAccess(user.id);
 
     const body = await request.json();
     const input = onboardingContextFieldsSchema.parse(body);

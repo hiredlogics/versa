@@ -25,7 +25,7 @@ export function LeadSignalBadges({
   const hidden = signals.length - visible.length;
 
   if (signals.length === 0) {
-    return <span className="text-xs text-lp-muted-dark">—</span>;
+    return <span className="text-xs text-lp-muted-dark">None</span>;
   }
 
   return (

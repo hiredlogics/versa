@@ -10,7 +10,7 @@ export type PlatformStatus = {
 };
 
 const USER_MESSAGE =
-  "Lead search is temporarily unavailable. Our team has been notified — please try again shortly.";
+  "Lead search is temporarily unavailable. Our team has been notified. Please try again shortly.";
 
 export function PlatformStatusBanner({ status }: { status: PlatformStatus | null }) {
   if (!status || status.leadSearchReady) return null;
@@ -37,6 +37,6 @@ export function PlatformStatusBanner({ status }: { status: PlatformStatus | null
 
 export function providerErrorMessage(isAdmin?: boolean) {
   return isAdmin
-    ? "Lead search is unavailable — configure Apollo in Admin → API Keys."
+    ? "Lead search is unavailable. Add the Apollo key in Admin → API Keys."
     : USER_MESSAGE;
 }
