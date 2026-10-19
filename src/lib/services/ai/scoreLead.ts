@@ -42,6 +42,38 @@ export function shortList(value: unknown): string[] {
     .slice(0, 3);
 }
 
+const SAYS_NO_EMAIL = /\b(no|missing|without|lacks?|unknown)\b[^.]*\bemail\b|\bemail\b[^.]*\b(missing|unknown|not (found|available))\b/i;
+const SAYS_HAS_EMAIL = /\b(has|with|verified)\b[^.]*\bemail\b|\bemail (is )?(available|found|verified)\b/i;
+const SAYS_NO_SIZE = /\b(unknown|no|missing)\b[^.]*\b(company )?size\b|\bsize\b[^.]*\bunknown\b/i;
+const SAYS_NO_LOCATION = /\b(unknown|no|missing)\b[^.]*\blocation\b|\blocation\b[^.]*\bunknown\b/i;
+const SAYS_NO_INDUSTRY = /\b(unknown|no|missing)\b[^.]*\bindustry\b|\bindustry\b[^.]*\bunknown\b/i;
+
+function known(value: string | null | undefined): boolean {
+  const v = (value ?? "").trim();
+  return v.length > 0 && v !== "N/A" && v.toLowerCase() !== "unknown";
+}
+
+/**
+ * Drops points the lead's own data proves wrong, e.g. "No email found" on a lead
+ * that has one. The model writes these points freely; this is the one check we
+ * can make without another AI call.
+ */
+export function dropContradictions(
+  points: string[],
+  lead: Pick<ScoredLeadInput, "hasEmail" | "employees" | "location" | "industry">
+): string[] {
+  return points.filter((point) => {
+    if (lead.hasEmail && SAYS_NO_EMAIL.test(point)) return false;
+    if (lead.hasEmail === false && SAYS_HAS_EMAIL.test(point) && !SAYS_NO_EMAIL.test(point)) {
+      return false;
+    }
+    if (lead.employees > 0 && SAYS_NO_SIZE.test(point)) return false;
+    if (known(lead.location) && SAYS_NO_LOCATION.test(point)) return false;
+    if (known(lead.industry) && SAYS_NO_INDUSTRY.test(point)) return false;
+    return true;
+  });
+}
+
 /** Keep each OpenAI score call small enough to finish under AI_TIMEOUT_MS. */
 export const SCORE_BATCH_SIZE = Math.min(
   40,
@@ -121,21 +153,27 @@ Use the skill names exactly as listed. Never add other skills.
 `
     : "";
 
-  return `Score B2B leads 1-10 for the user's search.
+  const rolesLine = context.targetTitles?.length
+    ? `Roles this search asked for: ${context.targetTitles.join(", ")}`
+    : "";
+
+  return `Score leads 1-10 for the user's search.
 
 Search intent: "${context.searchIntent || context.keywords || ""}"
 Current prompt: "${context.originalPrompt || ""}"
+${rolesLine}
 ${ctxBlock}
 ${skillsBlock}
 
 Rules:
+- Score how closely the person matches what the user asked for: the role first, then skills, company, industry, size and location.
+- Seniority is NOT a bonus by itself. Someone more senior than the role asked for is a worse fit, not a better one: for a Data Engineer search, a Data Engineer beats a CTO.
+- Only reward seniority or decision-making power when the prompt asks for it (founders, CEOs, heads of, VPs, directors, decision makers, leaders).
 - Match saved ICP when prompt is vague.
 - Cap relevance low if title is excluded unless prompt explicitly requests that role.
-- Prefer decision-makers in target titles, UNLESS this is an open-to-work / hiring search.
 - For open-to-work / job-seeking / "looking for a job" intent:
-  - Score software engineers, developers, and matching titles at least 6 to 8 when location/role fit.
-  - Do NOT require CEO/founder authority.
-  - Do NOT penalize for missing email or employed status (Apollo can't prove open-to-work).
+  - Score people in the requested role at least 6 to 8 when location and role fit.
+  - Do NOT penalize for missing email or employed status (the data can't prove open-to-work).
   - Explicit seeking/available/freelance title signals can go to 8 to 10.
 - Include ALL leads in response (use the provided index values).${
     context.compareAcrossLeads
@@ -160,6 +198,8 @@ Rules:
   Never write vague points like "Relevant experience", "Current role as X",
   "Limited information", "Diverse experience" or "Diverse job history".
   Never refer to another lead by number or index (no "lead 2"); name the difference instead.
+  Only state facts present in this lead's data. If a field is missing, say it is unknown; never guess it.
+  Never rank a place, company, size or industry as better or worse unless the search asks for it (no "New York is less desirable than San Francisco").
   ${
     context.openToWork
       ? "This search is about job seekers: job-seeking signals matter."
@@ -278,8 +318,8 @@ async function scoreChunkWithAi(
           recommendedApproach:
             item.recommendedApproach || heuristicChunk[item.index].recommendedApproach,
           ...skillsFromAi(item, context.targetSkills),
-          pros: shortList(item.pros),
-          cons: shortList(item.cons),
+          pros: dropContradictions(shortList(item.pros), chunk[item.index]),
+          cons: dropContradictions(shortList(item.cons), chunk[item.index]),
         };
         scores[item.index] = applyCaps(base, chunk[item.index], context);
         fromAi[item.index] = true;

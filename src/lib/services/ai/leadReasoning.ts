@@ -80,15 +80,17 @@ export function buildLeadWhyReasoning(
     ? ` Title signals (${titleSignals.join("; ")}) add urgency and make outreach timely.`
     : "";
 
+  // No strength words ("strong match"): the score says how good the fit is, and it
+  // changes when the search is compared again, while this text does not.
   let fit: string;
   if (context.openToWork) {
     fit = intent
-      ? `is a strong hire / job-search fit for “${intent}”, Open to Work can’t be verified from public data, but role + company context still warrant outreach.`
-      : `is a strong hire / job-search fit, Open to Work can’t be verified from public data, but role + company context still warrant outreach.`;
+      ? `matches the role in your search for “${intent}”. Open to Work can’t be verified from public data, but role and company still warrant outreach.`
+      : `matches the role in your search. Open to Work can’t be verified from public data, but role and company still warrant outreach.`;
   } else if (intent) {
-    fit = `is a strong ICP match for “${intent}”.`;
+    fit = `matches your search for “${intent}”.`;
   } else {
-    fit = `is a strong ICP match based on title and company.`;
+    fit = `matches your search on title and company.`;
   }
 
   const offer = services.length
@@ -124,8 +126,9 @@ Seller context (use only when relevant):
     ? `Mode: hiring / open-to-work search.
 - Do NOT claim they are unemployed or officially Open to Work unless profileSummary/title clearly says so.
 - Prefer job-search urgency (visa/transfer, immediate, W2/C2C, stack keywords, layoff language in title).`
-    : `Mode: B2B buyer outreach.
-- Explain buying authority / ICP fit, not hiring fit.`;
+    : `Mode: normal search.
+- Explain why this person fits what the user asked for: their role first, then skills, company and industry.
+- Do not praise seniority or buying power unless the prompt asks for leaders or decision makers.`;
 
   return `You write the "Why Reach Out" column for a lead spreadsheet.
 
@@ -135,13 +138,18 @@ ${ctxBlock}
 ${mode}
 
 STYLE: match this reference quality (1 to 2 dense sentences, specific):
-"Java full-stack developer at Morgan Stanley with H1B transfer eligibility and willingness to relocate is a strong visa-driven job-search fit. Even without explicit layoff confirmation, 'transfer eligible' typically indicates active movement and time sensitivity where an AI job search assistant is valuable."
+${
+    context.openToWork
+      ? `"Java full-stack developer at Morgan Stanley with H1B transfer eligibility and willingness to relocate, which points to an active, visa-driven job search. 'Transfer eligible' usually means they want to move soon."`
+      : `"Data Engineer at Shopify whose last two roles were data platform work at retail companies, which matches the data engineering role you searched for. Based in Toronto, inside your target area."`
+  }
 
 HARD RULES:
 - One unique paragraph per lead. Cite THIS person's title, company, and any concrete signals in the title/profileSummary.
 - Never use generic score phrases: "Matching role", "Matches your search intent", "Matches saved target industry", "Good company size".
 - No email draft, greeting, subject line, or bullet lists.
 - If a detail is unknown, skip it, do not invent layoffs or Open to Work badges.
+- Never say how good a fit they are or rank them ("strong fit", "top lead", "ideal", "perfect", "best"). Give the reasons only; the score is shown separately and can change.
 
 Return JSON only: { "leads": [{ "index": 0, "reasoning": "..." }] }`;
 }
@@ -163,7 +171,6 @@ async function generateWhyChunk(
     employees: lead.employees,
     location: lead.location,
     hasEmail: lead.hasEmail,
-    leadScore: lead.leadScore,
     profileSummary: lead.profileSummary ?? null,
     titleSignals: extractTitleSignals(lead.title),
   }));

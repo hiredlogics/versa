@@ -270,6 +270,7 @@ async function runSearchStep(args: {
   );
   scoreContext.openToWork = args.criteria.openToWork;
   scoreContext.fitCriteria = args.criteria.fitCriteria;
+  scoreContext.targetTitles = args.criteria.apollo?.personTitles ?? args.criteria.jobTitles ?? [];
   scoreContext.requireEmail = args.wantsEmail;
 
   // After new leads are saved, score the whole search again side by side.

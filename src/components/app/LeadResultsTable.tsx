@@ -117,6 +117,8 @@ export function LeadResultsTable({
             pros={row.original.scorePros}
             cons={row.original.scoreCons}
             reasoning={row.original.reasoning}
+            fitVerdict={row.original.fitVerdict}
+            fitReason={row.original.fitReason}
           />
         ),
       }),

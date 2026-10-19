@@ -268,6 +268,19 @@ export function applyRelevanceGate<T extends { id: string; title?: string | null
   return { kept, rejected, summary, protectedCount };
 }
 
+/**
+ * What gets saved on the lead and shown to the user. "unknown" (not checked, or
+ * the check failed) saves nothing. Long dashes become commas: users never see them.
+ */
+export function fitForLead(result: GateResult | undefined): {
+  fitVerdict: string | null;
+  fitReason: string | null;
+} {
+  if (!result || result.verdict === "unknown") return { fitVerdict: null, fitReason: null };
+  const reason = result.reason.replace(/\s*[–—]\s*/g, ", ").trim();
+  return { fitVerdict: result.verdict, fitReason: reason || null };
+}
+
 /** Clear matches unlock before maybes when the unlock budget runs short. */
 export function gateRank(verdict: GateVerdict | undefined): number {
   if (verdict === "match") return 0;

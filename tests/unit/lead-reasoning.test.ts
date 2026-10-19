@@ -101,7 +101,9 @@ describe("buildLeadWhyReasoning", () => {
 
     expect(result.reasoning).toContain("CEO at CloudCo");
     expect(result.reasoning).toContain("San Francisco");
-    expect(result.reasoning).toMatch(/SaaS founders|ICP match|AI lead scoring/i);
+    expect(result.reasoning).toMatch(/SaaS founders|matches your search|AI lead scoring/i);
+    // The score says how strong the fit is; this text must not claim it.
+    expect(result.reasoning).not.toMatch(/strong/i);
     expect(result.reasoning.toLowerCase()).not.toContain("matching role");
     expect(result.reasoning.toLowerCase()).not.toContain("matches your search intent");
     expect(result.emailDraft).toBe("");

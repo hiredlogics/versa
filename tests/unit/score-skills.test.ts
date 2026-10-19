@@ -168,9 +168,9 @@ describe("score pros and cons", () => {
     vi.mocked(aiChat).mockRejectedValueOnce(new Error("AI down"));
     const result = await scoreLeadsWithAi([lead], context);
     expect(result.provider).toBe("HEURISTIC");
-    expect(result.scores[0].cons).toEqual(
-      expect.arrayContaining(["Not a decision maker title", "No email found"])
-    );
+    expect(result.scores[0].cons).toEqual(expect.arrayContaining(["No email found"]));
+    // Seniority is only judged when the search asks for leaders.
+    expect(result.scores[0].cons).not.toContain("Not a decision maker title");
   });
 });
 

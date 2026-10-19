@@ -1,3 +1,4 @@
+import { scoreTitle } from "./pipeline/verify";
 import type { LeadScoreContext, LeadScoreResult } from "./types";
 
 export type HeuristicLeadInput = {
@@ -45,6 +46,7 @@ const AUTHORITY_SIGNALS = [
   "president",
   "owner",
   "head of",
+  "director",
 ];
 
 const STOP_WORDS = new Set([
@@ -87,6 +89,23 @@ const BUYER_SIGNALS = [
   "owner",
 ];
 
+/** Words that mean the user wants leaders, so seniority may raise a score. */
+const SENIORITY_REQUEST =
+  /\b(ceos?|ctos?|cfos?|coos?|cmos?|cios?|founders?|co-?founders?|owners?|chiefs?|vps?|vice presidents?|presidents?|heads? of|directors?|executives?|leaders?|leadership|decision[\s-]?makers?|c-?suite)\b/i;
+
+export function asksForSeniority(context?: LeadScoreContext): boolean {
+  const text = `${context?.originalPrompt ?? ""} ${context?.searchIntent ?? ""}`;
+  return SENIORITY_REQUEST.test(text);
+}
+
+/** "exact" when the title is or contains a searched title, "close" when they share a word. */
+export function titleRoleFit(title: string, targetTitles: string[]): "exact" | "close" | "none" {
+  const value = scoreTitle(title, targetTitles);
+  if (value >= 32) return "exact";
+  if (value > 0) return "close";
+  return "none";
+}
+
 export function heuristicScoreLead(
   lead: HeuristicLeadInput,
   context?: LeadScoreContext
@@ -107,7 +126,10 @@ export function heuristicScoreLead(
     } else {
       cons.push("No job seeking words in title");
     }
-    if (ROLE_SIGNALS.some((s) => title.includes(s))) {
+    const otwRoleMatch =
+      ROLE_SIGNALS.some((s) => title.includes(s)) ||
+      titleRoleFit(lead.title, context.targetTitles ?? []) !== "none";
+    if (otwRoleMatch) {
       score += 2;
       reasons.push("Matching role");
     } else {
@@ -120,7 +142,7 @@ export function heuristicScoreLead(
       cons.push("Your search words are not in the profile");
     }
     // Employed professionals in the target role are still valid outreach/hire targets
-    if (score < 7 && ROLE_SIGNALS.some((s) => title.includes(s))) {
+    if (score < 7 && otwRoleMatch) {
       score = 7;
       reasons.push("Target role match for this job search");
     }
@@ -137,15 +159,31 @@ export function heuristicScoreLead(
       cons.push("Company size unknown or outside 11 to 5,000");
     }
   } else {
-    if (AUTHORITY_SIGNALS.some((s) => title.includes(s))) {
-      score += 2;
-      reasons.push("Has decision making authority");
-    } else {
-      cons.push("Not a decision maker title");
-    }
-    if (signals.length > 0 && BUYER_SIGNALS.some((s) => title.includes(s))) {
+    // The role asked for is the main thing. A Data Engineer search wants Data
+    // Engineers; a CTO at the same company is a worse fit, not a better one.
+    const roleFit = titleRoleFit(lead.title, context?.targetTitles ?? []);
+    if (roleFit === "exact") {
+      score += 3;
+      reasons.push("Title matches the role you searched for");
+    } else if (roleFit === "close") {
       score += 1;
-      reasons.push("Decision maker for this search");
+      reasons.push("Title is close to the role you searched for");
+    } else if ((context?.targetTitles?.length ?? 0) > 0) {
+      cons.push("Title is not one of the roles you searched for");
+    }
+
+    // Seniority counts only when the search asks for leaders.
+    if (asksForSeniority(context)) {
+      if (AUTHORITY_SIGNALS.some((s) => title.includes(s))) {
+        score += 2;
+        reasons.push("Senior title, as your search asks");
+      } else {
+        cons.push("Not a senior title, which your search asks for");
+      }
+      if (signals.length > 0 && BUYER_SIGNALS.some((s) => title.includes(s))) {
+        score += 1;
+        reasons.push("Leader for the area you searched");
+      }
     }
     if (textMatchesSignals(title, signals)) {
       score += 2;

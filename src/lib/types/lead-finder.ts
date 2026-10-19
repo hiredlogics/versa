@@ -27,6 +27,9 @@ export interface LeadRecord {
   /** Points for / against the score, shown when hovering it. */
   scorePros?: string[];
   scoreCons?: string[];
+  /** Relevance check before the email unlock: "match", "partial" or "no". */
+  fitVerdict?: string | null;
+  fitReason?: string | null;
   openToWorkLevel?: string | null;
   openToWorkReasons?: string[];
 }

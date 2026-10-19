@@ -15,6 +15,7 @@ import {
 import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
 import {
   applyRelevanceGate,
+  fitForLead,
   gateModeFor,
   gateRank,
   judgeRelevance,
@@ -668,6 +669,7 @@ export async function runSequentialLeadBatches(input: {
       missingSkills: lead.missingSkills ?? [],
       scorePros: lead.scorePros ?? [],
       scoreCons: lead.scoreCons ?? [],
+      ...fitForLead(verdicts.get(lead.apolloPersonId)),
       openToWorkLevel: otwScores[i].level,
       openToWorkReasons: otwScores[i].reasons,
       whySource: whySourceByApolloId.get(lead.apolloPersonId) ?? "TEMPLATE",

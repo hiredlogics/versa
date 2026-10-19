@@ -9,7 +9,7 @@ import type { LeadRecord } from "@/lib/types/lead-finder";
 import { priorityLabel } from "@/lib/types/lead-finder";
 import { formatSkillsBreakdown } from "@/lib/skills-breakdown";
 import { OPEN_TO_WORK_NOTE, OpenToWorkBadge } from "@/components/app/OpenToWorkBadge";
-import { ScorePoints } from "@/components/app/ScoreWhy";
+import { FitCheck, ScorePoints } from "@/components/app/ScoreWhy";
 
 export function LeadDetailDrawer({
   lead,
@@ -83,6 +83,7 @@ export function LeadDetailDrawer({
                 {skillsBreakdown && (
                   <p className="text-xs font-medium text-lp-off-white">{skillsBreakdown}</p>
                 )}
+                <FitCheck verdict={lead.fitVerdict} reason={lead.fitReason} />
                 <ScorePoints pros={lead.scorePros} cons={lead.scoreCons} />
               </section>
 

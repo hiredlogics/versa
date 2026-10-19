@@ -17,11 +17,15 @@ export function ScoreWhy({
   pros = [],
   cons = [],
   reasoning,
+  fitVerdict,
+  fitReason,
 }: {
   score: number;
   pros?: string[];
   cons?: string[];
   reasoning?: string | null;
+  fitVerdict?: string | null;
+  fitReason?: string | null;
 }) {
   const [position, setPosition] = useState<{
     top: number;
@@ -103,6 +107,7 @@ export function ScoreWhy({
             <p className="text-[11px] font-semibold uppercase tracking-wider text-lp-muted-dark">
               Why {score}/10
             </p>
+            <FitCheck verdict={fitVerdict} reason={fitReason} />
             {hasPoints ? (
               <ScorePoints pros={pros} cons={cons} />
             ) : (
@@ -115,6 +120,36 @@ export function ScoreWhy({
           document.body,
         )}
     </>
+  );
+}
+
+const FIT_LABEL: Record<string, string> = {
+  match: "Fits your search",
+  partial: "Partly fits your search",
+  no: "May not fit your search",
+};
+
+/** The check made before this person's email was unlocked, with its reason. */
+export function FitCheck({
+  verdict,
+  reason,
+}: {
+  verdict?: string | null;
+  reason?: string | null;
+}) {
+  const label = verdict ? FIT_LABEL[verdict] : undefined;
+  if (!label) return null;
+  const tone =
+    verdict === "match"
+      ? "text-emerald-300"
+      : verdict === "partial"
+        ? "text-amber-300"
+        : "text-rose-300";
+  return (
+    <p className="text-xs leading-snug text-lp-muted">
+      <span className={`font-medium ${tone}`}>{label}</span>
+      {reason ? <span>: {reason}</span> : null}
+    </p>
   );
 }
 

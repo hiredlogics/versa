@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Data engineering developers",
+    "prompt": "Data engineering developers in Canada",
+    "people": [
+      { "id": "de", "title": "Data Engineer", "company": "Shopify", "industry": "retail", "employees": 10000, "location": "Toronto, Canada", "headline": "Spark, Airflow, dbt" },
+      { "id": "sde", "title": "Senior Data Engineer", "company": "Wealthsimple", "industry": "financial services", "employees": 1500, "location": "Toronto, Canada" },
+      { "id": "cto", "title": "CTO", "company": "Shopify", "industry": "retail", "employees": 10000, "location": "Ottawa, Canada" },
+      { "id": "vp", "title": "VP Engineering", "company": "Wealthsimple", "industry": "financial services", "employees": 1500, "location": "Toronto, Canada" },
+      { "id": "mkt", "title": "Marketing Manager", "company": "Shopify", "industry": "retail", "employees": 10000, "location": "Toronto, Canada" }
+    ],
+    "pairs": [["de", "cto"], ["sde", "vp"], ["de", "mkt"], ["sde", "mkt"]]
+  },
+  {
+    "name": "React developers",
+    "prompt": "React developers in the United States",
+    "people": [
+      { "id": "react", "title": "Frontend Developer", "company": "Airbnb", "industry": "internet", "employees": 6000, "location": "San Francisco, US", "headline": "React, TypeScript, Next.js" },
+      { "id": "fs", "title": "Full Stack Engineer", "company": "Notion", "industry": "computer software", "employees": 800, "location": "New York, US", "headline": "React and Node" },
+      { "id": "founder", "title": "Founder & CEO", "company": "Small Studio", "industry": "computer software", "employees": 12, "location": "Austin, US" },
+      { "id": "dir", "title": "Director of Engineering", "company": "Airbnb", "industry": "internet", "employees": 6000, "location": "San Francisco, US" }
+    ],
+    "pairs": [["react", "founder"], ["react", "dir"], ["fs", "founder"]]
+  },
+  {
+    "name": "SaaS founders (leaders asked for)",
+    "prompt": "Founders and CEOs of B2B SaaS companies in the United States",
+    "people": [
+      { "id": "ceo", "title": "Co-Founder & CEO", "company": "Ramp", "industry": "computer software", "employees": 900, "location": "New York, US", "headline": "Building finance software for businesses" },
+      { "id": "founder", "title": "Founder", "company": "Small SaaS Co", "industry": "computer software", "employees": 30, "location": "Austin, US" },
+      { "id": "eng", "title": "Software Engineer", "company": "Ramp", "industry": "computer software", "employees": 900, "location": "New York, US" },
+      { "id": "bakery", "title": "Founder", "company": "Austin Bakehouse", "industry": "food production", "employees": 8, "location": "Austin, US" }
+    ],
+    "pairs": [["ceo", "eng"], ["founder", "eng"], ["founder", "bakery"]]
+  },
+  {
+    "name": "Heads of payments",
+    "prompt": "Heads of payments at US fintech companies",
+    "people": [
+      { "id": "head", "title": "Head of Payments", "company": "Brex", "industry": "financial services", "employees": 1200, "location": "San Francisco, US" },
+      { "id": "analyst", "title": "Payments Analyst", "company": "Brex", "industry": "financial services", "employees": 1200, "location": "San Francisco, US" },
+      { "id": "talent", "title": "Head of Talent", "company": "Stripe", "industry": "financial services", "employees": 8000, "location": "San Francisco, US" }
+    ],
+    "pairs": [["head", "analyst"], ["head", "talent"]]
+  }
+]

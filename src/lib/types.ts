@@ -187,6 +187,8 @@ export interface LeadScoreContext {
   targetSkills?: string[];
   /** Soft requirements from the parser, judged before unlocking. */
   fitCriteria?: string[];
+  /** The job titles this search asked for. Scores reward matching these, not seniority. */
+  targetTitles?: string[];
   /** Score the leads relative to each other (all from the same search). */
   compareAcrossLeads?: boolean;
 }
