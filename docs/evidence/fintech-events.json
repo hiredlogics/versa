@@ -1,0 +1,102 @@
+[
+  {
+    "event": "apollo_variant_attempt",
+    "level": 0,
+    "label": "exact AI filters",
+    "totalEntries": 3895,
+    "pagePeople": 100,
+    "params": {
+      "tags": [
+        "fintech"
+      ],
+      "q": null,
+      "size": [
+        "11,50"
+      ],
+      "titles": [
+        "Founder",
+        "CEO"
+      ]
+    }
+  },
+  {
+    "event": "apollo_variant_selected",
+    "level": 0,
+    "label": "exact AI filters",
+    "totalEntries": 3895,
+    "relaxed": false
+  },
+  {
+    "event": "prescreen",
+    "candidates": 100,
+    "passed": 94,
+    "dropped": 6,
+    "minScore": 60,
+    "durationMs": 31208
+  },
+  {
+    "event": "stage_chunk_summary",
+    "stage": "unlock",
+    "people": 30,
+    "unlockedEmail": 10,
+    "chunkFailures": 0,
+    "chunkCount": 1,
+    "medianMs": 1777,
+    "p95Ms": 1777,
+    "maxMs": 1777,
+    "revealPersonal": false,
+    "stoppedEarly": true
+  },
+  {
+    "event": "contact_pool_saved",
+    "saved": 10
+  },
+  {
+    "event": "postcheck",
+    "candidates": 10,
+    "passed": 7,
+    "dropped": 3,
+    "minScore": 60,
+    "durationMs": 3841
+  },
+  {
+    "event": "postcheck_rejected",
+    "rejected": [
+      {
+        "company": "FinTech Automation",
+        "title": "Founder and CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry does not match fintech."
+      },
+      {
+        "company": "4Told FinTech",
+        "title": "CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry does not match fintech."
+      },
+      {
+        "company": "FINTECH.TV",
+        "title": "Founder & CEO",
+        "industry": "media production",
+        "score": 40,
+        "reason": "Industry does not match fintech."
+      }
+    ]
+  },
+  {
+    "event": "batch_complete",
+    "batchIndex": 1,
+    "fetched": 100,
+    "savedWithEmail": 7,
+    "skippedUnverified": 0,
+    "leadsFetched": 100,
+    "leadsWithEmail": 7,
+    "lastPage": 1,
+    "totalPages": 10,
+    "unlockAttempts": 10,
+    "unlockBudget": 30,
+    "creditsPerSavedLead": 1.43
+  }
+]

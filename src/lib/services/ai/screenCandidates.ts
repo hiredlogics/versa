@@ -137,7 +137,7 @@ const POSTCHECK_SYSTEM = `You do the final quality check on B2B sales leads AFTE
 You now see job title, employer, employer industry, employee count and location. Score 0-100 how well each lead matches the request.
 Rules:
 - Role must match in function and seniority.
-- Industry must fit the wanted industry. The industry label is a coarse provider tag: "information technology & services" and "computer software" also cover security, data and SaaS vendors, so when the label is generic, let the employer name and what you know about the company decide (e.g. "Cyberhill" with an IT-services label is a plausible cybersecurity firm).
+- Industry must fit the wanted industry. The industry label is a coarse provider tag: "information technology & services" and "computer software" also cover security, data and SaaS vendors, so when the label is generic, let the employer name and what you know about the company decide (e.g. "Cyberhill" with an IT-services label is a plausible cybersecurity firm). If the employer name itself contains the wanted industry term (e.g. "FinTech Automation" for fintech), treat industry as a match unless the name shows it is media, a community, an event or an agency.
 - "Companies in industry X" means businesses whose main product or service is X. Communities, societies, associations, conferences, events, media, recruiters, training providers, marketing agencies and banks that merely serve or mention X are NOT in industry X and score below 40, unless the request asks for them. Judge this from the employer name and industry label together.
 - Employee count and location must fall inside the wanted ranges when they are given.
 - A clear contradiction on any hard constraint scores below 40. Missing data is not a contradiction.
