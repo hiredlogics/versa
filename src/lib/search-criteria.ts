@@ -620,58 +620,113 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     return variants;
   }
 
+  // With industry tags in play the free-text keyword is redundant and far more
+  // restrictive (tags + q_keywords "Cybersecurity" matched 5 people; the tag
+  // alone matched 1,600+), so it is folded into the tags instead.
+  const tagSet = new Set(organizationKeywordTags ?? []);
+  if (organizationKeywordTags && industryKeyword) {
+    for (const tag of industryToKeywordTags(industryKeyword) ?? []) tagSet.add(tag);
+  }
+  const tags = organizationKeywordTags ? [...tagSet] : undefined;
+  // Apollo OR-s keyword tags, so synonyms widen the pool without leaving the industry.
+  const widerTags = tags ? expandIndustryTags(tags) : undefined;
+  // A size the user asked for is a hard constraint: the post-unlock check
+  // rejects anything outside it, so relaxing it here only burns credits.
+  // Parsers fill 10-500 when the prompt names no size; that pair is a guess.
+  const sizeRequested =
+    (criteria.companySizeMin > 0 || criteria.companySizeMax > 0) &&
+    !(criteria.companySizeMin === 10 && criteria.companySizeMax === 500);
+
   const exact: ApolloSearchFilters = {
     personTitles: titles,
     personLocations: primaryLocation,
-    qKeywords: industryKeyword,
-    organizationKeywordTags,
+    qKeywords: tags ? undefined : industryKeyword,
+    organizationKeywordTags: tags,
     employeeRanges,
     includeSimilarTitles: base.includeSimilarTitles !== false,
   };
 
-  // 0 — exact AI filters (industry keyword kept)
+  // 0 — exact AI filters
   add(0, "exact AI filters", exact);
 
-  // 1 — broaden company-size buckets, KEEP industry keyword
-  add(1, "industry + titles + wider company size", {
-    ...exact,
-    employeeRanges: ["11,50", "51,200", "201,500"],
-  });
+  // 1 — industry synonyms, same titles and size
+  if (widerTags && tags && widerTags.length > tags.length) {
+    add(1, "industry synonyms + titles + size", { ...exact, organizationKeywordTags: widerTags });
+  }
+  const widest: ApolloSearchFilters = { ...exact, organizationKeywordTags: widerTags ?? tags };
 
-  // 2 — drop company size only, KEEP industry keyword
-  add(2, "industry + titles + location (no size filter)", {
-    ...exact,
-    employeeRanges: undefined,
-  });
+  // 2/3 — size was a parser guess, not a request: allow wider buckets, then none
+  if (!sizeRequested) {
+    add(2, "industry + titles + wider company size", {
+      ...widest,
+      employeeRanges: ["11,50", "51,200", "201,500"],
+    });
+    add(3, "industry + titles + location (no size filter)", {
+      ...widest,
+      employeeRanges: undefined,
+    });
+  }
 
-  // 3 — fewer titles, KEEP industry keyword
+  // 4 — fewer titles, KEEP industry and any requested size
   if (titles.length > 2) {
-    add(3, "industry + top titles + location", {
-      ...exact,
+    add(4, "industry + top titles + location", {
+      ...widest,
       personTitles: titles.slice(0, 3),
-      employeeRanges: undefined,
     });
   }
 
-  // 4 — shorten keyword to primary industry token only if multi-word
-  if (industryKeyword && industryKeyword.includes(" ")) {
-    add(4, `primary industry keyword: "${industryKeyword.split(/\s+/)[0]}"`, {
+  // 5 — free-text industry keyword instead of tags (different matching)
+  if (industryKeyword) {
+    add(5, `industry free-text keyword "${industryKeyword}"`, {
       ...exact,
-      qKeywords: industryKeyword.split(/\s+/).slice(0, 2).join(" "),
-      employeeRanges: undefined,
+      organizationKeywordTags: undefined,
+      qKeywords: industryKeyword,
     });
   }
 
-  // 5 — LAST resort: drop keyword (score by searchIntent after fetch)
-  add(5, "titles + location only (industry ranked after fetch)", {
+  // 6 — LAST resort: no industry filter; the LLM screen judges fit after fetch.
+  add(6, "titles + location only (industry judged after fetch)", {
     personTitles: titles.slice(0, 3),
     personLocations: primaryLocation,
     qKeywords: undefined,
-    employeeRanges: undefined,
+    organizationKeywordTags: undefined,
+    employeeRanges: sizeRequested ? employeeRanges : undefined,
     includeSimilarTitles: true,
   });
 
   return variants;
+}
+
+const INDUSTRY_SYNONYMS: Record<string, string[]> = {
+  software: ["saas", "software development"],
+  saas: ["software"],
+  cybersecurity: ["cyber security", "information security", "network security"],
+  "cyber security": ["cybersecurity", "information security"],
+  "information security": ["cybersecurity", "cyber security"],
+  fintech: ["financial technology", "payments"],
+  healthcare: ["health care", "medical"],
+  "health care": ["healthcare", "medical"],
+  "e-commerce": ["ecommerce", "online retail"],
+  ecommerce: ["e-commerce", "online retail"],
+  "real estate": ["proptech", "property management"],
+  logistics: ["supply chain", "transportation"],
+  manufacturing: ["industrial", "machinery"],
+  insurance: ["insurtech"],
+  education: ["edtech", "e-learning"],
+  biotech: ["biotechnology", "life sciences"],
+  "artificial intelligence": ["ai", "machine learning"],
+  ai: ["artificial intelligence", "machine learning"],
+  recruiting: ["staffing", "talent acquisition"],
+  staffing: ["recruiting", "talent acquisition"],
+};
+
+/** Adds known synonyms so the OR-ed tag filter widens without leaving the industry. */
+export function expandIndustryTags(tags: string[]): string[] {
+  const out = new Set(tags);
+  for (const tag of tags) {
+    for (const synonym of INDUSTRY_SYNONYMS[tag] ?? []) out.add(synonym);
+  }
+  return [...out].slice(0, 8);
 }
 
 export function normalizeSearchCriteria(

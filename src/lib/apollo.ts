@@ -136,7 +136,7 @@ interface ApolloSearchResponse {
   };
 }
 
-interface ApolloSearchRawPerson extends ApolloProfileRaw {
+export interface ApolloSearchRawPerson extends ApolloProfileRaw {
   id: string;
   first_name?: string;
   last_name?: string;
@@ -238,7 +238,7 @@ function defaultContactEmailStatus(): string[] | undefined {
   return raw === "false" || raw === "0" ? undefined : ["verified"];
 }
 
-function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string): ApolloPerson {
+export function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string): ApolloPerson {
   const org = raw.organization;
   const lastName = raw.last_name || raw.last_name_obfuscated || "";
   const email = extractBestEmail(raw);
@@ -349,9 +349,11 @@ async function searchWithSmartFallback(
   // Always allowed to widen a too-narrow query; the employer stays pinned.
   const smartRelax = true;
   const variants = buildApolloSearchVariants(criteria);
-  // OTW keyword hits are rare; accepting a pool of 1 often means unlock finds
-  // no verified email. Prefer a larger pool before stopping (still OTW-biased).
-  const minAcceptPool = criteria.openToWork ? 25 : 1;
+  // A tiny pool means the exact filters were too literal (e.g. the industry
+  // tag matched 5 people). Widening keeps the industry and relaxes size or
+  // titles, so the LLM screen has real candidates to choose from. The widest
+  // pool seen is still used when no variant reaches the minimum.
+  const minAcceptPool = 25;
 
   logLeadFetch("apollo_filters_input", {
     filters: JSON.parse(formatApolloFiltersLog(criteria)) as Record<string, unknown>,
@@ -395,8 +397,8 @@ async function searchWithSmartFallback(
         best = candidate;
       }
 
-      // Accept once the pool is large enough — or immediately for non-OTW.
-      if (!criteria.openToWork || result.totalEntries >= minAcceptPool) {
+      // Accept once the pool is large enough; otherwise try the next, wider variant.
+      if (result.totalEntries >= minAcceptPool) {
         if (variant.level > 0) {
           console.log(
             `[apollo] Smart relax level ${variant.level}: ${variant.label} → ${result.totalEntries} results`
@@ -412,7 +414,7 @@ async function searchWithSmartFallback(
       }
 
       console.log(
-        `[apollo] Level ${variant.level} only ${result.totalEntries} hits (<${minAcceptPool}) — trying wider OTW variant`
+        `[apollo] Level ${variant.level} only ${result.totalEntries} hits (<${minAcceptPool}) — trying wider variant`
       );
     }
 

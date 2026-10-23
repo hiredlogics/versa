@@ -192,11 +192,19 @@ describe("search-criteria helpers", () => {
       },
     });
 
-    expect(variants[0].filters.qKeywords).toBe("real estate");
-    expect(variants[1].filters.qKeywords).toBe("real estate");
-    expect(variants[2].filters.qKeywords).toBe("real estate");
-    // Last variant may drop keyword only as last resort
-    expect(variants[variants.length - 1].filters.qKeywords).toBeUndefined();
+    // The industry travels as OR-ed company keyword tags (the free-text keyword
+    // on top of tags over-restricts), and stays on every variant but the last.
+    const withIndustry = variants.slice(0, -1);
+    expect(withIndustry.length).toBeGreaterThan(2);
+    for (const variant of withIndustry) {
+      const tagged = (variant.filters.organizationKeywordTags ?? []).includes("real estate");
+      const keyworded = variant.filters.qKeywords === "real estate";
+      expect(tagged || keyworded).toBe(true);
+    }
+    // Last variant may drop the industry only as last resort
+    const last = variants[variants.length - 1].filters;
+    expect(last.qKeywords).toBeUndefined();
+    expect(last.organizationKeywordTags).toBeUndefined();
   });
 
   it("moves need-words out of long keyword blobs", () => {

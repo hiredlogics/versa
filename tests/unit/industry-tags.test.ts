@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildApolloSearchVariants, industryToKeywordTags } from "@/lib/search-criteria";
+import {
+  buildApolloSearchVariants,
+  expandIndustryTags,
+  industryToKeywordTags,
+} from "@/lib/search-criteria";
 import type { SearchCriteria } from "@/lib/types";
 
 function criteriaFor(industry: string, extra: Partial<SearchCriteria> = {}): SearchCriteria {
@@ -14,6 +18,7 @@ function criteriaFor(industry: string, extra: Partial<SearchCriteria> = {}): Sea
     apollo: {
       personTitles: ["Head of Sales", "VP of Sales"],
       personLocations: ["United States"],
+      qKeywords: industry,
       employeeRanges: ["51,200"],
       includeSimilarTitles: true,
     },
@@ -39,15 +44,57 @@ describe("industryToKeywordTags", () => {
   });
 });
 
+describe("expandIndustryTags", () => {
+  it("adds known synonyms and keeps the originals first", () => {
+    expect(expandIndustryTags(["cybersecurity"])).toEqual([
+      "cybersecurity",
+      "cyber security",
+      "information security",
+      "network security",
+    ]);
+    expect(expandIndustryTags(["underwater basket weaving"])).toEqual(["underwater basket weaving"]);
+  });
+});
+
 describe("buildApolloSearchVariants industry tags", () => {
-  it("sends the industry to Apollo and keeps it through the relax levels", () => {
+  it("sends the industry as tags, not as the restrictive free-text keyword", () => {
     const variants = buildApolloSearchVariants(criteriaFor("Software"));
     expect(variants[0].filters.organizationKeywordTags).toEqual(["software"]);
-    // Widening size / dropping size must not drop the industry.
-    expect(variants[1].filters.organizationKeywordTags).toEqual(["software"]);
-    expect(variants[2].filters.organizationKeywordTags).toEqual(["software"]);
+    expect(variants[0].filters.qKeywords).toBeUndefined();
+  });
+
+  it("widens with synonyms before giving up the industry", () => {
+    const variants = buildApolloSearchVariants(criteriaFor("Cybersecurity"));
+    expect(variants[0].filters.organizationKeywordTags).toEqual(["cybersecurity"]);
+    expect(variants[1].filters.organizationKeywordTags).toEqual(
+      expect.arrayContaining(["cybersecurity", "cyber security", "information security"])
+    );
     // Only the last-resort variant searches without the industry.
-    expect(variants[variants.length - 1].filters.organizationKeywordTags).toBeUndefined();
+    const last = variants[variants.length - 1].filters;
+    expect(last.organizationKeywordTags).toBeUndefined();
+    expect(last.qKeywords).toBeUndefined();
+  });
+
+  it("never relaxes a company size the user asked for", () => {
+    const variants = buildApolloSearchVariants(criteriaFor("Software"));
+    for (const variant of variants) {
+      expect(variant.filters.employeeRanges).toEqual(["51,200"]);
+    }
+  });
+
+  it("may widen or drop size when the parser only guessed it", () => {
+    const variants = buildApolloSearchVariants(
+      criteriaFor("Software", {
+        companySizeMin: 0,
+        companySizeMax: 0,
+        apollo: {
+          personTitles: ["Head of Sales"],
+          personLocations: ["United States"],
+          includeSimilarTitles: true,
+        },
+      })
+    );
+    expect(variants.some((v) => v.filters.employeeRanges === undefined)).toBe(true);
   });
 
   it("never adds an industry tag when the employer is pinned", () => {
@@ -67,8 +114,19 @@ describe("buildApolloSearchVariants industry tags", () => {
     }
   });
 
-  it("omits the tag entirely when the industry is unknown", () => {
-    const variants = buildApolloSearchVariants(criteriaFor("Any"));
+  it("falls back to the free-text keyword when the industry is unknown", () => {
+    const variants = buildApolloSearchVariants(
+      criteriaFor("Any", {
+        apollo: {
+          personTitles: ["Head of Sales"],
+          personLocations: ["United States"],
+          qKeywords: "saas",
+          employeeRanges: ["51,200"],
+          includeSimilarTitles: true,
+        },
+      })
+    );
     expect(variants[0].filters.organizationKeywordTags).toBeUndefined();
+    expect(variants[0].filters.qKeywords).toBe("saas");
   });
 });

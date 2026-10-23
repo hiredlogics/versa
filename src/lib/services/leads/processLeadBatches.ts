@@ -13,7 +13,9 @@ import {
   generateLeadReasoningBatch,
 } from "@/lib/services/ai/leadReasoning";
 import { scoreLeadsWithAi, toDbPriority } from "@/lib/services/ai/scoreLead";
+import { prescreenCandidates, verifyUnlockedLeads } from "@/lib/services/ai/screenCandidates";
 import { filterLeadsWithUsableEmail } from "@/lib/services/leads/enrichWhyBatch";
+import { lookupContactPool, saveToContactPool } from "@/lib/services/leads/contactPool";
 import {
   getMaxAutoBatches,
   getProcessBatchSize,
@@ -411,6 +413,37 @@ export async function runSequentialLeadBatches(input: {
       }))
     );
 
+    // LLM pre-screen on the free search data (title + employer) so weak fits
+    // never reach the paid unlock step. Null means the AI was unavailable, in
+    // which case the heuristic order stands and nothing is dropped.
+    await prisma.leadSearch.update({
+      where: { id: input.searchId },
+      data: {
+        relaxNote: batchProgressNote({
+          checked: leadsFetched + people.length,
+          pool: totalAvailable,
+          withEmail: leadsWithEmail,
+          batchIndex,
+          batchSize,
+          phase: `Screening ${workList.length.toLocaleString()} candidates with AI before spending credits…`,
+        }),
+      },
+    });
+    const prescreen = await prescreenCandidates(
+      workList.map((lead) => ({ id: lead.apolloPersonId, title: lead.title, company: lead.company })),
+      { prompt: input.prompt, criteria: input.criteria, userId: input.userId, searchId: input.searchId }
+    );
+    if (prescreen) {
+      workList = workList
+        .filter((lead) => prescreen.get(lead.apolloPersonId)?.pass !== false)
+        .sort((a, b) => {
+          const fit =
+            (prescreen.get(b.apolloPersonId)?.score ?? 50) -
+            (prescreen.get(a.apolloPersonId)?.score ?? 50);
+          return fit !== 0 ? fit : b.leadScore - a.leadScore;
+        });
+    }
+
     // Unlock highest-scored first so credit exhaustion still keeps the best fits,
     // and never spend more unlock credits than this run is allowed.
     const peopleById = new Map(people.map((p) => [p.id, p]));
@@ -425,6 +458,23 @@ export async function runSequentialLeadBatches(input: {
       isUsableEmail(result.person.email) &&
       (!verifiedOnly || isVerifiedEmail(result.person.email, result.person.email_status ?? null));
     let unlockedThisBatch = 0;
+
+    // Contact pool: anyone we already paid to unlock is reused for free.
+    const poolHits = await lookupContactPool(unlockPeople.map((p) => p.id));
+    const pooled = unlockPeople
+      .filter((p) => poolHits.has(p.id))
+      .map((p) => poolHits.get(p.id) as EnrichedApolloResult);
+    const usableFromPool = pooled.filter(isUsableForSave).length;
+    const toUnlock = unlockPeople.filter((p) => !poolHits.has(p.id));
+    const targetFromApollo = Math.max(0, stillNeeded - usableFromPool);
+    if (pooled.length > 0) {
+      logLeadFetch("contact_pool_hit", {
+        searchId: input.searchId,
+        reused: pooled.length,
+        usable: usableFromPool,
+        stillNeededFromApollo: targetFromApollo,
+      });
+    }
 
     await prisma.leadSearch.update({
       where: { id: input.searchId },
@@ -444,10 +494,10 @@ export async function runSequentialLeadBatches(input: {
     const unlockTimer = startStageTimer();
     let enriched: EnrichedApolloResult[] = [];
     try {
-      enriched = await enrichPeopleBatch(unlockPeople, {
+      enriched = targetFromApollo <= 0 || toUnlock.length === 0 ? [] : await enrichPeopleBatch(toUnlock, {
           deadlineAt: Date.now() + unlockTimeoutMs,
           shouldStop: input.wasStopped,
-          targetUsable: stillNeeded,
+          targetUsable: targetFromApollo,
           isUsable: isUsableForSave,
           onProgress: async (done, total) => {
             unlockedThisBatch = done;
@@ -508,6 +558,18 @@ export async function runSequentialLeadBatches(input: {
     // size of the list we were prepared to unlock.
     unlockAttempts += unlockedThisBatch;
 
+    // Remember every paid unlock before anything else can fail, then merge the
+    // free pool hits back in so the rest of the stage treats them alike.
+    try {
+      await saveToContactPool(enriched, input.userId);
+    } catch (error) {
+      logLeadFetch("contact_pool_save_failed", {
+        searchId: input.searchId,
+        error: error instanceof Error ? error.message.slice(0, 200) : String(error),
+      });
+    }
+    enriched = [...pooled, ...enriched];
+
     const { storedById, summaryById } = applyEnrichmentToLeads(workList, enriched);
 
     const withAnyEmail = filterLeadsWithUsableEmail(workList);
@@ -515,7 +577,39 @@ export async function runSequentialLeadBatches(input: {
       ? withAnyEmail.filter((lead) => isVerifiedEmail(lead.email, lead.emailStatus))
       : withAnyEmail;
     const skippedUnverified = withAnyEmail.length - keep.length;
-    workList = sortLeads(keep);
+
+    // Final LLM check on the full unlocked record. Leads that fail are held
+    // back from the user; they stay in the contact pool so the credit is not
+    // lost if a later search fits them.
+    const postcheck = await verifyUnlockedLeads(
+      keep.map((lead) => ({
+        id: lead.apolloPersonId,
+        title: lead.title,
+        company: lead.company,
+        industry: lead.industry,
+        employees: lead.employees,
+        location: lead.location,
+      })),
+      { prompt: input.prompt, criteria: input.criteria, userId: input.userId, searchId: input.searchId }
+    );
+    const delivered = postcheck
+      ? keep.filter((lead) => postcheck.get(lead.apolloPersonId)?.pass !== false)
+      : keep;
+    if (postcheck && delivered.length < keep.length) {
+      logLeadFetch("postcheck_rejected", {
+        searchId: input.searchId,
+        rejected: keep
+          .filter((lead) => postcheck.get(lead.apolloPersonId)?.pass === false)
+          .map((lead) => ({
+            company: lead.company,
+            title: lead.title,
+            industry: lead.industry,
+            score: postcheck.get(lead.apolloPersonId)?.score,
+            reason: postcheck.get(lead.apolloPersonId)?.reason,
+          })),
+      });
+    }
+    workList = sortLeads(delivered);
 
     // Only the leads we are about to save get a Why, so the AI call stays small.
     const remainingSlots = Math.max(0, maxLeadsThisRun - savedThisRun);
