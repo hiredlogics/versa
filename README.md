@@ -30,6 +30,19 @@ npx prisma db seed
 npm run dev
 ```
 
+### Local auth without Clerk keys
+
+Leave `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` empty in development and
+Clerk runs in **keyless mode**: the first browser visit to `/login` provisions a temporary dev
+instance and stores its keys in `.clerk/.tmp/keyless.json` (git-ignored). Use the "Configure
+your application" prompt in the UI to claim it, or paste real keys into `.env.local` later.
+
+Sign-ins from a new browser trigger Clerk's new-device check; the login form shows an
+email-code step for it. Dev instances accept `*+clerk_test@example.com` with code `424242`.
+
+Tests read `.env` / `.env.local` via `tests/setup-env.ts`, so `npm test` works once
+`DATABASE_URL` is set there.
+
 ### Database (Docker)
 
 Run PostgreSQL in Docker (port **5434** on host — avoids clash with local Postgres on 5432):

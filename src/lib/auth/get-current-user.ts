@@ -1,4 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { Prisma } from "@prisma/client";
 import { isConfiguredAdminEmail } from "@/lib/admin/credentials";
 import { prisma } from "@/lib/db/prisma";
 import type { User, UserRole } from "@prisma/client";
@@ -30,14 +31,24 @@ export async function getCurrentUser(): Promise<User | null> {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.user.create({
-    data: {
-      clerkId,
-      email,
-      name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null,
-      role: resolveUserRole(email, clerkUser.publicMetadata?.role as UserRole),
-    },
-  });
+  try {
+    return await prisma.user.create({
+      data: {
+        clerkId,
+        email,
+        name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || null,
+        role: resolveUserRole(email, clerkUser.publicMetadata?.role as UserRole),
+      },
+    });
+  } catch (error) {
+    // Right after sign-up several requests (/auth/continue, layouts, API calls)
+    // race to create the same user. Only one insert wins; the others re-read it.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const created = await prisma.user.findUnique({ where: { clerkId } });
+      if (created) return created;
+    }
+    throw error;
+  }
 }
 
 export async function requireUser(): Promise<User> {

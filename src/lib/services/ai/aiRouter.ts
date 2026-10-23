@@ -85,7 +85,7 @@ export async function aiChat(options: AiCallOptions): Promise<{
     throw new Error("No AI providers configured");
   }
 
-  let lastError = "All AI providers failed";
+  let lastError = "";
 
   for (const { name, client, model } of providers) {
     const start = Date.now();
@@ -131,5 +131,7 @@ export async function aiChat(options: AiCallOptions): Promise<{
     }
   }
 
-  throw new Error(lastError);
+  // Keep this prefix: callers (parsePrompt, clarifyWithAi) match on it to fall
+  // back to heuristic parsing instead of failing the whole search.
+  throw new Error(`All AI providers failed: ${lastError || "unknown error"}`);
 }
