@@ -6,6 +6,18 @@ export interface ApolloSearchFilters {
   includeSimilarTitles?: boolean;
   /** Employer domains, e.g. ["apple.com"] for "people who work at Apple". */
   organizationDomains?: string[];
+  /**
+   * Industry words matched against Apollo's company keyword tags
+   * (q_organization_keyword_tags), e.g. ["software"]. Unlike qKeywords this
+   * narrows to companies in that industry instead of free-text matching.
+   */
+  organizationKeywordTags?: string[];
+  /**
+   * Apollo contact_email_status filter, e.g. ["verified"]. Search is free and
+   * every unlock costs a credit even when no email comes back, so filtering
+   * here is the cheapest way to avoid paying for dead contacts.
+   */
+  contactEmailStatus?: string[];
 }
 
 export interface SearchCriteria {

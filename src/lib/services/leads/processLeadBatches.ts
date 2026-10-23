@@ -182,7 +182,14 @@ export async function runSequentialLeadBatches(input: {
   const openToWorkMode = Boolean(input.criteria.openToWork);
 
   const batchesThisRunCap = maxBatches === 0 ? Number.POSITIVE_INFINITY : maxBatches;
-  const unlockBudget = getUnlockAttemptBudget(batchSize);
+  // Credit ceiling for this run: never more than the configured budget, and
+  // never more than a few times the leads actually requested. With the
+  // verified-email search filter nearly every unlock yields an email, so the
+  // run normally stops at maxLeadsThisRun long before this ceiling.
+  const unlockBudget = Math.min(
+    getUnlockAttemptBudget(batchSize),
+    Math.max(10, maxLeadsThisRun * 3)
+  );
   let unlockAttempts = 0;
   let batchesThisRun = 0;
 
@@ -407,11 +414,17 @@ export async function runSequentialLeadBatches(input: {
     // Unlock highest-scored first so credit exhaustion still keeps the best fits,
     // and never spend more unlock credits than this run is allowed.
     const peopleById = new Map(people.map((p) => [p.id, p]));
+    // How many leads this run still owes the user. The unlock stage stops the
+    // moment it has that many usable emails instead of unlocking the whole page.
+    const stillNeeded = Math.max(0, maxLeadsThisRun - savedThisRun);
     const unlockPeople = workList
       .map((lead) => peopleById.get(lead.apolloPersonId))
       .filter((p): p is ApolloPerson => Boolean(p))
       .slice(0, Math.max(0, unlockBudget - unlockAttempts));
-    unlockAttempts += unlockPeople.length;
+    const isUsableForSave = (result: EnrichedApolloResult) =>
+      isUsableEmail(result.person.email) &&
+      (!verifiedOnly || isVerifiedEmail(result.person.email, result.person.email_status ?? null));
+    let unlockedThisBatch = 0;
 
     await prisma.leadSearch.update({
       where: { id: input.searchId },
@@ -434,7 +447,10 @@ export async function runSequentialLeadBatches(input: {
       enriched = await enrichPeopleBatch(unlockPeople, {
           deadlineAt: Date.now() + unlockTimeoutMs,
           shouldStop: input.wasStopped,
+          targetUsable: stillNeeded,
+          isUsable: isUsableForSave,
           onProgress: async (done, total) => {
+            unlockedThisBatch = done;
             if (await input.wasStopped()) return;
             await prisma.leadSearch.update({
               where: { id: input.searchId },
@@ -487,6 +503,10 @@ export async function runSequentialLeadBatches(input: {
         throw error;
       }
     }
+
+    // Count what was actually sent to Apollo (each one is a credit), not the
+    // size of the list we were prepared to unlock.
+    unlockAttempts += unlockedThisBatch;
 
     const { storedById, summaryById } = applyEnrichmentToLeads(workList, enriched);
 
@@ -623,6 +643,11 @@ export async function runSequentialLeadBatches(input: {
       leadsWithEmail,
       lastPage,
       totalPages,
+      // Credit efficiency: Apollo charges one lead credit per unlock attempt.
+      unlockAttempts,
+      unlockBudget,
+      creditsPerSavedLead:
+        savedThisRun > 0 ? Math.round((unlockAttempts / savedThisRun) * 100) / 100 : null,
     });
 
     if (creditsExhausted || stopped || hitSaveCap) {

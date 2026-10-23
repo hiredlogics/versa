@@ -493,6 +493,23 @@ export interface ApolloQueryVariant {
   filters: ApolloSearchFilters;
 }
 
+const NON_INDUSTRY_VALUES = new Set(["", "any", "n/a", "none", "unknown", "all", "open to work"]);
+
+/**
+ * Turn a parsed industry ("Software", "Real Estate / PropTech") into Apollo
+ * company keyword tags (["software"], ["real estate", "proptech"]). Returns
+ * undefined when the prompt named no real industry so the filter is omitted.
+ */
+export function industryToKeywordTags(industry: string | null | undefined): string[] | undefined {
+  if (!industry) return undefined;
+  const tags = industry
+    .split(/[\/,;|&]|\band\b/i)
+    .map((part) => part.trim().toLowerCase().replace(/\s+/g, " "))
+    .filter((part) => part.length >= 2 && !NON_INDUSTRY_VALUES.has(part));
+  const unique = [...new Set(tags)].slice(0, 3);
+  return unique.length > 0 ? unique : undefined;
+}
+
 export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQueryVariant[] {
   const base = criteria.apollo;
   if (!base) return [];
@@ -505,6 +522,10 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     criteria.companySizeMax
   );
   const industryKeyword = base.qKeywords?.trim() || undefined;
+  // The parsed industry goes to Apollo as a company keyword tag. Before this,
+  // "software companies" reached Apollo as nothing at all (173k matches, 1 in 10
+  // relevant); with the tag the same prompt narrows to ~40k software firms.
+  const organizationKeywordTags = industryToKeywordTags(criteria.industry);
 
   const variants: ApolloQueryVariant[] = [];
   const seen = new Set<string>();
@@ -515,7 +536,12 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   const organizationDomains = normalizeDomains(base.organizationDomains);
   const pinned: Partial<ApolloSearchFilters> =
     organizationDomains.length > 0
-      ? { organizationDomains, employeeRanges: undefined, qKeywords: undefined }
+      ? {
+          organizationDomains,
+          employeeRanges: undefined,
+          qKeywords: undefined,
+          organizationKeywordTags: undefined,
+        }
       : {};
 
   function add(level: number, label: string, filters: ApolloSearchFilters) {
@@ -526,6 +552,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
       k: merged.qKeywords,
       e: merged.employeeRanges,
       d: merged.organizationDomains,
+      g: merged.organizationKeywordTags,
     });
     if (seen.has(key)) return;
     seen.add(key);
@@ -597,6 +624,7 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     personTitles: titles,
     personLocations: primaryLocation,
     qKeywords: industryKeyword,
+    organizationKeywordTags,
     employeeRanges,
     includeSimilarTitles: base.includeSimilarTitles !== false,
   };

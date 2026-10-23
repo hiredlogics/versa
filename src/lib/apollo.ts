@@ -29,6 +29,13 @@ export type EnrichBatchOptions = {
   /** Stop unlocking when Date.now() >= deadlineAt; returns partial results. */
   deadlineAt?: number;
   shouldStop?: () => boolean | Promise<boolean>;
+  /**
+   * Stop as soon as this many usable results are in hand. Chunks shrink to
+   * exactly what is still needed, so asking for 10 leads never unlocks 100.
+   */
+  targetUsable?: number;
+  /** What counts toward targetUsable. Defaults to "has a usable email". */
+  isUsable?: (result: EnrichedApolloResult) => boolean;
 };
 
 export function isApolloCreditsError(error: unknown): boolean {
@@ -212,8 +219,23 @@ export function extractBestEmail(raw: ApolloSearchRawPerson | null | undefined):
   return null;
 }
 
+/**
+ * Personal (non-work) emails cost extra credits on top of the business email
+ * and are rarely wanted for B2B outreach, so this is opt-in.
+ */
 function shouldRevealPersonalEmails(): boolean {
-  return process.env.APOLLO_REVEAL_PERSONAL_EMAILS !== "false";
+  return process.env.APOLLO_REVEAL_PERSONAL_EMAILS === "true";
+}
+
+/**
+ * Search-time email filter. Every unlock costs a credit even when Apollo has
+ * no email for the person (verified 2026-10-23: 5 "unavailable" unlocks = 5
+ * credits, 0 emails), so when the app only saves verified emails we ask Apollo
+ * for verified-email people in the first place.
+ */
+function defaultContactEmailStatus(): string[] | undefined {
+  const raw = (process.env.LEAD_REQUIRE_VERIFIED_EMAIL || "true").trim().toLowerCase();
+  return raw === "false" || raw === "0" ? undefined : ["verified"];
 }
 
 function normalizePerson(raw: ApolloSearchRawPerson, fallbackIndustry?: string): ApolloPerson {
@@ -277,6 +299,13 @@ function buildParamsFromFilters(
   }
   if (filters.organizationDomains?.length) {
     params.q_organization_domains_list = filters.organizationDomains;
+  }
+  if (filters.organizationKeywordTags?.length) {
+    params.q_organization_keyword_tags = filters.organizationKeywordTags;
+  }
+  const emailStatus = filters.contactEmailStatus ?? defaultContactEmailStatus();
+  if (emailStatus?.length) {
+    params.contact_email_status = emailStatus;
   }
 
   return params;
@@ -352,6 +381,9 @@ async function searchWithSmartFallback(
         q_keywords: variant.filters.qKeywords || null,
         organization_num_employees_ranges: variant.filters.employeeRanges || null,
         include_similar_titles: variant.filters.includeSimilarTitles !== false,
+        q_organization_keyword_tags: variant.filters.organizationKeywordTags || null,
+        contact_email_status:
+          variant.filters.contactEmailStatus ?? defaultContactEmailStatus() ?? null,
         page,
         per_page: perPage,
       },
@@ -466,17 +498,28 @@ export async function enrichPeopleBatch(
     typeof onProgressOrOptions === "function"
       ? { onProgress: onProgressOrOptions }
       : onProgressOrOptions ?? {};
-  const { onProgress, deadlineAt, shouldStop } = options;
+  const { onProgress, deadlineAt, shouldStop, targetUsable } = options;
+  const isUsable =
+    options.isUsable ?? ((result: EnrichedApolloResult) => isUsableEmail(result.person.email));
 
   const enriched: EnrichedApolloResult[] = [];
   const reveal = shouldRevealPersonalEmails();
   const bulkSize = 10;
   let done = 0;
+  let usable = 0;
   const chunkMs: number[] = [];
   let chunkFailures = 0;
   let stoppedEarly = false;
 
-  for (let i = 0; i < people.length; i += bulkSize) {
+  let i = 0;
+  while (i < people.length) {
+    // Every unlock is a credit: once the target is met, stop; otherwise only
+    // unlock as many as are still missing (never a full chunk of 10 for 2).
+    const stillNeeded = targetUsable && targetUsable > 0 ? targetUsable - usable : Infinity;
+    if (stillNeeded <= 0) {
+      stoppedEarly = true;
+      break;
+    }
     if (deadlineAt && Date.now() >= deadlineAt) {
       console.warn(
         `[apollo] unlock deadline reached after ${done}/${people.length} — returning partial`
@@ -489,7 +532,7 @@ export async function enrichPeopleBatch(
       break;
     }
 
-    const chunk = people.slice(i, i + bulkSize);
+    const chunk = people.slice(i, i + Math.min(bulkSize, stillNeeded));
     const chunkStarted = Date.now();
     let chunkOk = true;
     try {
@@ -562,8 +605,10 @@ export async function enrichPeopleBatch(
     });
 
     done += chunk.length;
+    usable = enriched.filter(isUsable).length;
     onProgress?.(done, people.length);
-    if (i + bulkSize < people.length) await sleep(120);
+    i += chunk.length;
+    if (i < people.length) await sleep(120);
   }
 
   // Pad unprocessed people so callers can zip by id without gaps
