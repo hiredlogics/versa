@@ -1,0 +1,152 @@
+[
+  {
+    "label": "Founders/CEOs, SaaS, US, 11-50",
+    "total": 63185,
+    "verified": 52527,
+    "sample": [
+      "Founder and CEO @ SaaS Talent",
+      "Founder & CEO @ SaaS Logistic , LLC",
+      "CEO & Founder @ SaaS e Solutions"
+    ]
+  },
+  {
+    "label": "Heads of Sales, software, US, 51-200",
+    "total": 19018,
+    "verified": 14999,
+    "sample": [
+      "Sales Director, Head of Sales @ Chromatic",
+      "VP, Sales @ Software Solutions",
+      "Vice President of Sales @ SafetyChain Software"
+    ]
+  },
+  {
+    "label": "VP Marketing, cybersecurity, US, 51-200",
+    "total": 2287,
+    "verified": 1726,
+    "sample": [
+      "VP, Head of Marketing @ Nordicom Technologies",
+      "Marketing Director @ Cybersecurity Community",
+      "Vice President / Marketing Director @ Bank of Canton"
+    ]
+  },
+  {
+    "label": "CTOs, fintech, US, 11-50",
+    "total": 1351,
+    "verified": 1182,
+    "sample": [
+      "Chief Technology Officer @ Neural Payments",
+      "CTO @ Run Payments",
+      "Chief Technology Officer @ Tekcard Payments"
+    ]
+  },
+  {
+    "label": "HR Directors, healthcare, US, 201-500",
+    "total": 6129,
+    "verified": 4531,
+    "sample": [
+      "Director, Head of Human Resources @ Women's Healthcare Associates, LLC",
+      "Head of Human Resources (Director III) @ Health Plan of San Mateo (HPSM)",
+      "Vice Head of HR, President @ Managed Health Care Associates, Inc."
+    ]
+  },
+  {
+    "label": "E-commerce Directors, retail brands, US, 51-200",
+    "total": 974,
+    "verified": 858,
+    "sample": [
+      "Director of Ecommerce @ Health-E Commerce",
+      "Director of Ecommerce @ Powerplay Retail™",
+      "VP, Ecommerce @ Musictoday"
+    ]
+  },
+  {
+    "label": "Operations heads, logistics, US, 51-200",
+    "total": 11065,
+    "verified": 9176,
+    "sample": [
+      "Head of Operations, COO @ StoneArch Logistics, LLC.",
+      "Chief Operating Officer @ Elite Supply Chain Services",
+      "Chief Operating Officer @ Transportation Partners & Logistics"
+    ]
+  },
+  {
+    "label": "Practice owners, dental, US, 1-10 (local SMB)",
+    "total": 14572,
+    "verified": 4498,
+    "sample": [
+      "Dentist/Owner @ Dentist SOS",
+      "Owner/dentist @ Kelly Dental - Dentist Springfield MO",
+      "Dentist and Owner @ Hickory Dentist by Dental Health Concepts"
+    ]
+  },
+  {
+    "label": "Restaurant owners, US, 1-10 (local SMB)",
+    "total": 4606,
+    "verified": 2137,
+    "sample": [
+      "Owner @ Arizona Restaurant Sales",
+      "Owner @ Mediterranean Restaurant Equipment",
+      "Owner @ Northeast Restaurant Group"
+    ]
+  },
+  {
+    "label": "Heads of Sales, software, United Kingdom, 51-200",
+    "total": 3396,
+    "verified": 2806,
+    "sample": [
+      "Vice President & Sales Director @ Sumillion Limited",
+      "Sales Director, Head of Sales @ 5Y Technology",
+      "Head of Sales @ IMP Software"
+    ]
+  },
+  {
+    "label": "Heads of Sales, software, Germany, 51-200",
+    "total": 1845,
+    "verified": 1537,
+    "sample": [
+      "Head of Sales @ Nesto Software GmbH",
+      "Head of Sales @ Ferber-Software GmbH",
+      "Head of Sales @ PSI Software – Discrete Manufacturing"
+    ]
+  },
+  {
+    "label": "Heads of Sales, software, Pakistan, 51-200",
+    "total": 255,
+    "verified": 92,
+    "sample": [
+      "Vice President of Sales @ ePAGING",
+      "Vice President Sales @ Sky47 Limited",
+      "Vice President of Sales @ xLoop"
+    ]
+  },
+  {
+    "label": "CFOs, manufacturing, Texas, 201-500 (state-level)",
+    "total": 365,
+    "verified": 311,
+    "sample": [
+      "CFO @ Hastings Manufacturing",
+      "Chief Financial Officer @ ACS Manufacturing, INC",
+      "CFO @ Athena Manufacturing, L.P."
+    ]
+  },
+  {
+    "label": "'Tech-savvy people', US (no role, no industry)",
+    "total": 5293772,
+    "verified": 3508676,
+    "sample": [
+      "Founder, CEO, and Director @ Expensify",
+      "Director, CEO & Founder @ HOBBY",
+      "CEO, Founder and Director @ Phytonix Corporation"
+    ]
+  },
+  {
+    "label": "Marketing managers, US, any industry, any size",
+    "total": 294456,
+    "verified": 184942,
+    "sample": [
+      "Marketing Manager @ The ReWild Group LLC",
+      "Marketing Manager @ Mashgin",
+      "Marketing Manager @ VOTIX"
+    ]
+  }
+]
