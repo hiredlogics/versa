@@ -1,0 +1,166 @@
+[
+  {
+    "event": "apollo_variant_attempt",
+    "level": 0,
+    "label": "exact AI filters",
+    "totalEntries": 10831,
+    "pagePeople": 100,
+    "params": {
+      "tags": [
+        "fitness technology",
+        "computer vision",
+        "human pose estimation",
+        "digital health",
+        "rehabilitation",
+        "sports technology",
+        "biomechanics",
+        "ai research"
+      ],
+      "q": null,
+      "size": [
+        "11,50",
+        "51,200"
+      ],
+      "titles": 5
+    }
+  },
+  {
+    "event": "apollo_variant_selected",
+    "level": 0,
+    "label": "exact AI filters",
+    "totalEntries": 10831,
+    "relaxed": false
+  },
+  {
+    "event": "prescreen",
+    "candidates": 100,
+    "passed": 30,
+    "dropped": 70,
+    "minScore": 60,
+    "durationMs": 28421
+  },
+  {
+    "event": "stage_chunk_summary",
+    "stage": "unlock",
+    "people": 30,
+    "unlockedEmail": 20,
+    "chunkFailures": 0,
+    "chunkCount": 2,
+    "medianMs": 857,
+    "p95Ms": 1740,
+    "maxMs": 1740,
+    "revealPersonal": false,
+    "stoppedEarly": true
+  },
+  {
+    "event": "postcheck",
+    "candidates": 20,
+    "passed": 8,
+    "dropped": 12,
+    "minScore": 60,
+    "durationMs": 6223
+  },
+  {
+    "event": "postcheck_rejected",
+    "rejected": [
+      {
+        "company": "Sportsbox AI",
+        "title": "Chief Technology Officer/Founder",
+        "industry": "sports",
+        "score": 40,
+        "reason": "Role matches but industry is not AI fitness technology."
+      },
+      {
+        "company": "TuringSense",
+        "title": "CEO and Co-Founder",
+        "industry": "electrical/electronic manufacturing",
+        "score": 30,
+        "reason": "Role matches but industry is unrelated to AI fitness."
+      },
+      {
+        "company": "Uplift Labs",
+        "title": "Co-Founder & CTO",
+        "industry": "computer software",
+        "score": 30,
+        "reason": "Role matches but industry is unrelated to AI fitness."
+      },
+      {
+        "company": "APDM Wearable Technologies",
+        "title": "VP of Engineering",
+        "industry": "medical devices",
+        "score": 40,
+        "reason": "Role matches; industry is medical devices, not AI fitness."
+      },
+      {
+        "company": "Umbo Computer Vision",
+        "title": "CEO / Co-founder",
+        "industry": "security & investigations",
+        "score": 30,
+        "reason": "Role matches but industry is unrelated to AI fitness."
+      },
+      {
+        "company": "MOVRS",
+        "title": "Co-Founder and CEO",
+        "industry": "information technology & services",
+        "score": 50,
+        "reason": "Role matches; industry is IT services, not AI fitness."
+      },
+      {
+        "company": "UltronAI",
+        "title": "Founder, CEO and Chief Technology Officer",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Role matches; industry is research, not AI fitness."
+      },
+      {
+        "company": "Senseye, Inc.",
+        "title": "CEO/Founder",
+        "industry": "research",
+        "score": 50,
+        "reason": "Role matches; industry is research, not AI fitness."
+      },
+      {
+        "company": "Model Health",
+        "title": "Co-Founder and CEO",
+        "industry": "information technology & services",
+        "score": 50,
+        "reason": "Role matches; industry is IT services, not AI fitness."
+      },
+      {
+        "company": "AiKYNETIX",
+        "title": "Co-Founder & CEO",
+        "industry": "information technology & services",
+        "score": 50,
+        "reason": "Role matches; industry is IT services, not AI fitness."
+      },
+      {
+        "company": "LayerJot",
+        "title": "Founder, CEO, CTO",
+        "industry": "information technology & services",
+        "score": 50,
+        "reason": "not rated"
+      },
+      {
+        "company": "LLume : by Organic Robotics Corporation",
+        "title": "CEO & Co-Founder",
+        "industry": "electrical/electronic manufacturing",
+        "score": 30,
+        "reason": "Role matches but industry is unrelated to AI fitness."
+      }
+    ]
+  },
+  {
+    "event": "batch_complete",
+    "batchIndex": 1,
+    "fetched": 100,
+    "savedWithEmail": 8,
+    "skippedUnverified": 0,
+    "leadsFetched": 100,
+    "leadsWithEmail": 8,
+    "lastPage": 1,
+    "totalPages": 10,
+    "unlockAttempts": 20,
+    "unlockBudget": 60,
+    "creditsPerSavedLead": 2.5
+  }
+]

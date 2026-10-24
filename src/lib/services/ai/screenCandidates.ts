@@ -112,8 +112,11 @@ function describeRequest(meta: ScreenMeta): string {
   const parts = [
     `Original request: "${meta.prompt}"`,
     c.jobTitles?.length ? `Wanted roles: ${c.jobTitles.join(", ")}` : null,
-    c.industry && !/^(any|n\/a)$/i.test(c.industry) ? `Wanted industry: ${c.industry}` : "Industry: not specified (do not judge industry)",
-    c.industryTags?.length ? `Wanted industries, as keyword tags: ${c.industryTags.join(", ")}` : null,
+    c.industryTags?.length
+      ? `Wanted industries (a company that belongs to ANY ONE of these is a full industry match): ${[...new Set([c.industry, ...c.industryTags].filter((x): x is string => Boolean(x) && !/^(any|n\/a)$/i.test(x)))].join("; ")}`
+      : c.industry && !/^(any|n\/a)$/i.test(c.industry)
+        ? `Wanted industry: ${c.industry}`
+        : "Industry: not specified (do not judge industry)",
     c.country ? `Wanted location: ${c.country}` : null,
     c.companySizeMin || c.companySizeMax
       ? `Wanted company size: ${c.companySizeMin || 1} to ${c.companySizeMax || "any"} employees`
@@ -139,7 +142,7 @@ const POSTCHECK_SYSTEM = `You do the final quality check on B2B sales leads AFTE
 You now see job title, employer, employer industry, employee count and location. Score 0-100 how well each lead matches the request.
 Rules:
 - Role must match in function and seniority.
-- Industry must fit the wanted industry. The industry label is a coarse provider tag: "information technology & services" and "computer software" also cover security, data and SaaS vendors, so when the label is generic, let the employer name and what you know about the company decide (e.g. "Cyberhill" with an IT-services label is a plausible cybersecurity firm). If the employer name itself contains the wanted industry term (e.g. "FinTech Automation" for fintech), treat industry as a match unless the name shows it is media, a community, an event or an agency.
+- Industry must fit ANY ONE of the wanted industries. When the request lists several industries or keyword tags, matching any of them is a full match; the "wanted industry" line is only the first of them, never the sole target. The industry label is a coarse provider tag: "information technology & services", "computer software", "sports", "research", "medical devices" and "electrical/electronic manufacturing" all routinely cover companies that build AI, computer-vision, motion-capture or wearable-sensor products, so when the label is generic or adjacent, let the employer name, the request's own qualification rules and what you know about the company decide (e.g. "Cyberhill" with an IT-services label is a plausible cybersecurity firm; "Sportsbox AI" labelled "sports" is a motion-analysis AI company). If the employer name itself contains the wanted industry term (e.g. "FinTech Automation" for fintech), treat industry as a match unless the name shows it is media, a community, an event or an agency.
 - "Companies in industry X" means businesses whose main product or service is X. Communities, societies, associations, conferences, events, media, recruiters, training providers, marketing agencies and banks that merely serve or mention X are NOT in industry X and score below 40, unless the request asks for them. Judge this from the employer name and industry label together.
 - Employee count and location must fall inside the wanted ranges when they are given.
 - A clear contradiction on any hard constraint scores below 40. Missing data is not a contradiction.
@@ -168,6 +171,9 @@ async function screen<T extends { id: string }>(
         user: `${describeRequest(meta)}\n\nCandidates (JSON):\n${JSON.stringify(chunk)}`,
         jsonMode: true,
         temperature: 0,
+        // The post-check decides what the user sees and runs on at most a few
+        // dozen people, so it gets the stronger model; the pre-screen stays cheap.
+        openAiModel: kind === "postcheck" ? "gpt-4o" : undefined,
       });
       for (const [id, verdict] of parseVerdicts(content, chunk.map((c) => c.id), minScore)) {
         verdicts.set(id, verdict);

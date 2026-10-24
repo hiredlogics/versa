@@ -13,6 +13,11 @@ export interface AiCallOptions {
   user: string;
   jsonMode?: boolean;
   temperature?: number;
+  /**
+   * OpenAI model to use instead of the default (e.g. "gpt-4o" for the small,
+   * high-stakes post-unlock check). Ignored for the other providers.
+   */
+  openAiModel?: string;
 }
 
 const TIMEOUT_MS = parseInt(process.env.AI_TIMEOUT_MS || "30000", 10);
@@ -92,7 +97,7 @@ export async function aiChat(options: AiCallOptions): Promise<{
     try {
       const response = await withTimeout(
         client.chat.completions.create({
-          model,
+          model: name === "OPENAI" && options.openAiModel ? options.openAiModel : model,
           messages: [
             { role: "system", content: options.system },
             { role: "user", content: options.user },
