@@ -1,0 +1,110 @@
+{
+  "search": {
+    "id": "cmvlmphh1009tipkru6205pcc",
+    "prompt": "Lead search request (combine all lines into ONE search):\n- Earlier: Find 20 leads for Agit.fit (https://agit.fit/). About Agit.fit: we provide high-quality synthetic human-motion datasets for AI and computer vision teams: 3D human pose, depth maps, segmentation, body keypoints, exercise movements and common exercise-form errors, so companies can train AI models without relying only on expensive real-world data collection and manual annotation. Goal: decision-makers at companies that could buy synthetic human-motion training data. Target industries: AI-powered fitness technology; computer vision and human pose estimation; digital health and remote physiotherapy; rehabilitation and musculoskeletal (MSK) technology; sports technology and movement analysis; biomechanics and motion tracking; AI research companies working on 3D human motion; robotics or AR/VR companies that need human-motion datasets. Target job titles: Founder, Co-Founder, CEO, CTO, VP of Engineering, Head of AI, Head of Machine Learning, Director of Computer Vision, Head of Data Science, AI Research Lead, Director of R&D, ML Engineering Manager. Filters: United States; company size 11-200 employees; verified business email. Company keywords: AI fitness, computer vision, human pose estimation, motion tracking, synthetic data, 3D human pose, movement analysis, digital physiotherapy, rehabilitation technology, biomechanics, sports AI, exercise form correction. Rules: prioritize companies that build their own AI or computer-vision products involving human movement (rep counting, exercise-form correction, movement assessment, pose estimation, rehabilitation). Avoid ordinary gyms, personal trainers, fitness influencers, unrelated healthcare providers, and companies with no clear link to AI or motion data. If fewer than 20 qualified leads exist, return only the relevant ones.\n- Latest refinement: As described in my request above — 20 leads\nUse the latest refinement to update industry, titles, location, and needs. Keep the full meaning.",
+    "status": "COMPLETE",
+    "displayStatus": "partial",
+    "parsedCriteria": {
+      "country": "United States",
+      "summary": "Looking for decision-makers at companies in the United States that could purchase synthetic human-motion training data, specifically in industries related to AI-powered fitness technology, computer vision, digital health, and robotics. The target company size is between 11 and 200 employees, and the focus is on those developing AI or computer-vision products involving human movement.",
+      "industry": "AI-powered fitness technology",
+      "keywords": [
+        "AI-powered",
+        "fitness",
+        "technology"
+      ],
+      "jobTitles": [
+        "Founder",
+        "Co-Founder",
+        "CEO",
+        "CTO",
+        "VP of Engineering"
+      ],
+      "openToWork": false,
+      "companyNames": [],
+      "linkedinUrls": [],
+      "searchIntent": "Decision-makers at companies in the United States that could buy synthetic human-motion training data, particularly in AI-powered fitness technology, computer vision, digital health, and robotics. AI fitness computer vision human pose estimation motion tracking synthetic data 3D human pose movement analysis digital physiotherapy rehabilitation technology biomechanics sports AI exercise form correction. Original request: Lead search request (combine all lines into ONE search):\n- Earlier: Find 20 leads for Agit.fit (https://agit.fit/). About Agit.fit: we provide high-quality synthetic human-motion datasets for AI and computer vision teams: 3D human pose, depth maps, segmentation, body keypoints, exercise movements and common exercise-form errors, so companies can train AI models without relying only on expensive real-world data collection and manual annotation. Goal: decision-makers at companies that could buy synthetic human-motion training data. Target industries: AI-powered fitness technology; computer vision and human pose estimation; digital health and remote physiotherapy; rehabilitation and musculoskeletal (MSK) technology; sports technology and movement analysis; biomechanics and motion tracking; AI research companies working on 3D human motion; robotics or AR/VR companies that need human-motion datasets. Target job titles: Founder, Co-Founder, CEO, CTO, VP of Engineering, Head of AI, Head of Machine Learning, Director of Computer Vision, Head of Data Science, AI Research Lead, Director of R&D, ML Engineering Manager. Filters: United States; company size 11-200 employees; verified business email. Company keywords: AI fitness, computer vision, human pose estimation, motion tracking, synthetic data, 3D human pose, movement analysis, digital physiotherapy, rehabilitation technology, biomechanics, sports AI, exercise form correction. Rules: prioritize companies that build their own AI or computer-vision products involving human movement (rep counting, exercise-form correction, movement assessment, pose estimation, rehabilitation). Avoid ordinary gyms, personal trainers, fitness influencers, unrelated healthcare providers, and companies with no clear link to AI or motion data. If fewer than 20 qualified leads exist, return only the relevant ones.\n- Latest refinement: As described in my request above — 20 leads\nUse the latest refinement to update industry, titles, location, and needs. Keep the full meaning.",
+      "intentSummary": "Looking for decision-makers at companies in the United States that could purchase synthetic human-motion training data, specifically in industries related to AI-powered fitness technology, computer vision, digital health, and robotics. The target company size is between 11 and 200 employees, and the focus is on those developing AI or computer-vision products involving human movement.",
+      "companyDomains": [],
+      "companySizeMax": 200,
+      "companySizeMin": 11,
+      "seniorityLevels": []
+    },
+    "criteriaSummary": [
+      "United States",
+      "11–200 employees",
+      "AI-powered fitness technology",
+      "AI-powered",
+      "fitness",
+      "technology",
+      "Founder",
+      "Co-Founder",
+      "CEO"
+    ],
+    "totalFound": 223469,
+    "totalQualified": 3,
+    "averageScore": 10,
+    "createdAt": "2026-10-23T23:56:32.813Z",
+    "updatedAt": "2026-10-23T23:57:27.956Z",
+    "durationMs": 49644,
+    "relaxNote": "Saved 3 leads with a verified email after checking 100 / 223,469 matches. Saved this batch. Click Get next 100 when you want more (you asked for more / more matches remain). (Filters: titles + location only (industry judged after fetch) — interests like \"AI chatbots\" ranked after fetch)",
+    "errorMessage": null,
+    "aiProviderUsed": "HEURISTIC",
+    "leadsPreviewLimit": 200,
+    "leadsOffset": 0,
+    "canResume": true
+  },
+  "leads": [
+    {
+      "id": "cmvlmqnv400alipkrhl162vp9",
+      "name": "Divyaanshu Makkar",
+      "title": "Co-Founder and CEO",
+      "company": "WizCommerce",
+      "industry": "information technology & services",
+      "employees": 200,
+      "location": "New York, New York, United States",
+      "email": "divyaanshu@wizcommerce.com",
+      "emailStatus": "verified",
+      "linkedinUrl": "http://www.linkedin.com/in/divyaanshumakkar",
+      "leadScore": 10,
+      "priorityLevel": "VERY_HIGH",
+      "reasoning": "Divyaanshu Makkar, Co-Founder and CEO of WizCommerce, leads an AI operating system tailored for wholesalers and distributors, indicating a strong interest in innovative technologies that could benefit from synthetic human-motion datasets, particularly in enhancing AI capabilities.",
+      "recommendedApproach": "",
+      "hasEmail": true
+    },
+    {
+      "id": "cmvlmqnv400amipkrkj2dvolp",
+      "name": "Jason Richter",
+      "title": "Founder / CEO",
+      "company": "Lug",
+      "industry": "retail",
+      "employees": 200,
+      "location": "Orlando, Florida, United States",
+      "email": "jason@luglife.com",
+      "emailStatus": "verified",
+      "linkedinUrl": "http://www.linkedin.com/in/jasonrichterlug",
+      "leadScore": 10,
+      "priorityLevel": "VERY_HIGH",
+      "reasoning": "Jason Richter, Founder and CEO of Lug, is at the helm of a company focused on inclusivity in retail, which suggests a potential application of synthetic human-motion data to improve user experience and product design in AI-powered fitness technology.",
+      "recommendedApproach": "",
+      "hasEmail": true
+    },
+    {
+      "id": "cmvlmqnv400anipkr4t38p61k",
+      "name": "Anna Iarotska",
+      "title": "CEO & Co-founder",
+      "company": "Robo Wunderkind",
+      "industry": "e-learning",
+      "employees": 11,
+      "location": "United States",
+      "email": "anna@robowunderkind.com",
+      "emailStatus": "verified",
+      "linkedinUrl": "http://www.linkedin.com/in/annaiarotska",
+      "leadScore": 10,
+      "priorityLevel": "VERY_HIGH",
+      "reasoning": "Anna Iarotska, CEO & Co-founder of Robo Wunderkind, is driving an EdTech initiative that emphasizes innovative learning tools, hinting at a possible integration of synthetic human-motion data for educational purposes in AI and computer vision applications.",
+      "recommendedApproach": "",
+      "hasEmail": true
+    }
+  ]
+}

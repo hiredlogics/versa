@@ -1,0 +1,264 @@
+[
+  {
+    "event": "apollo_variant_attempt",
+    "level": 0,
+    "label": "exact AI filters",
+    "totalEntries": 0,
+    "pagePeople": 0,
+    "params": {
+      "tags": [
+        "ai-powered fitness technology"
+      ],
+      "q": null,
+      "size": [
+        "11,50",
+        "51,200"
+      ],
+      "titles": [
+        "Founder",
+        "Co-Founder",
+        "CEO",
+        "CTO",
+        "VP of Engineering"
+      ]
+    }
+  },
+  {
+    "event": "apollo_variant_attempt",
+    "level": 4,
+    "label": "industry + top titles + location",
+    "totalEntries": 0,
+    "pagePeople": 0,
+    "params": {
+      "tags": [
+        "ai-powered fitness technology"
+      ],
+      "q": null,
+      "size": [
+        "11,50",
+        "51,200"
+      ],
+      "titles": [
+        "Founder",
+        "Co-Founder",
+        "CEO"
+      ]
+    }
+  },
+  {
+    "event": "apollo_variant_attempt",
+    "level": 5,
+    "label": "industry free-text keyword \"AI-powered fitness technology\"",
+    "totalEntries": 0,
+    "pagePeople": 0,
+    "params": {
+      "tags": null,
+      "q": "AI-powered fitness technology",
+      "size": [
+        "11,50",
+        "51,200"
+      ],
+      "titles": [
+        "Founder",
+        "Co-Founder",
+        "CEO",
+        "CTO",
+        "VP of Engineering"
+      ]
+    }
+  },
+  {
+    "event": "apollo_variant_attempt",
+    "level": 6,
+    "label": "titles + location only (industry judged after fetch)",
+    "totalEntries": 223469,
+    "pagePeople": 100,
+    "params": {
+      "tags": null,
+      "q": null,
+      "size": [
+        "11,50",
+        "51,200"
+      ],
+      "titles": [
+        "Founder",
+        "Co-Founder",
+        "CEO"
+      ]
+    }
+  },
+  {
+    "event": "apollo_variant_selected",
+    "level": 6,
+    "label": "titles + location only (industry judged after fetch)",
+    "totalEntries": 223469,
+    "relaxed": true
+  },
+  {
+    "event": "prescreen",
+    "candidates": 100,
+    "passed": 50,
+    "dropped": 50,
+    "minScore": 60,
+    "durationMs": 26819
+  },
+  {
+    "event": "stage_chunk_summary",
+    "stage": "unlock",
+    "people": 50,
+    "unlockedEmail": 20,
+    "chunkFailures": 0,
+    "chunkCount": 2,
+    "medianMs": 821,
+    "p95Ms": 1847,
+    "maxMs": 1847,
+    "revealPersonal": false,
+    "stoppedEarly": true
+  },
+  {
+    "event": "postcheck",
+    "candidates": 20,
+    "passed": 3,
+    "dropped": 17,
+    "minScore": 60,
+    "durationMs": 5866
+  },
+  {
+    "event": "postcheck_rejected",
+    "rejected": [
+      {
+        "company": "Wokelo AI",
+        "title": "Co-Founder & CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "Revaya",
+        "title": "CEO & Founder, Founder",
+        "industry": "staffing & recruiting",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "Raya",
+        "title": "CEO & Founder",
+        "industry": "staffing & recruiting",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "AlgoExpert",
+        "title": "Co-Founder & CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "TruckTractorTrailer.com",
+        "title": "Founder/CEO",
+        "industry": "internet",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "Klaar",
+        "title": "Co-Founder & CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "TechLit Africa",
+        "title": "CEO & Founder",
+        "industry": "nonprofit organization management",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "Peak Performance Partners",
+        "title": "Co-Founder & CEO",
+        "industry": "professional training & coaching",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "Citrine",
+        "title": "CEO & Founder",
+        "industry": "marketing & advertising",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "Dare Capital",
+        "title": "Co-Founder and CEO",
+        "industry": "financial services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "Hammer Media",
+        "title": "Founder / CEO",
+        "industry": "online media",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "BlueTuskr",
+        "title": "Founder/CEO",
+        "industry": "marketing & advertising",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "Ignite AI",
+        "title": "Founder & CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "ObjectSecurity",
+        "title": "Founder & CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "The Healthcare Leadership Institute (HLI)",
+        "title": "Founder and CEO",
+        "industry": "management consulting",
+        "score": 20,
+        "reason": "Industry unrelated to AI-powered fitness technology."
+      },
+      {
+        "company": "One Million by One Million (1Mby1M)",
+        "title": "Founder and CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      },
+      {
+        "company": "The Pause Technologies Inc.",
+        "title": "Founder and CEO",
+        "industry": "information technology & services",
+        "score": 40,
+        "reason": "Industry not aligned with AI-powered fitness technology."
+      }
+    ]
+  },
+  {
+    "event": "batch_complete",
+    "batchIndex": 1,
+    "fetched": 100,
+    "savedWithEmail": 3,
+    "skippedUnverified": 0,
+    "leadsFetched": 100,
+    "leadsWithEmail": 3,
+    "lastPage": 1,
+    "totalPages": 10,
+    "unlockAttempts": 20,
+    "unlockBudget": 60,
+    "creditsPerSavedLead": 6.67
+  }
+]
