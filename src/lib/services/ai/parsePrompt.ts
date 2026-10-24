@@ -38,6 +38,11 @@ PHASE 2 — Convert that understanding into accurate Apollo filters
   Never invent "20,43" or use hyphens.
   If the prompt says ~20–50 people → ["11,50"]. If 50–200 → ["51,200"]. If vague → ["11,50","51,200","201,500"].
 - industry: primary industry name (e.g. "Real Estate")
+- industryTags: 3-8 short company keyword tags that Apollo can match (lowercase, 1-3 words each),
+  covering EVERY industry the prompt names. Apollo OR-s them. Use real sector words, never
+  invented labels: "AI-powered fitness technology companies, pose estimation, digital physio"
+  → ["fitness app", "fitness technology", "computer vision", "pose estimation", "motion capture", "digital health", "physiotherapy"].
+  A single-industry prompt still gets 2-4 tags: "software companies" → ["software", "saas"].
 - openToWork: true ONLY if the user wants job seekers / "open to work" / between jobs.
   CRITICAL: Apollo has NO open-to-work filter. Still emit tight personTitles + personLocations + qKeywords.
   Never omit titles or keywords just because openToWork is true — that balloons the Apollo pool.
@@ -52,6 +57,7 @@ Return ONLY valid JSON:
   "summary": "string",
   "searchIntent": "full intent including industry AND needs",
   "industry": "primary industry",
+  "industryTags": ["string"],
   "country": "primary country",
   "companySizeMin": number,
   "companySizeMax": number,

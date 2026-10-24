@@ -623,11 +623,15 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
   // With industry tags in play the free-text keyword is redundant and far more
   // restrictive (tags + q_keywords "Cybersecurity" matched 5 people; the tag
   // alone matched 1,600+), so it is folded into the tags instead.
-  const tagSet = new Set(organizationKeywordTags ?? []);
+  // Multi-industry briefs: the parser's tag list ("computer vision", "pose
+  // estimation", ...) is OR-ed by Apollo, so it widens to every named industry.
+  // Those go first so the cap never drops them in favour of a derived label.
+  const tagSet = new Set(criteria.industryTags ?? []);
+  for (const tag of organizationKeywordTags ?? []) tagSet.add(tag);
   if (organizationKeywordTags && industryKeyword) {
     for (const tag of industryToKeywordTags(industryKeyword) ?? []) tagSet.add(tag);
   }
-  const tags = organizationKeywordTags ? [...tagSet] : undefined;
+  const tags = tagSet.size > 0 ? [...tagSet].slice(0, 8) : undefined;
   // Apollo OR-s keyword tags, so synonyms widen the pool without leaving the industry.
   const widerTags = tags ? expandIndustryTags(tags) : undefined;
   // A size the user asked for is a hard constraint: the post-unlock check
@@ -684,15 +688,20 @@ export function buildApolloSearchVariants(criteria: SearchCriteria): ApolloQuery
     });
   }
 
-  // 6 — LAST resort: no industry filter; the LLM screen judges fit after fetch.
-  add(6, "titles + location only (industry judged after fetch)", {
-    personTitles: titles.slice(0, 3),
-    personLocations: primaryLocation,
-    qKeywords: undefined,
-    organizationKeywordTags: undefined,
-    employeeRanges: sizeRequested ? employeeRanges : undefined,
-    includeSimilarTitles: true,
-  });
+  // 6 — LAST resort: no industry filter at all. Only when the brief named no
+  // industry. When industries were stated, searching "any founder in the US"
+  // is exactly what we must never do: it spent 20 credits for 0 good leads
+  // (Agit.fit test, 2026-10-23). Returning nothing is the honest outcome.
+  if (!tags) {
+    add(6, "titles + location only (industry judged after fetch)", {
+      personTitles: titles.slice(0, 3),
+      personLocations: primaryLocation,
+      qKeywords: undefined,
+      organizationKeywordTags: undefined,
+      employeeRanges: sizeRequested ? employeeRanges : undefined,
+      includeSimilarTitles: true,
+    });
+  }
 
   return variants;
 }
@@ -719,6 +728,22 @@ const INDUSTRY_SYNONYMS: Record<string, string[]> = {
   recruiting: ["staffing", "talent acquisition"],
   staffing: ["recruiting", "talent acquisition"],
 };
+
+/** Cleans the parser's industry tag list: lowercase, trimmed, deduped, at most 8. */
+export function normalizeIndustryTags(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") continue;
+    const tag = raw.trim().toLowerCase().replace(/\s+/g, " ");
+    if (tag.length < 2 || tag.length > 40 || NON_INDUSTRY_VALUES.has(tag) || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+    if (out.length >= 8) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
 
 /** Adds known synonyms so the OR-ed tag filter widens without leaving the industry. */
 export function expandIndustryTags(tags: string[]): string[] {
@@ -884,6 +909,7 @@ export function normalizeSearchCriteria(
     companySizeMax: companySizeMax,
     jobTitles: apollo.personTitles,
     keywords: apolloKeywords || rawKeywords || undefined,
+    industryTags: normalizeIndustryTags(parsed.industryTags),
     summary: parsed.summary || userPrompt.slice(0, 120),
     searchIntent: `${fullIntent}${otwIntentSuffix}`.trim(),
     openToWork,

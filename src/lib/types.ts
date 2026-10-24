@@ -22,6 +22,13 @@ export interface ApolloSearchFilters {
 
 export interface SearchCriteria {
   industry: string;
+  /**
+   * Several Apollo company keyword tags for briefs that span industries
+   * ("computer vision", "pose estimation", "digital physiotherapy"). Apollo
+   * OR-s tags, so a list widens correctly where a single made-up label
+   * ("ai-powered fitness technology") matches nobody.
+   */
+  industryTags?: string[];
   country: string;
   companySizeMin: number;
   companySizeMax: number;

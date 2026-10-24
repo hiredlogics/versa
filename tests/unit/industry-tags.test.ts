@@ -63,16 +63,39 @@ describe("buildApolloSearchVariants industry tags", () => {
     expect(variants[0].filters.qKeywords).toBeUndefined();
   });
 
-  it("widens with synonyms before giving up the industry", () => {
+  it("widens with synonyms and never searches without the stated industry", () => {
     const variants = buildApolloSearchVariants(criteriaFor("Cybersecurity"));
     expect(variants[0].filters.organizationKeywordTags).toEqual(["cybersecurity"]);
     expect(variants[1].filters.organizationKeywordTags).toEqual(
       expect.arrayContaining(["cybersecurity", "cyber security", "information security"])
     );
-    // Only the last-resort variant searches without the industry.
-    const last = variants[variants.length - 1].filters;
-    expect(last.organizationKeywordTags).toBeUndefined();
-    expect(last.qKeywords).toBeUndefined();
+    // Every variant keeps the industry, as tags or as the free-text keyword.
+    for (const variant of variants) {
+      const keeps = (variant.filters.organizationKeywordTags?.length ?? 0) > 0 || Boolean(variant.filters.qKeywords);
+      expect(keeps).toBe(true);
+    }
+  });
+
+  it("merges the parser's industry tag list for multi-industry briefs", () => {
+    const variants = buildApolloSearchVariants(
+      criteriaFor("AI-powered fitness technology", {
+        industryTags: ["fitness technology", "computer vision", "pose estimation", "digital health"],
+      })
+    );
+    expect(variants[0].filters.organizationKeywordTags).toEqual(
+      expect.arrayContaining(["ai-powered fitness technology", "computer vision", "pose estimation", "digital health"])
+    );
+    // No last-resort variant without an industry when industries were stated.
+    expect(variants.every((v) => (v.filters.organizationKeywordTags?.length ?? 0) > 0 || Boolean(v.filters.qKeywords))).toBe(true);
+  });
+
+  it("still offers the no-industry fallback when the brief named none", () => {
+    const variants = buildApolloSearchVariants(
+      criteriaFor("Any", {
+        apollo: { personTitles: ["Head of Sales"], personLocations: ["United States"], employeeRanges: ["51,200"], includeSimilarTitles: true },
+      })
+    );
+    expect(variants.some((v) => !v.filters.organizationKeywordTags && !v.filters.qKeywords)).toBe(true);
   });
 
   it("never relaxes a company size the user asked for", () => {

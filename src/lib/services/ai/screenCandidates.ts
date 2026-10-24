@@ -113,6 +113,7 @@ function describeRequest(meta: ScreenMeta): string {
     `Original request: "${meta.prompt}"`,
     c.jobTitles?.length ? `Wanted roles: ${c.jobTitles.join(", ")}` : null,
     c.industry && !/^(any|n\/a)$/i.test(c.industry) ? `Wanted industry: ${c.industry}` : "Industry: not specified (do not judge industry)",
+    c.industryTags?.length ? `Wanted industries, as keyword tags: ${c.industryTags.join(", ")}` : null,
     c.country ? `Wanted location: ${c.country}` : null,
     c.companySizeMin || c.companySizeMax
       ? `Wanted company size: ${c.companySizeMin || 1} to ${c.companySizeMax || "any"} employees`
@@ -130,6 +131,7 @@ Rules:
 - Judge the industry from the employer name and what you know about that company. A name that clearly signals a different industry (a car dealer, a bank, a hospital) scores low. A neutral name you cannot place scores around 55-65, never high.
 - "Companies in industry X" means businesses whose main product or service is X. Communities, societies, associations, conferences, events, media, recruiters, training providers, marketing agencies and banks that merely serve or mention X are NOT in industry X and score below 40, unless the request asks for them.
 - When the request names no industry, ignore industry entirely.
+- When the request lists specific industries, a company you cannot place in one of them from its name and your knowledge scores below 50. Generic words in a name ("AI", "Tech", "Labs", "Solutions") are not evidence of the wanted industry.
 - Be strict: credits are spent on everyone you pass. Reserve 80+ for clear fits.
 Return JSON only: {"verdicts":[{"id":"...","score":0-100,"reason":"<= 12 words"}]} with one entry per id.`;
 

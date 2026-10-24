@@ -193,18 +193,14 @@ describe("search-criteria helpers", () => {
     });
 
     // The industry travels as OR-ed company keyword tags (the free-text keyword
-    // on top of tags over-restricts), and stays on every variant but the last.
-    const withIndustry = variants.slice(0, -1);
-    expect(withIndustry.length).toBeGreaterThan(2);
-    for (const variant of withIndustry) {
+    // on top of tags over-restricts) and stays on every variant: when the user
+    // named an industry there is no "any company" fallback any more.
+    expect(variants.length).toBeGreaterThan(2);
+    for (const variant of variants) {
       const tagged = (variant.filters.organizationKeywordTags ?? []).includes("real estate");
       const keyworded = variant.filters.qKeywords === "real estate";
       expect(tagged || keyworded).toBe(true);
     }
-    // Last variant may drop the industry only as last resort
-    const last = variants[variants.length - 1].filters;
-    expect(last.qKeywords).toBeUndefined();
-    expect(last.organizationKeywordTags).toBeUndefined();
   });
 
   it("moves need-words out of long keyword blobs", () => {
